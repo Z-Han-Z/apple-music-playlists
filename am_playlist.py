@@ -177,6 +177,34 @@ def json_or_empty(body: str):
         return None
 
 
+def resolve_storefront(explicit: str | None, cfg: dict, dev: str,
+                       user: str | None = None) -> str:
+    """地区码解析顺序：显式参数 → 配置里记住的 → 问 /me/storefront → 兜底 us。
+
+    登录时会把账号的真实 storefront 存进配置，所以之后不用每次传 --storefront。
+    """
+    if explicit:
+        return explicit
+    if cfg.get("storefront"):
+        return cfg["storefront"]
+    if user:
+        try:
+            _, body = api("GET", "/me/storefront", dev=dev, user=user)
+            sf = json.loads(body)["data"][0]["id"]
+            cfg["storefront"] = sf
+            save_config(cfg)
+            return sf
+        except Exception:
+            pass
+    return "us"
+    if not body or not body.strip():
+        return None
+    try:
+        return json.loads(body)
+    except json.JSONDecodeError:
+        return None
+
+
 def api(method: str, path: str, *, dev: str, user: str | None = None,
         body: dict | None = None, root: str = API_ROOT,
         query: dict | None = None) -> tuple[int, str]:
@@ -625,6 +653,7 @@ def cmd_login(args) -> int:
         dev = get_developer_token(cfg)
         st, body = api("GET", "/me/storefront", dev=dev, user=token)
         sf = json.loads(body).get("data", [{}])[0].get("id", "?")
+        cfg["storefront"] = sf          # 记住账号所在地区，之后不用每次传 --storefront
         print(f"✓ token 校验通过，storefront = {sf}")
     except ApiError as e:
         print(f"✗ token 校验失败: HTTP {e.status} {e.body[:200]}")
@@ -747,11 +776,13 @@ def cmd_create(args) -> int:
     dev = get_developer_token(cfg, verbose=args.verbose)
 
     if args.dry_run:                       # 预演只需 catalog 权限，不需要登录
+        args.storefront = resolve_storefront(args.storefront, cfg, dev, get_user_token(cfg))
         ids = _gather_track_ids(args, dev)
         print(f"[dry-run] 将创建歌单「{args.name}」并写入 {len(ids)} 首曲目")
         return 0
 
     user = require_user(cfg)
+    args.storefront = resolve_storefront(args.storefront, cfg, dev, user)
     ids = _gather_track_ids(args, dev)
 
     payload: dict = {"attributes": {"name": args.name}}
@@ -835,11 +866,13 @@ def cmd_add(args) -> int:
     cfg = load_config()
     dev = get_developer_token(cfg)
     if args.dry_run:                       # 预演只需 catalog 权限，不需要登录
+        args.storefront = resolve_storefront(args.storefront, cfg, dev, get_user_token(cfg))
         ids = _gather_track_ids(args, dev)
         print(f"[dry-run] 将向「{args.playlist}」写入 {len(ids)} 首")
         return 0
 
     user = require_user(cfg)
+    args.storefront = resolve_storefront(args.storefront, cfg, dev, user)
     p = find_playlist(args.playlist, dev, user)
     if not p:
         print(f"找不到歌单: {args.playlist}")
@@ -931,7 +964,8 @@ def main() -> int:
         sp.add_argument("--tracks", help="逗号/换行分隔的 '歌名 - 艺人' 列表")
         sp.add_argument("--json", help="JSON 文件：[\"歌名 - 艺人\", ...] 或 [{name,artist},...]")
         sp.add_argument("--isrcs", action="store_true", help="按 ISRC 精确匹配（更快更准）")
-        sp.add_argument("--storefront", default="cn")
+        sp.add_argument("--storefront", default=None,
+                        help="地区码；不给则用配置里记住的，再兜底 us")
         sp.add_argument("--dry-run", action="store_true")
 
     p = sub.add_parser("create", help="创建歌单（可一次带上全部曲目）")

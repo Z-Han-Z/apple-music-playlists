@@ -41,7 +41,7 @@ TOOLS = [
             "type": "object",
             "properties": {
                 "term": {"type": "string", "description": "搜索词，例如 '晴天 周杰伦' 或 'Bohemian Rhapsody'"},
-                "storefront": {"type": "string", "description": "地区代码，中国用 cn，美国 us，默认 cn"},
+                "storefront": {"type": "string", "description": "地区代码（如 us / jp / cn）。不给则用配置里记住的账号地区，再兜底 us"},
                 "types": {"type": "string", "description": "songs / albums / artists，默认 songs"},
                 "limit": {"type": "integer", "description": "返回条数，默认 5"},
             },
@@ -79,7 +79,7 @@ TOOLS = [
                     "description": "曲目列表，每项形如 '歌名 - 艺人'；或用 --isrcs 时填 ISRC",
                 },
                 "isrcs": {"type": "boolean", "description": "tracks 是否按 ISRC 精确匹配（更快、更准）"},
-                "storefront": {"type": "string", "description": "地区代码，默认 cn"},
+                "storefront": {"type": "string", "description": "地区代码。不给则用配置里记住的账号地区，再兜底 us"},
                 "dry_run": {"type": "boolean", "description": "只解析曲目不写入，用于预览匹配结果"},
             },
             "required": ["name", "tracks"],
@@ -95,7 +95,7 @@ TOOLS = [
                 "playlist": {"type": "string", "description": "歌单名或 p.xxxx ID"},
                 "tracks": {"type": "array", "items": {"type": "string"}, "description": "'歌名 - 艺人' 列表"},
                 "isrcs": {"type": "boolean"},
-                "storefront": {"type": "string", "description": "地区代码，默认 cn"},
+                "storefront": {"type": "string", "description": "地区代码。不给则用配置里记住的账号地区，再兜底 us"},
                 "dry_run": {"type": "boolean"},
             },
             "required": ["playlist", "tracks"],
@@ -179,7 +179,7 @@ def t_status(_args: dict) -> str:
 def t_search(args: dict) -> str:
     cfg = am.load_config()
     dev = am.get_developer_token(cfg)
-    st, body = am.api("GET", f"/catalog/{args.get('storefront','cn')}/search", dev=dev,
+    st, body = am.api("GET", f"/catalog/{am.resolve_storefront(args.get('storefront'), cfg, dev, am.get_user_token(cfg))}/search", dev=dev,
                       query={"term": args["term"], "types": args.get("types", "songs"),
                              "limit": int(args.get("limit", 5))})
     lines = []
@@ -227,7 +227,7 @@ def _resolve(tracks: list[str], storefront: str, isrcs: bool) -> tuple[list[str]
 def t_create(args: dict) -> str:
     cfg = am.load_config()
     dev = am.get_developer_token(cfg)
-    storefront = args.get("storefront", "cn")
+    storefront = am.resolve_storefront(args.get("storefront"), cfg, dev, am.get_user_token(cfg))
     tracks = [str(x) for x in args["tracks"]]
     isrcs = bool(args.get("isrcs"))
 
@@ -262,7 +262,7 @@ def t_create(args: dict) -> str:
 def t_add(args: dict) -> str:
     cfg = am.load_config()
     dev = am.get_developer_token(cfg)
-    storefront = args.get("storefront", "cn")
+    storefront = am.resolve_storefront(args.get("storefront"), cfg, dev, am.get_user_token(cfg))
     user = am.require_user(cfg)
     p = am.find_playlist(args["playlist"], dev, user)
     if not p:
