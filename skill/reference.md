@@ -72,6 +72,40 @@ GET /v1/catalog/{sf}/artists/{id}/view/similar-artists    # 404 No related ...�
 
 ---
 
+### 收听历史（两个**不同**的地方，别找错）
+
+**最近播放**（**不含**播放次数）：
+```
+GET /v1/me/recent/played            → 最近播放的歌单/专辑等（默认 10）
+GET /v1/me/recent/played/tracks     → 最近播放的曲目（默认 30，带 catalog id）
+GET /v1/me/recent/radio-stations    → 最近听的电台
+GET /v1/me/library/recently-added   → 最近加入音乐库
+```
+
+**播放次数**（Apple Music Replay / 音乐回忆 的后端，**官方文档未收录**，
+是从网页播放器 `/includes/music-replay/build/replay.esm.js` 里挖出来的）：
+```
+GET /v1/me/music-summaries/search?period=year,all-time   → 有哪些期间可查
+GET /v1/me/music-summaries/year-2026/view/top-songs     → song-period-summaries
+GET /v1/me/music-summaries/year-2026/view/top-albums    → album-period-summaries
+GET /v1/me/music-summaries/year-2026/view/top-artists   → artist-period-summaries
+```
+每条：
+```json
+{"id":"eWVhci0yMDI2LXNvbmctMTY1NzMxODg4NA","type":"song-period-summaries",
+ "attributes":{"playCount":57,"firstPlayed":"2026-01-13T19:54:12Z",
+               "lastPlayed":"2026-09-02T07:54:46Z","year":"2026"},
+ "relationships":{"song":{"data":[{"id":"1657318884","type":"songs","href":"/v1/catalog/cn/songs/1657318884"}]}}}
+```
+要点：`id` 是 base64（解开是 `year-2026-song-1657318884`）；`relationships.*.data` 是**数组**且
+**只有 id**，要名字得再查 `/v1/catalog/{sf}/songs?ids=`；分页用 `offset`（`limit` 传 200 会 400）；
+**只在 `amp-api.music.apple.com` 上稳定**；`all-time` 不一定存在。
+
+另有一个 `playlist` 关系指向 Replay 歌单（`pl.rp-…`，`playlistType: "replay"`），
+但它的曲目响应里**没有** `playCount`。
+
+---
+
 ## 3. song 的属性字段（实测完整清单）
 
 ```

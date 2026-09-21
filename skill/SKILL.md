@@ -24,7 +24,7 @@ description: Use when creating, curating, auditing, or reordering Apple Music pl
 | "帮我排一下顺序" | `playlist_optimize.py`（见 §三） |
 | 排查 API 报错 | 先看 §四 |
 
-**MCP 工具（9 个）**
+**MCP 工具（11 个）**
 
 ```
 am_status            先查这个：token 是否有效、是否已登录
@@ -36,6 +36,8 @@ am_add_tracks        向已有歌单追加
 am_delete_playlist   删除（必须 confirm=true）
 am_audit_playlist    元数据层体检
 am_analyze_flow      听感体检（BPM/调性/响度/能量/情绪 + 相邻衔接 + 弧线形状）
+am_recently_played   最近播放（曲目 / 歌单 / 电台 / 最近入库）
+am_top_played        播放次数排行（songs / albums / artists × 年份或 all-time）
 ```
 
 **动手前先 `am_status`。** 未登录时不要反复重试——直接让用户跑一次 `python am_playlist.py login`。
@@ -179,6 +181,52 @@ tempo    → 倒 U 型（两端慢、中段快）
 | **BPM 有倍频歧义** | 同一首可能被估成 90 或 180。**比较前把 BPM 折进 [70,160)**，否则"两首慢歌相邻"会误报约 4 倍 |
 | **时长能筛掉间奏** | `durationInMillis < 120000` 的基本是间奏/前奏曲，不是歌 |
 | **艺人搜不到 ≠ 歌不在本区** | 某日本企划在 cn 的**艺人检索为空**，但用 ISRC 反查 **cn 曲库命中 9 首**。判断某歌在不在某区要按 ISRC 查 |
+
+### 4.4 收听历史（最近播放 / 播放次数）
+
+**这两样在完全不同的接口里，别找错地方。**
+
+| 想要 | 端点 | 有播放次数吗 |
+|---|---|---|
+| 最近播放的**曲目** | `/v1/me/recent/played/tracks`（默认 30 条） | ❌ |
+| 最近播放的**歌单/专辑** | `/v1/me/recent/played` | ❌ |
+| 最近听的电台 | `/v1/me/recent/radio-stations` | ❌ |
+| 最近加入音乐库 | `/v1/me/library/recently-added` | ❌ |
+| **播放次数** | `/v1/me/music-summaries/...` ← **只在这里** | ✅ |
+
+**播放次数（Apple Music Replay / 音乐回忆 后端）**——官方文档里**没有**，是从网页播放器的
+Replay 组件 bundle（`/includes/music-replay/build/replay.esm.js`）里挖出来的：
+
+```
+GET /v1/me/music-summaries/search?period=year,all-time     → 有哪些期间可查
+GET /v1/me/music-summaries/year-2026/view/top-songs        → song-period-summaries
+GET /v1/me/music-summaries/year-2026/view/top-albums       → album-period-summaries
+GET /v1/me/music-summaries/year-2026/view/top-artists      → artist-period-summaries
+```
+
+每条返回：
+
+```json
+{"id":"eWVhci0yMDI2LXNvbmctMTY1NzMxODg4NA","type":"song-period-summaries",
+ "attributes":{"playCount":57,"firstPlayed":"2026-01-13T19:54:12Z",
+               "lastPlayed":"2026-09-02T07:54:46Z","year":"2026"},
+ "relationships":{"song":{"data":[{"id":"1657318884","type":"songs"}]}}}
+```
+
+- `id` 是 **base64**，解开就是可读的 `year-2026-song-1657318884`
+- `relationships.song.data` 是**数组**，且只给 id —— 要曲名得再去 `/v1/catalog/{sf}/songs?ids=` 查
+- 分页用 `offset`（`limit` 有上限，传 200 会 400）
+- **只在 `amp-api.music.apple.com` 上稳定**；官方主机对部分期间返回 404
+- **`all-time` 不一定存在**（实测某账号 404）——先跑 `search?period=year,all-time` 看有哪些
+- Apple 返回的顺序与 `playCount` **并非严格一致**，展示前自己按次数重排
+
+命令行封装在 `listening_stats.py`：
+
+```bash
+python listening_stats.py periods                                  # 有哪些期间
+python listening_stats.py top --kind songs --year 2026 --limit 30  # 播放次数排行
+python listening_stats.py recent --kind tracks --limit 30          # 最近播放
+```
 
 ---
 

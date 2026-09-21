@@ -23,6 +23,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import am_playlist as am  # noqa: E402
 import playlist_audit as audit_mod  # noqa: E402
 import playlist_flow as flow_mod  # noqa: E402
+import listening_stats as listening  # noqa: E402
 
 PROTOCOL_VERSION = "2024-11-05"
 SERVER_INFO = {"name": "apple-music-playlists", "version": "1.0.0"}
@@ -141,6 +142,38 @@ TOOLS = [
                 "refresh": {"type": "boolean", "description": "忽略特征缓存重新抓取，默认 false"},
             },
             "required": ["playlist"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "am_recently_played",
+        "description": "查最近播放。kind=tracks 是最近播放的曲目；played 是最近播放的歌单/专辑；"
+                       "stations 是最近听的电台；added 是最近加入音乐库的内容。"
+                       "注意：Apple 的这个接口**不返回播放次数**。",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "kind": {"type": "string", "enum": ["tracks", "played", "stations", "added"],
+                         "description": "默认 tracks"},
+                "limit": {"type": "integer", "description": "条数，默认 30"},
+            },
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "am_top_played",
+        "description": "查**播放次数**排行（数据来自 Apple Music Replay / 音乐回忆的后端）。"
+                       "可以查 songs / albums / artists，按年份或 all-time。"
+                       "返回每项的播放次数、首次播放日期、最近播放日期。"
+                       "注意：只有 amp-api 主机可用；all-time 期间不一定存在，失败时先试具体年份。",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "kind": {"type": "string", "enum": ["songs", "albums", "artists"],
+                         "description": "默认 songs"},
+                "year": {"type": "integer", "description": "如 2026；不给则用 all-time"},
+                "limit": {"type": "integer", "description": "条数，默认 30"},
+            },
             "additionalProperties": False,
         },
     },
@@ -307,6 +340,17 @@ def t_flow(args: dict) -> str:
     return flow_mod.flow_report(args["playlist"], bool(args.get("refresh")))
 
 
+def t_recent(args: dict) -> str:
+    return listening.recent_report(args.get("kind", "tracks"), int(args.get("limit", 30)))
+
+
+def t_top(args: dict) -> str:
+    year = args.get("year")
+    return listening.top_report(args.get("kind", "songs"),
+                                int(year) if year else None,
+                                int(args.get("limit", 30)))
+
+
 HANDLERS = {
     "am_status": t_status,
     "am_search_songs": t_search,
@@ -317,6 +361,8 @@ HANDLERS = {
     "am_delete_playlist": t_delete,
     "am_audit_playlist": t_audit,
     "am_analyze_flow": t_flow,
+    "am_recently_played": t_recent,
+    "am_top_played": t_top,
 }
 
 

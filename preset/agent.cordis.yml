@@ -42,7 +42,9 @@
       - `mcp__applemusic__am_create_playlist` —— 主入口：给一个歌单名 + `"歌名 - 艺人"` 数组，
         服务端自动匹配并写入。曲目有歧义（同名不同版本）时先 `dry_run: true` 预览匹配结果。
       - `mcp__applemusic__am_add_tracks` / `am_list_playlists` / `am_show_playlist` —— 追加、列出、查看。
-      - 地区默认 `cn`；用户要欧美曲库时传 `storefront: "us"`。
+      - `mcp__applemusic__am_recently_played` / `am_top_played` —— 查最近播放、查播放次数排行
+        （播放次数来自 Apple Music Replay 后端，只在 amp-api 上可用）。
+      - 地区默认用配置里记住的账号地区（登录时自动写入），要欧美曲库时传 `storefront: "us"`。
 
       规则：**写操作前先 am_status**；**批量建单前先 dry_run 预览**；只有本工具创建的歌单才能被本工具写入
       （Apple 的限制），遇到 403 就这么向用户解释，而不是反复重试。用户说"帮我建个歌单"时，
@@ -76,7 +78,7 @@
 # ── Apple Music 歌单自动化（MCP）─────────────────────────────────────────────
 
 # One mcp-client instance = one MCP server. It spawns our stdlib-only Python
-# server over stdio and registers its nine tools as `mcp__applemusic__*`.
+# server over stdio and registers its eleven tools as `mcp__applemusic__*`.
 # `failOnStartupError: false` keeps this preset loadable even if the server
 # cannot start (a bad Python path must not brick the whole agent); the failure
 # then shows up as a tool error instead of a mount failure.

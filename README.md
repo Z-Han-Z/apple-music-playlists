@@ -37,10 +37,11 @@ including a zero-dependency one).
 | File | Purpose |
 |---|---|
 | `am_playlist.py` | Core: token management, catalog search, create / edit / delete playlists, track resolution |
-| `am_mcp_server.py` | MCP (stdio) server exposing **9 tools** to any MCP client |
+| `am_mcp_server.py` | MCP (stdio) server exposing **11 tools** to any MCP client |
 | `playlist_audit.py` | **Metadata audit**: length, artist concentration, genres, eras, durations, duplicates, interludes |
 | `playlist_flow.py` | **Audio-feature audit**: BPM / key / loudness / energy / valence, adjacency checks, arc shape |
 | `playlist_optimize.py` | Simulated-annealing **track ordering** against the measured rules |
+| `listening_stats.py` | **Listening history**: recently played, and per-track/album/artist **play counts** (Apple Music Replay backend) |
 
 All three analysis modules are importable as libraries:
 
@@ -56,7 +57,7 @@ ids, report = playlist_optimize.optimize("stack.json")   # -> (list[str], str)
 
 `am_status` · `am_search_songs` · `am_list_playlists` · `am_show_playlist` ·
 `am_create_playlist` · `am_add_tracks` · `am_delete_playlist` ·
-`am_audit_playlist` · `am_analyze_flow`
+`am_audit_playlist` · `am_analyze_flow` · `am_recently_played` · `am_top_played`
 
 Mount it in a Cordis agent preset with the template in [`preset/`](preset/), or wire it into
 any other MCP client with:
@@ -166,6 +167,7 @@ python am_playlist.py create --name "歌单名" --tracks "歌名 - 艺人, ..."
 python playlist_audit.py  "歌单名"            # 元数据层体检
 python playlist_flow.py   "歌单名"            # 听感层体检（BPM/调性/响度/能量/情绪）
 python playlist_optimize.py 清单.json -o 曲序.json   # 按规则重排曲序
+python listening_stats.py top --kind songs --year 2026   # 播放次数排行
 ```
 
 **凭证配置见 [`SETUP.md`](SETUP.md)**；策展方法论见 [`docs/`](docs/)。
