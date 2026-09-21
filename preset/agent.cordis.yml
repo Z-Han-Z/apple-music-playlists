@@ -1,0 +1,168 @@
+# The `music` agent preset: the light `chat` composition plus one mounted MCP
+# server that owns Apple Music playlist automation.
+#
+# Why an MCP server instead of "just let the agent call the script": the script
+# is a CLI, so every call would be a shell-quoting problem and every result a
+# parsing problem. The MCP bridge exposes six typed tools instead, and its
+# tool names are namespaced `mcp__applemusic__<name>` by the mcp-client plugin.
+#
+# This file is an AGENT-PLANE composition, mounted ONCE under a standing scope;
+# sessions join by scope parentage. A service row here MUST sit inside a group
+# carrying an `isolate` realm, or it publishes into the root realm and the
+# roster rejects the mount. The only service-owning row left here is the
+# compaction group. The mcp-client row below publishes NO service — it consumes
+# the host `tools` registry and registers tools into this preset's scoped layer,
+# so it stays outside any realm (wrapping it in one would hide that registry).
+
+# ── identity ────────────────────────────────────────────────────────────────
+
+- id: persona
+  name: '@deepseek-ai/dsh-persona'
+  config:
+    prefix: |
+      You are a chat assistant powered by the {{model}} model. Your working directory is {{cwd}}.
+
+      This session is casual talk plus music-library chores: questions arrive loosely related to each other, and neither the memory nor the context needs to be complete. Cheap and quick beats thorough here.
+
+      - Answer the current question on its own terms. Do not infer a continuing thread, project, or task from earlier turns unless the user or the question itself says so.
+      - Retain only durable, reusable facts. Drop small talk, one-off details, and anything a later turn supersedes; do not build memory files or summaries unasked.
+      - Keep the working context shallow: do not reread or re-derive earlier turns, do not gather more than the question needs, and do not re-verify casual claims at length.
+      - Ambiguous, or possibly referring backwards: ask briefly or state the assumption in one clause; never silently guess continuity.
+      - Short answers by default; longer only when the question itself is substantial.
+
+      ## Apple Music 歌单自动化
+
+      你可以直接操作用户的 Apple Music 账号，工具由 `mcp__applemusic__*` 提供：
+
+      - `mcp__applemusic__am_status` —— 先查这个：确认 developer token 有效、且已保存 music-user-token。
+        若返回"未登录"，不要反复重试：直接告诉用户，在终端跑一次
+        `python "<PROJECT_ROOT>\am_playlist.py" login`
+        （会打开浏览器登录 Apple ID，只需一次），之后建歌单就是全自动的。
+      - `mcp__applemusic__am_search_songs` —— 在 catalog 里搜曲目，先搜再建，避免猜错版本。
+      - `mcp__applemusic__am_create_playlist` —— 主入口：给一个歌单名 + `"歌名 - 艺人"` 数组，
+        服务端自动匹配并写入。曲目有歧义（同名不同版本）时先 `dry_run: true` 预览匹配结果。
+      - `mcp__applemusic__am_add_tracks` / `am_list_playlists` / `am_show_playlist` —— 追加、列出、查看。
+      - 地区默认 `cn`；用户要欧美曲库时传 `storefront: "us"`。
+
+      规则：**写操作前先 am_status**；**批量建单前先 dry_run 预览**；只有本工具创建的歌单才能被本工具写入
+      （Apple 的限制），遇到 403 就这么向用户解释，而不是反复重试。用户说"帮我建个歌单"时，
+      自己把歌名补全成"歌名 - 艺人"，不要反问一堆细节。
+
+      **动手前先加载 `apple-music-playlists` 技能**（用 skill 工具）。它记录了这套工具的完整用法、
+      排序规则（四条相邻硬规则 + Man in a hole 弧线）、以及一批实测踩过的坑
+      （gzip 响应、DELETE 必须走 amp-api、BPM 倍频歧义、搜索词不能带 " - " 等）。
+      同目录还有 `reference.md` 是 API 契约速查。
+
+- id: agent-instructions
+  name: '@deepseek-ai/dsh-agent-instructions'
+  config:
+    maxBytes: 32768
+
+# ── skills ──────────────────────────────────────────────────────────────────
+
+# The skill REGISTRY lives in the host composition; these two rows layer the
+# local-root discovery and the loader onto THIS preset's agents. Both are
+# consumers (skill-filesystem injects 'skills' and registers a provider into it),
+# so they stay outside any realm — wrapping them would hide the host registry.
+#
+# This pair is what makes the user-level skill at ~/.dsh/skills/apple-music-playlists
+# reachable from this preset. Without it the catalog would list nothing here.
+- id: skill-filesystem
+  name: '@deepseek-ai/dsh-skill-filesystem'
+
+- id: tool-skill
+  name: '@deepseek-ai/dsh-tool-skill'
+
+# ── Apple Music 歌单自动化（MCP）─────────────────────────────────────────────
+
+# One mcp-client instance = one MCP server. It spawns our stdlib-only Python
+# server over stdio and registers its nine tools as `mcp__applemusic__*`.
+# `failOnStartupError: false` keeps this preset loadable even if the server
+# cannot start (a bad Python path must not brick the whole agent); the failure
+# then shows up as a tool error instead of a mount failure.
+- id: mcp-apple-music
+  name: '@deepseek-ai/dsh-mcp-client'
+  config:
+    transport: stdio
+    serverName: applemusic
+    command: '<PYTHON>'
+    args:
+      - '<PROJECT_ROOT>\am_mcp_server.py'
+    env:
+      PYTHONIOENCODING: utf-8
+    cwd: '<PROJECT_ROOT>'
+    toolCallTimeoutMs: 120000
+    failOnStartupError: false
+
+# ── shell ───────────────────────────────────────────────────────────────────
+
+# Both shell tools consume the host registry from here; their executors
+# (`bash-sandbox`/`pwsh-sandbox`) are host-plane. `tool-jobs` is deliberately
+# absent, so `run_in_background` is simply unavailable to this agent.
+- id: tool-bash
+  name: '@deepseek-ai/dsh-tool-bash'
+  disabled: !!js process.platform === 'win32'
+
+- id: tool-pwsh
+  name: '@deepseek-ai/dsh-tool-pwsh'
+  disabled: !!js process.platform !== 'win32'
+
+# ── filesystem ──────────────────────────────────────────────────────────────
+
+- id: tool-fs
+  name: '@deepseek-ai/dsh-tool-fs'
+
+- id: tool-fs-search
+  name: '@deepseek-ai/dsh-tool-fs-search'
+  config:
+    sampleOverCapGlobResults: false
+
+# ── web ─────────────────────────────────────────────────────────────────────
+
+- id: tool-web
+  name: '@deepseek-ai/dsh-tool-web'
+  config:
+    fetch: false
+    searchTimeoutMs: 60000
+
+# ── asking the user ─────────────────────────────────────────────────────────
+
+- id: tool-ask-user
+  name: '@deepseek-ai/dsh-tool-ask-user'
+
+# ── goals ───────────────────────────────────────────────────────────────────
+
+# A multi-step music chore ("按我的口味凑一张 30 首的歌单") benefits from a goal,
+# so both rows stay here.
+- id: command-goal
+  name: '@deepseek-ai/dsh-command-goal'
+
+- id: tool-goal
+  name: '@deepseek-ai/dsh-tool-goal'
+
+# ── deliverables ────────────────────────────────────────────────────────────
+
+- id: present
+  name: '@deepseek-ai/dsh-tool-present'
+
+# ── compaction ──────────────────────────────────────────────────────────────
+
+- id: compaction
+  name: cordis:group
+  group: true
+  isolate:
+    compaction: true
+    toolResultPruner: true
+  config:
+    - id: compaction-basic
+      name: '@deepseek-ai/dsh-compaction-basic'
+
+    - id: command-compact
+      name: '@deepseek-ai/dsh-command-compact'
+
+    - id: tool-result-pruner
+      name: '@deepseek-ai/dsh-compaction-tool-result-pruner'
+      config:
+        thresholdChars: 4096
+        headChars: 2048
+        tailChars: 768

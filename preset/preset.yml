@@ -1,0 +1,2 @@
+name: 音乐歌单
+description: 挂载 Apple Music MCP 服务：让 Agent 直接搜索曲目、创建/编辑歌单、体检与重排曲序。需先在终端做一次性登录（python am_playlist.py login），之后全自动。
