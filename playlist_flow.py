@@ -152,6 +152,35 @@ def norm(vals: list[float]) -> list[float]:
     return [(v - lo) / (hi - lo) for v in vals]
 
 
+# 六种叙事弧的理想曲线（5 点，0=最低 1=最高），来源见 docs/how-to-build-a-good-playlist.md
+ARCHETYPES = {
+    "Rags to riches（持续上升）": [0.0, 0.25, 0.5, 0.75, 1.0],
+    "Tragedy（持续下降）": [1.0, 0.75, 0.5, 0.25, 0.0],
+    "Man in a hole（落-起）": [0.70, 0.20, 0.0, 0.35, 1.0],
+    "Icarus（起-落）": [0.0, 0.60, 1.0, 0.50, 0.0],
+    "Cinderella（起-落-起）": [0.0, 0.70, 1.0, 0.30, 1.0],
+    "Oedipus（落-起-落）": [1.0, 0.30, 0.80, 0.20, 0.0],
+}
+
+
+def classify_shape(vals: list[float]) -> tuple[str, list[float], dict[str, float]]:
+    """把整条曲线的 5 段均值与六种叙事弧比 MSE，返回 (最佳形状, 段均值, 各形状得分)。
+
+    ⚠️ 这是启发式：段数少、曲线平缓、或曲子是"多段复合弧"时会误判。
+    所以调用方应该把段均值一起打出来，让人自己判断。
+    """
+    k = 5
+    step = max(1, len(vals) // k)
+    segs = [statistics.mean(vals[i * step:(i + 1) * step]) for i in range(k)]
+    z = norm(segs)
+    scores = {
+        name: sum((a - b) ** 2 for a, b in zip(z, ideal)) / k
+        for name, ideal in ARCHETYPES.items()
+    }
+    best = min(scores, key=scores.get)
+    return best, segs, scores
+
+
 def analyze(rows: list[dict]) -> None:
     n = len(rows)
     print(f"\n{'='*100}\n好听度体检（{n} 首有特征的曲目）\n{'='*100}")
@@ -237,17 +266,15 @@ def analyze(rows: list[dict]) -> None:
          lambda x: f"#{x[0]}→#{x[0]+1}  {x[1][:20]} E {x[3]:.2f}→{x[4]:.2f} ({x[5]}→{x[6]})")
 
     # ---------- 4. 形状 ----------
+    # 原来只切 3 段，把"六幕的 Cinderella（起-落-起）"误判成 Icarus。
+    # 改成切 5 段，再和六种叙事弧的理想曲线比 MSE，并同时打印段均值供人工判断。
     print(f"\n【4】弧线形状（§4：六种叙事弧）")
-    v0, vmid, v1 = statistics.mean(valence[:max(1, n//3)]), \
-                   statistics.mean(valence[n//3:2*n//3] or [0]), \
-                   statistics.mean(valence[2*n//3:])
-    shape = "Man in a hole（落-起）" if vmid < v0 and v1 > vmid else \
-            "Icarus（起-落）" if vmid > v0 and v1 < vmid else \
-            "Rags to riches（持续上升）" if v1 > v0 > vmid else \
-            "Tragedy（持续下降）" if v1 < vmid < v0 else "混合/无明确形状"
-    print(f"     valence 三段均值：首 {v0:.3f} → 中 {vmid:.3f} → 末 {v1:.3f}")
+    shape, segs, scores = classify_shape(valence)
+    print(f"     valence 五段均值：" + " → ".join(f"{s:.3f}" for s in segs))
     print(f"     识别出的形状：**{shape}**")
-    print(f"     （PLOS 发现专业人排专辑偏向 Man in a hole）")
+    top = sorted(scores.items(), key=lambda x: x[1])[:3]
+    print("     最接近的三种：" + "，".join(f"{k}({v:.3f})" for k, v in top))
+    print(f"     ⚠️ 这是**启发式**判断：段数少或曲线平缓时会误判，请对照上面的段均值自行判断。")
 
     # ---------- 5. 调性分布 ----------
     print(f"\n【5】调性分布（Camelot）")

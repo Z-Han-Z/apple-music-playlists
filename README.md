@@ -42,6 +42,7 @@ including a zero-dependency one).
 | `playlist_flow.py` | **Audio-feature audit**: BPM / key / loudness / energy / valence, adjacency checks, arc shape |
 | `playlist_optimize.py` | Simulated-annealing **track ordering** against the measured rules |
 | `listening_stats.py` | **Listening history**: recently played, and per-track/album/artist **play counts** (Apple Music Replay backend) |
+| `profile_library.py` | **Taste profile**: what your most-played music actually sounds like (BPM / energy / valence spread, mood quadrants) |
 
 All three analysis modules are importable as libraries:
 
