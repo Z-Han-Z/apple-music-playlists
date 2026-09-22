@@ -86,7 +86,7 @@ any other MCP client with:
 python -m unittest discover -s tests -v
 ```
 
-104 tests, all **offline** — no network, no credentials. Two kinds:
+The suite is entirely **offline** — no network, no credentials. Two kinds:
 
 - **Behaviour**: the pure math that decides what "sounds good" — Camelot mapping, BPM folding,
   arc classification, each adjacency penalty asserted in isolation, annealing determinism and the
@@ -254,7 +254,7 @@ python playlist_flow.py   "歌单名"            # 听感层体检（BPM/调性/
 python playlist_optimize.py 清单.json -o 曲序.json   # 按规则重排曲序
 python playlist_optimize.py 清单.json --arc cinderella  # 指定叙事弧（默认 man-in-a-hole）
 python listening_stats.py top --kind songs --year 2026   # 播放次数排行
-python -m unittest discover -s tests         # 104 项测试，全部离线
+python -m unittest discover -s tests         # 测试（全部离线）
 ```
 
 **凭证配置见 [`SETUP.md`](SETUP.md)**；策展方法论见 [`docs/`](docs/)。

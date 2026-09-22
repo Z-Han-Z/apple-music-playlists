@@ -66,7 +66,7 @@ python playlist_audit.py     "歌单名"              # 元数据层体检
 python playlist_flow.py      "歌单名" [--refresh]  # 听感层体检（联网抓特征）
 python playlist_optimize.py  清单.json [-o 输出.json] [--features 缓存.json] [--arc 形状]
 python playlist_optimize.py  --list-shapes   # 六个可选形状
-python -m unittest discover -s tests         # 104 项测试，全部离线
+python -m unittest discover -s tests         # 测试（全部离线）
 ```
 
 **`--storefront` 不要写死。** 不给参数就用配置里记住的账号地区。`search` 曾经的默认值是
@@ -315,7 +315,7 @@ token 在里面，改了所有人得重新登录（有测试盯着这条）。
 重拉。直接沿用会让特征链静默失效——"有特征"的比例变成 0%，而且不报错。
 
 ```bash
-python -m unittest discover -s tests -v   # 104 项，全部离线，不需要 token
+python -m unittest discover -s tests -v   # 测试：全部离线，不需要 token
 ```
 
 测试分两类：**行为**（Camelot、BPM 折叠、弧线分类、每条相邻惩罚单独断言、退火确定性与分组

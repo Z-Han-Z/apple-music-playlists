@@ -290,6 +290,71 @@ class TestUtf8Output(unittest.TestCase):
                          f"reconfigure 的实现在别的文件里也出现了：{hits}")
 
 
+class TestDocsDoNotLie(unittest.TestCase):
+    """文档里的数字会腐烂。能守住的就守，不值得守的干脆别写。
+
+    这一轮实测抓到两处，都不是假想问题：
+
+      · README 和 SKILL 写着"104 项测试"，实际早已是 139——因为我在**同一个
+        session 里加了三次测试，三次都没回头改文档**。
+      · 更糟的一处：docs/platform-adapters.md 先写"这 12% 现在是被静默丢掉的"，
+        十行之后又写"这一条已经落地了"——自相矛盾。原因是我在同一次编辑里补了
+        修复，却没有回头调和上面那段。
+
+    第一版的修法是"把数字改对，并加一条断言钉住它"。断言立刻失败了——
+    因为它自己也是三个测试，实际数量又变了。这恰好说明：**写进文档的测试数量
+    本身就是个负资产**，它一变就要改两处，而它对读者几乎没有价值。
+    所以现在的处理是：测试数量从文档里删掉，工具数量保留并用断言守住
+    （它很少变，而且确实告诉读者该期待什么）。
+    """
+
+    # 这些不是仓库文件，而是使用者侧的产物或示例输入名
+    EXTERNAL = {"config.json", "tracks.json", "stack.json", "blocks.json",
+                "features.json", "pool.json", "order.json"}
+
+    def _claim(self, rel: str, pattern: str) -> int:
+        src = (ROOT / rel).read_text(encoding="utf-8")
+        m = re.search(pattern, src)
+        self.assertIsNotNone(m, f"{rel} 里找不到该声明（pattern={pattern}）")
+        return int(m.group(1))
+
+    def test_documented_tool_counts_match_reality(self):
+        import am_mcp_server as srv
+        actual = len(srv.TOOLS)
+        claims = [("README.md", r"\*\*(\d+) tools\*\*"),
+                  ("skill/SKILL.md", r"MCP 工具（(\d+) 个）")]
+        for rel, pat in claims:
+            self.assertEqual(self._claim(rel, pat), actual,
+                             f"{rel} 写的 MCP 工具数与实际（{actual}）不符")
+
+    def test_docs_do_not_hardcode_a_test_count(self):
+        """测试数量不该出现在文档里——它会腐烂，而且没人靠它做决定。"""
+        for rel in ("README.md", "skill/SKILL.md"):
+            src = (ROOT / rel).read_text(encoding="utf-8")
+            self.assertIsNone(
+                re.search(r"\d+\s*(?:tests\b|项测试)", src),
+                f"{rel} 又把测试数量写进去了；它一定会过期")
+
+    def test_claimed_paths_exist(self):
+        """文档里用反引号括起来的仓库内路径必须真的存在。
+
+        解析顺序：**先按该文件所在目录**，再按仓库根目录。
+        `skill/SKILL.md` 里写 `reference.md` 指的是同目录的兄弟文件
+        （skill 部署出去时这两个文件是平铺在一起的），
+        但 skill 正文里也会引用仓库根部的 `docs/...`、`SETUP.md`。
+        两种都要能解析。
+        """
+        for rel in ("README.md", "skill/SKILL.md", "docs/platform-adapters.md"):
+            here = (ROOT / rel).parent
+            src = (ROOT / rel).read_text(encoding="utf-8")
+            for m in re.finditer(r"`([A-Za-z0-9_./-]+\.(?:py|md|json|yml))`", src):
+                ref = m.group(1)
+                if ref.startswith(("http", "/abs")) or Path(ref).name in self.EXTERNAL:
+                    continue
+                self.assertTrue((here / ref).exists() or (ROOT / ref).exists(),
+                                f"{rel} 提到了不存在的文件：{ref}")
+
+
 class TestMcpServerConsistency(unittest.TestCase):
     """声明了工具却没接上 handler（或反过来）是这类服务器的经典 bug。"""
 
