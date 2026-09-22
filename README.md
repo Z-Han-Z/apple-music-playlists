@@ -231,6 +231,7 @@ More in [`docs/apple-music-api-notes.md`](docs/apple-music-api-notes.md) and
 | [`docs/playlist-curation-survey.md`](docs/playlist-curation-survey.md) | Survey of published curation guidance (platform rules, DJ methods, academic findings) |
 | [`docs/platform-adapters.md`](docs/platform-adapters.md) | The platform-adapter boundary: what is platform-neutral, what an adapter must provide, and what breaks on a service that exposes no ISRC |
 | [`skill/`](skill/) | Agent skill: workflow + the accumulated gotcha list |
+| [`CHANGELOG.md`](CHANGELOG.md) | Release history, including behaviour changes between versions |
 | [`preset/`](preset/) | Cordis agent preset template that mounts the MCP server |
 
 ---
