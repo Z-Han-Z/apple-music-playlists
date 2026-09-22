@@ -577,8 +577,7 @@ VERSION_NOISE = VERSION_NOISE_WORDS + VERSION_NOISE_CJK
 def version_noise_hits(title: str) -> list[str]:
     """曲名里命中了哪些"版本后缀"，返回小写词表。
 
-    匹配机制来自 `playlist_core.marker_hits`（拉丁词整词、CJK 子串）——和器乐标记
-    共用同一套机制，但**词表是分开的**：`Live` 是版本后缀，不是器乐标记。
+    匹配机制来自 `playlist_core.marker_hits`：拉丁词按整词匹配，CJK 按子串匹配。
     """
     return marker_hits(title, VERSION_NOISE_WORDS, VERSION_NOISE_CJK)
 

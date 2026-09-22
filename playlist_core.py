@@ -351,13 +351,9 @@ def coverage_report(counts: dict[str, int], total: int,
     return "\n".join(lines)
 
 
-# ---------------------------------------------------------------- 标记词 / 人声判定
-#
-# 机制与词表刻意分开：
-#   · 机制（`marker_hits`）是共用的——拉丁词整词匹配、CJK 子串匹配。
-#     子串匹配会误伤一大片：`Alive` / `Olive` / `Deliver` 全含 `live`。
-#   · 词表**不共用**：`Live` 是版本后缀，但它不是器乐标记。
-# 两份词表、一个机制，这是有意的选择，不是漏了去重。
+# ---------------------------------------------------------------- 通用标记词匹配
+# 拉丁词必须按整词匹配，CJK 才能按子串匹配；否则 Alive / Olive / Deliver
+# 都会因为包含 "live" 而被误判为现场版。具体词表由调用方维护。
 
 def marker_hits(text: str, latin: tuple, cjk: tuple) -> list[str]:
     """在文本里找标记词。拉丁词按**整词**匹配，CJK 按子串匹配。"""
@@ -368,91 +364,3 @@ def marker_hits(text: str, latin: tuple, cjk: tuple) -> list[str]:
             re.escape(w) for w in sorted(latin, key=len, reverse=True)) + r")\b"
         hits += [m.group(0).lower() for m in re.finditer(pattern, low, re.I)]
     return hits
-
-
-# 标题里的"这是器乐 / 伴奏"标记。多词写法要把**空格版**也列上——
-# 实测里 "Off Vocal" 是最常见的写法，只写 "offvocal"/"off-vocal" 会漏掉它。
-INSTRUMENTAL_WORDS = (
-    "instrumental", "off vocal", "offvocal", "off-vocal", "karaoke",
-    "backing track", "backing", "playback", "no vocals", "no-vocals", "novocals",
-    "minus one", "minus-one", "minusone", "inst",
-)
-INSTRUMENTAL_CJK = ("伴奏", "纯音乐", "器乐", "无人声", "オフボーカル", "インスト", "カラオケ")
-
-
-def instrumental_hits(text: str) -> list[str]:
-    return marker_hits(text, INSTRUMENTAL_WORDS, INSTRUMENTAL_CJK)
-
-
-# 人声判定：给"排除纯音乐 / 伴奏"用
-VOCAL = "vocal"
-INSTRUMENTAL_MARKED = "marked-instrumental"        # 标题自己说了
-INSTRUMENTAL_FLAGGED = "flagged-instrumental"      # 歌词库明确标记（比标题更权威）
-INSTRUMENTAL_UNMARKED = "no-lyrics-anywhere"       # 查过的歌词源全都没有
-INTERLUDE = "interlude"                            # 太短，多半是过场
-UNKNOWN = "unknown"
-
-VOCALITY_LABELS = {
-    VOCAL: "有人声（歌词源返回了歌词）",
-    INSTRUMENTAL_MARKED: "器乐/伴奏——标题里写着",
-    INSTRUMENTAL_FLAGGED: "器乐——歌词库明确标记为 instrumental",
-    INSTRUMENTAL_UNMARKED: "多半是器乐——查过的歌词源都没收录",
-    INTERLUDE: "过场/间奏——时长过短",
-    UNKNOWN: "未知——没有足够证据",
-}
-
-INTERLUDE_MS = 120_000     # 与 playlist_audit 的老启发式一致（<2:00 视为间奏）
-
-
-def classify_vocality(title: str, *, lyrics_found: bool | None = None,
-                      has_apple_lyrics: bool | None = None,
-                      lrclib_instrumental: bool | None = None,
-                      duration_ms: int | None = None,
-                      interlude_ms: int = INTERLUDE_MS) -> str:
-    """判断一首是「有人声」还是「器乐/伴奏」。**按确定性从高到低，先命中先返回。**
-
-    四种信号的可信度差得很远，所以不该压成一个布尔：
-
-      1. 标题写着 `Instrumental` / `伴奏` / `Off Vocal` —— 几乎必然。这也是**唯一不需要联网**
-         的器乐信号；缺点是覆盖极低，实测整个库只抓到 0.8%。
-      2. **歌词库明确标记 `instrumental=True`（LRCLIB）** —— 比标题权威得多，
-         因为它来自实际的歌词数据库，而不是字符串匹配。
-      3. 任何歌词源真的返回了歌词 —— 必然有人声。这是最强的**正面**证据。
-      4. 查过的歌词源全都没有 —— **弱**证据：可能真是器乐，也可能只是没收录。
-      5. 时长 < 2 分钟 —— 多半是过场/前奏。
-
-    ⚠️ `has_apple_lyrics=False` **单独不足以判定器乐**。实测 Apple 的歌词覆盖只有 65%，
-    缺口集中在原声/爵士这类确实常为器乐的流派——但也可能是版权或未收录。
-    所以它单独出现时返回 UNKNOWN，不冒充结论。
-    """
-    if instrumental_hits(title):
-        return INSTRUMENTAL_MARKED
-    if lrclib_instrumental:
-        return INSTRUMENTAL_FLAGGED
-    if lyrics_found:
-        return VOCAL
-    if duration_ms is not None and 0 < duration_ms < interlude_ms:
-        return INTERLUDE
-    if lyrics_found is False:
-        return INSTRUMENTAL_UNMARKED
-    return UNKNOWN
-
-
-def vocality_report(counts: dict, total: int) -> str:
-    """把判定结果汇总成几行，便于直接回答"这张歌单里有多少是纯音乐/伴奏"。"""
-    if total <= 0:
-        return "人声/器乐判定：（没有曲目）"
-    order = (VOCAL, INSTRUMENTAL_MARKED, INSTRUMENTAL_FLAGGED,
-             INSTRUMENTAL_UNMARKED, INTERLUDE, UNKNOWN)
-    lines = [f"人声/器乐判定（{total} 首）"]
-    for key in order:
-        n = int(counts.get(key, 0))
-        if n:
-            lines.append(f"  · {n:>4} 首 {VOCALITY_LABELS[key]}")
-    excluded = sum(int(counts.get(k, 0)) for k in
-                   (INSTRUMENTAL_MARKED, INSTRUMENTAL_FLAGGED,
-                    INSTRUMENTAL_UNMARKED, INTERLUDE))
-    if excluded:
-        lines.append(f"  → 若做的是「要有歌词」的歌单，可排除上面 {excluded} 首"
-                     f"（缺歌词的 {int(counts.get(UNKNOWN, 0))} 首请自行判断）")
-    return "\n".join(lines)

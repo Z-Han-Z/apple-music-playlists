@@ -152,8 +152,10 @@ class TestMcpCompatibility(unittest.TestCase):
         self.assertIn("雨夜开车", text)
         self.assertIn("雨幕公路", text)
         self.assertIn("18 tracks", text)
-        for tool in ("am_status", "am_search_songs", "am_create_playlist"):
+        for tool in ("am_status", "am_resolve_candidates", "am_create_playlist"):
             self.assertIn(tool, text)
+        self.assertIn("Do not turn theme fit into arbitrary 0–1 scores", text)
+        self.assertIn("has_lyrics=false as unknown", text)
         self.assertIn("dry_run=true", text)
 
     def test_playlist_prompt_rejects_invalid_arguments(self):
@@ -178,6 +180,81 @@ class TestMcpCompatibility(unittest.TestCase):
         self.assertTrue(tools["am_status"]["annotations"]["readOnlyHint"])
         self.assertTrue(tools["am_delete_playlist"]["annotations"]["destructiveHint"])
         self.assertFalse(tools["am_delete_playlist"]["annotations"]["readOnlyHint"])
+
+    def test_candidate_resolver_grounds_metadata_without_scoring(self):
+        metadata = {
+            "101": {
+                "name": "Midnight Road",
+                "artistName": "Night Driver",
+                "albumName": "Streetlights",
+                "releaseDate": "2024-05-01",
+                "genreNames": ["Electronic"],
+                "durationInMillis": 201234,
+                "hasLyrics": False,
+                "isrc": "USAAA2400001",
+            },
+            "202": {
+                "name": "City Glow (Live)",
+                "artistName": "Night Driver",
+                "albumName": "On Stage",
+                "releaseDate": "2023-10-02",
+                "genreNames": ["Alternative"],
+                "durationInMillis": 180000,
+                "hasLyrics": True,
+                "isrc": "USAAA2300002",
+            },
+            "303": {
+                "name": "Dawn",
+                "artistName": "Night Driver",
+                "albumName": "First Light",
+                "releaseDate": "2025-01-01",
+                "genreNames": ["Ambient"],
+                "durationInMillis": 240000,
+                "isrc": "USAAA2500003",
+            },
+        }
+        resolutions = [(["101"], []), (["101"], []), ([], ["Missing"]),
+                       (["202"], []), (["303"], [])]
+        with patch.object(am, "load_config", return_value={}), \
+                patch.object(am, "get_developer_token", return_value="DEV"), \
+                patch.object(am, "get_user_token", return_value=None), \
+                patch.object(am, "resolve_storefront", return_value="us"), \
+                patch.object(am, "resolve_tracks", side_effect=resolutions), \
+                patch.object(mcp, "catalog_meta", return_value=metadata):
+            payload = json.loads(mcp.t_resolve_candidates({
+                "tracks": ["Midnight Road - Night Driver", "Midnight Road duplicate",
+                           "Missing", "City Glow - Night Driver", "Dawn - Night Driver"]
+            }))
+
+        self.assertEqual(payload["summary"]["input_count"], 5)
+        self.assertEqual(payload["summary"]["resolved_count"], 4)
+        self.assertEqual(payload["summary"]["unmatched_count"], 1)
+        self.assertEqual(payload["summary"]["duplicate_recordings"], 1)
+        self.assertEqual([row["input_index"] for row in payload["candidates"]],
+                         [0, 1, 2, 3, 4])
+        self.assertEqual(payload["candidates"][1]["duplicate_of_input_index"], 0)
+        self.assertEqual(payload["candidates"][2]["status"], "unmatched")
+        self.assertFalse(payload["candidates"][0]["has_lyrics"])
+        self.assertIsNone(payload["candidates"][4]["has_lyrics"])
+        self.assertIn("live", payload["candidates"][3]["version_markers"])
+        self.assertEqual(payload["summary"]["artists_over_two_tracks"],
+                         [{"artist": "Night Driver", "count": 3}])
+        self.assertFalse(any("score" in key.lower()
+                             for row in payload["candidates"]
+                             for key in row))
+
+    def test_candidate_resolver_schema_rejects_oversized_or_blank_pools(self):
+        cases = [
+            ({"tracks": ["song"] * 61}, "at most 60"),
+            ({"tracks": ["   "]}, "must not be empty"),
+        ]
+        for arguments, message in cases:
+            response = mcp.handle({
+                "jsonrpc": "2.0", "id": 13, "method": "tools/call",
+                "params": {"name": "am_resolve_candidates", "arguments": arguments},
+            })
+            self.assertEqual(response["error"]["code"], -32602)
+            self.assertIn(message, response["error"]["message"])
 
     def test_missing_required_tool_argument_is_a_json_rpc_error(self):
         response = mcp.handle({"jsonrpc": "2.0", "id": 3, "method": "tools/call",

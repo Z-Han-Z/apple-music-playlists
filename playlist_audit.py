@@ -26,7 +26,6 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import am_paths as ap  # noqa: E402
 import am_playlist as am  # noqa: E402
-import playlist_core as core  # noqa: E402
 from am_meta import catalog_meta  # noqa: E402
 
 # Windows 控制台默认 GBK；唯一实现在 am_paths
@@ -53,14 +52,12 @@ def audit(name: str) -> int:
 
     # 歌单内曲目：先拿 library-songs 的 catalog id
     lib = am.playlist_tracks(pid, dev, user)
-    cat_ids, names, cids = [], [], []
+    cat_ids, names = [], []
     for t in lib:
         a = t.get("attributes", {})
         names.append((a.get("name"), a.get("artistName"), a.get("durationInMillis", 0)))
         pp = a.get("playParams", {})
         cid = pp.get("catalogId") or pp.get("id")
-        # cids 与 names **按下标对齐**（可能含 None）；cat_ids 只收有的，用于批量查元数据
-        cids.append(str(cid) if cid else None)
         if cid:
             cat_ids.append(str(cid))
 
@@ -154,26 +151,12 @@ def audit(name: str) -> int:
     print(f"     最后一首：{nm} — {ar}  ({mmss(d)})")
     print("     ⚠️ 「是否以爆点/淡出结束」需人工判断。")
 
-    # ---------- 8. 人声 / 器乐（排除纯音乐、伴奏的依据） ----------
-    # 判定优先级：标题标记 > 歌词证据 > 时长。规则与词表都在 playlist_core，与优化器同源。
-    # ⚠️ 这里把 Apple 的 hasLyrics 当作**唯一**歌词源——第三方歌词源还没接，
-    #    所以「查过的源都没有」是**弱**证据，不等于确定是器乐。
-    voc = Counter()
-    for (nm, _ar, dur), cid in zip(names, cids):
-        m = meta.get(cid) or {}
-        voc[core.classify_vocality(nm or "", lyrics_found=m.get("hasLyrics"),
-                                   duration_ms=dur)] += 1
-    print(f"\n【8】人声 / 器乐（用来排除纯音乐、伴奏）")
-    print(core.vocality_report(voc, len(names)))
-    print("     依据只有 Apple 的歌词可用性与标题标记；接上第三方歌词源后这一节会更准。")
-
-    # ---------- 9. 机械检查：重复 / 间奏 ----------
+    # ---------- 8. 机械检查：重复 / 间奏 ----------
     dupes = [k for k, c in Counter(nm for nm, _, _ in names).items() if c > 1]
-    print(f"\n【9】机械项")
+    print(f"\n【8】机械项")
     print(f"     重复曲目：{('⚠️ ' + ', '.join(dupes)) if dupes else '✅ 无'}")
     inter = [(nm, d) for nm, _, d in names if d < 120000]
-    print(f"     短于 2:00（疑似间奏/过场）："
-          f"{('⚠️ ' + ', '.join(f'{x}({mmss(y)})' for x, y in inter)) if inter else '✅ 无'}")
+    print(f"     疑似间奏(<2:00)：{('⚠️ ' + ', '.join(f'{x}({mmss(y)})' for x, y in inter)) if inter else '✅ 无'}")
 
     print(f"\n{'='*72}")
     print("体检完毕。标 ⚠️/❌ 的项见 docs/playlist-curation-survey.md §10 的可执行清单。")

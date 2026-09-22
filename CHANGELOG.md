@@ -10,7 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - A standard MCP prompt, `create_playlist_from_description`, that turns a natural-language brief
-  into an explicit status → curation → catalog search → dry-run → create workflow.
+  into an explicit status → candidate pool → catalog grounding → direct comparison →
+  dry-run → create workflow.
 - `am_optimize_order` — a **read-only** MCP tool that computes a better track order (simulated
   annealing over the four adjacency rules and a chosen narrative arc) and writes nothing.
 
@@ -20,25 +21,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   optimizer. Accepts a free list, explicit blocks (movement order preserved, reordering only
   within), or an existing playlist, and returns a list ready to hand to `am_create_playlist`.
 - `am_library` now keeps `hasLyrics` from the catalog response it was already fetching, and the
-  library report shows lyrics coverage next to ISRC coverage. Zero extra requests — the field was
-  arriving and being discarded. Measured on a real library: 65.1% of songs have lyrics, and the
-  gap is concentrated in instrumental genres (soundtrack 11%, jazz 11%, electronic 32%) rather
-  than spread evenly.
-- `am_lyrics.py` — a second lyrics source (LRCLIB; free, no key) and its `instrumental` flag,
-  wired in as a stage of `playlist_core.classify_vocality`. Contract details are encoded because
-  they were measured: `/api/search` is fuzzy, while `/api/get` demands artist/track/album/duration
-  to the second (0/8 on a real library; one second off is a 404).
-
-  Measuring by population corrected a claim I had made wrong: LRCLIB hits **73%** of the songs
-  Apple already covers — where it is not needed — but only **27%** of the 552 songs Apple does
-  not, and **every one of those hits is flagged instrumental**. So its value is confirming
-  instrumentals, not filling in lyrics, which is the opposite of why I reached for it.
-
-- `am_optimize_order` accepts `arc_axes`: caller-supplied per-track numbers (typically a
-  `lyric_valence` the host LLM produced after reading lyrics) that enter the arc as extra axes.
-  Values align with the **input** track list, and the length must match exactly — a mismatch is
-  rejected before any request is sent, because scores aligned to the input while tracks align to
-  resolved entries would shift every score by one and the resulting order would still look normal.
+  library report shows lyrics coverage next to ISRC coverage. This costs no extra request; the
+  field was already arriving and being discarded. A false value is treated as missing evidence,
+  never as proof that a track is instrumental.
+- `am_resolve_candidates` — a read-only MCP grounding tool for LLM-generated candidate pools. It
+  preserves input order and returns real Apple Music metadata, catalog IDs, explicit version
+  markers, duplicate recordings, and artist-concentration warnings without assigning theme-fit
+  scores or making aesthetic decisions for the model.
 
 ### Changed
 
@@ -46,6 +35,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   user's description while this server validates candidates against Apple Music and performs the
   account operations. No separate LLM provider or API key is embedded in the server.
 - Kept the CLI as the authentication, diagnostics, scripting, and advanced-maintenance interface.
+- Replaced the experimental LLM-number-to-optimizer bridge with an LLM-native curation workflow:
+  generate a generous pool, ground it in Apple Music, compare candidates in natural language,
+  assign narrative roles, and use deterministic sequencing only as an optional final pass.
 
 ## [1.2.0] - 2026-09-22
 

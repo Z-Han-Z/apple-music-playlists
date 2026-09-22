@@ -81,7 +81,10 @@ python playlist_optimize.py list.json -o order.json --arc cinderella
 }
 ```
 
-Le serveur fournit 12 outils, des descriptions anglais/chinois et des annotations lecture seule,
+Le serveur fournit 13 outils. `am_resolve_candidates` confronte le vivier proposé par le LLM aux
+métadonnées réelles d'Apple Music, sans noter l'adéquation au thème : le modèle compare directement
+les candidats aux mots de l'utilisateur. L'optimisation de l'ordre reste facultative après la
+sélection. Les outils incluent des descriptions anglais/chinois et des annotations lecture seule,
 écriture et opération destructive. La configuration de Codex, Claude, Cursor, VS Code/Copilot,
 Gemini CLI, Windsurf, Docker, Cordis/DSH et Harness est détaillée dans
 [docs/client-setup.md](docs/client-setup.md).

@@ -38,12 +38,15 @@ SUPPORTED_PROTOCOL_VERSIONS = {
 SERVER_INFO = {"name": "apple-music-playlists", "version": am.VERSION}
 SERVER_INSTRUCTIONS = (
     "Turn natural-language playlist descriptions into Apple Music playlists: interpret the "
-    "brief, call am_status, propose suitable tracks, verify them with am_search_songs, then call "
-    "am_create_playlist with dry_run=true before the final write. The host client's LLM does the "
-    "curation; this server validates tracks against Apple Music and performs account operations. "
+    "brief, call am_status, propose a generous candidate pool, ground it with "
+    "am_resolve_candidates, and let the host LLM compare candidates directly against the user's "
+    "words. Do not invent scalar theme scores. Then call am_create_playlist with dry_run=true "
+    "before the final write. The host client's LLM does the curation; this server validates tracks "
+    "against Apple Music and performs account operations. "
     "am_delete_playlist is destructive and requires confirm=true. Only playlists created by this "
     "API client can be modified. / 根据用户的自然语言描述策划 Apple Music 歌单：先理解需求并调用 "
-    "am_status，由客户端模型提出候选曲目，用 am_search_songs 校验，再以 dry_run=true 调用 "
+    "am_status，由客户端模型提出充足的候选曲目，用 am_resolve_candidates 批量校验后直接比较"
+    "候选与用户文字的契合度，不要虚构主题分数；再以 dry_run=true 调用 "
     "am_create_playlist 预演后正式创建。删除必须 confirm=true；只有本 API 客户端创建的歌单可修改。"
 )
 
@@ -54,7 +57,8 @@ PROMPTS = [
         "title": "Create a playlist from a description / 根据描述创建歌单",
         "description": (
             "Curate, validate, preview, and create an Apple Music playlist from a natural-language "
-            "brief. The MCP host's model chooses candidates; Apple Music catalog search verifies them. / "
+            "brief. The MCP host's model chooses and compares candidates; Apple Music catalog "
+            "grounding verifies them. / "
             "根据自然语言需求策划、校验、预演并创建 Apple Music 歌单。"
         ),
         "arguments": [
@@ -105,6 +109,28 @@ TOOLS = [
                 "limit": {"type": "integer", "minimum": 1, "maximum": 100, "description": "返回条数，默认 5"},
             },
             "required": ["term"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "am_resolve_candidates",
+        "description": "批量校验 LLM 提出的候选曲目，并返回 Apple Music 的真实曲名、艺人、专辑、"
+                       "发行日期、流派、时长、歌词可用性、版本标记和 catalog ID。还会指出重复录音与"
+                       "艺人集中度，但**不替模型做主题评分或选曲**。模型应直接根据用户描述与这些"
+                       "真实信息比较候选，保留理由充分的曲目。只读，不修改音乐库。",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "tracks": {
+                    "type": "array",
+                    "items": {"type": "string", "minLength": 1},
+                    "minItems": 1,
+                    "maxItems": 60,
+                    "description": "候选曲目，每项形如 '歌名 - 艺人'。建议先给目标数量的 1.5–2 倍。",
+                },
+                "storefront": {"type": "string", "description": "可选地区代码；默认使用账号地区"},
+            },
+            "required": ["tracks"],
             "additionalProperties": False,
         },
     },
@@ -227,18 +253,6 @@ TOOLS = [
                 "arc": {"type": "string", "enum": list(SHAPE_ALIASES),
                         "description": "目标叙事弧，默认 man-in-a-hole（先落再起）。"
                                        "用 cinderella 表示起-落-起，等等"},
-                "arc_axes": {
-                    "type": "object",
-                    "description": "额外弧线轴（可选）：{轴名: [每首的数值]}，"
-                                   "数组**按输入曲目对齐**，长度必须严格等于输入项数（不符会被拒绝，"
-                                   "因为错位会静默污染排序）。"
-                                   "典型用法：你（LLM）读完歌词后给每首一个 lyric_valence，"
-                                   "服务端把它当作与 valence 并列的弧线轴。"
-                                   "⚠️ **只放「值该随叙事弧起伏」的量**——别放静态质量分"
-                                   "（主题契合、乐评评分、质量先验）：那些是「越高越好」、与位置无关，"
-                                   "塞进来等于让优化器去拟合一条无意义的曲线。"
-                                   "实测把主题契合当弧线轴喂进去，主题分最高的曲子被推到了末尾。",
-                },
                 "isrcs": {"type": "boolean", "description": "tracks/blocks 是否按 ISRC 精确匹配，默认 false"},
                 "refresh": {"type": "boolean", "description": "忽略音频特征缓存重抓，默认 false"},
             },
@@ -285,6 +299,7 @@ TOOLS = [
 _ENGLISH_TOOL_DESCRIPTIONS = {
     "am_status": "Check developer-token validity and Apple Music login status. Run before writes.",
     "am_search_songs": "Search the Apple Music catalog and return stable catalog IDs.",
+    "am_resolve_candidates": "Ground an LLM-curated candidate pool in Apple Music metadata; flag duplicates and version markers without scoring theme fit.",
     "am_list_playlists": "List every playlist in the current user's library, including IDs.",
     "am_show_playlist": "Show the tracks in a playlist selected by name or ID.",
     "am_create_playlist": "Create a playlist from 'Title - Artist' strings or ISRCs; supports dry-run matching.",
@@ -297,7 +312,7 @@ _ENGLISH_TOOL_DESCRIPTIONS = {
     "am_top_played": "Read Apple Music Replay play-count rankings by song, album, or artist.",
 }
 _READ_ONLY_TOOLS = {
-    "am_status", "am_search_songs", "am_list_playlists", "am_show_playlist",
+    "am_status", "am_search_songs", "am_resolve_candidates", "am_list_playlists", "am_show_playlist",
     "am_audit_playlist", "am_analyze_flow", "am_optimize_order",
     "am_recently_played", "am_top_played",
 }
@@ -353,6 +368,85 @@ def t_search(args: dict) -> str:
             a = item.get("attributes", {})
             lines.append(f"{item['id']}\t{a.get('name')} — {a.get('artistName') or a.get('curatorName','')}")
     return "\n".join(lines) or "无结果"
+
+
+def t_resolve_candidates(args: dict) -> str:
+    """把模型提出的候选批量落到真实 catalog 元数据上，不做语义评分。"""
+    cfg = am.load_config()
+    dev = am.get_developer_token(cfg)
+    sf = am.resolve_storefront(args.get("storefront"), cfg, dev, am.get_user_token(cfg))
+    queries = [item.strip() for item in args["tracks"]]
+
+    matched: list[tuple[int, str, str]] = []
+    candidates_by_index: dict[int, dict] = {}
+    for index, query in enumerate(queries):
+        ids, gone = am.resolve_tracks([query], dev, sf, quiet=True)
+        if gone or not ids:
+            candidates_by_index[index] = {
+                "input_index": index, "input": query, "status": "unmatched",
+            }
+        else:
+            matched.append((index, query, ids[0]))
+
+    metadata = catalog_meta([catalog_id for _, _, catalog_id in matched], dev, sf)
+    first_input_by_id: dict[str, int] = {}
+    artist_recordings: dict[str, set[str]] = {}
+    duplicate_count = 0
+    for index, query, catalog_id in matched:
+        item = metadata.get(catalog_id) or {}
+        artist = item.get("artistName") or ""
+        if artist:
+            artist_recordings.setdefault(artist, set()).add(catalog_id)
+        duplicate_of = first_input_by_id.get(catalog_id)
+        if duplicate_of is None:
+            first_input_by_id[catalog_id] = index
+        else:
+            duplicate_count += 1
+        duration_ms = item.get("durationInMillis")
+        row = {
+            "input_index": index,
+            "input": query,
+            "status": "resolved",
+            "catalog_id": catalog_id,
+            "name": item.get("name"),
+            "artist": artist or None,
+            "album": item.get("albumName"),
+            "release_date": item.get("releaseDate"),
+            "genres": item.get("genreNames") or [],
+            "duration_seconds": round(duration_ms / 1000, 1) if duration_ms else None,
+            "content_rating": item.get("contentRating"),
+            "has_lyrics": item.get("hasLyrics") if "hasLyrics" in item else None,
+            "isrc": item.get("isrc"),
+            "version_markers": am.version_noise_hits(item.get("name") or ""),
+        }
+        if duplicate_of is not None:
+            row["duplicate_of_input_index"] = duplicate_of
+        candidates_by_index[index] = row
+
+    concentrated = [
+        {"artist": artist, "count": len(recordings)}
+        for artist, recordings in sorted(
+            artist_recordings.items(), key=lambda pair: (-len(pair[1]), pair[0]))
+        if len(recordings) > 2
+    ]
+    candidates = [candidates_by_index[index] for index in range(len(queries))]
+    result = {
+        "storefront": sf,
+        "summary": {
+            "input_count": len(queries),
+            "resolved_count": len(matched),
+            "unmatched_count": len(queries) - len(matched),
+            "duplicate_recordings": duplicate_count,
+            "artists_over_two_tracks": concentrated,
+        },
+        "candidates": candidates,
+        "selection_note": (
+            "Use the user's original words to compare these grounded candidates directly. "
+            "Treat has_lyrics=false as unknown, not proof of an instrumental. Prefer explicit "
+            "reasons and playlist roles over scalar theme-fit scores."
+        ),
+    }
+    return json.dumps(result, ensure_ascii=False, indent=2)
 
 
 def t_list(_args: dict) -> str:
@@ -475,38 +569,6 @@ def t_flow(args: dict) -> str:
     return flow_mod.flow_report(args["playlist"], bool(args.get("refresh")))
 
 
-MAX_AXES = 4
-
-
-def _validate_arc_axes(spec, expected_len: int) -> str | None:
-    """校验调用方给的额外弧线轴。**长度必须严格等于输入曲目数。**
-
-    静默错位是这个参数最危险的失败方式：评分数组按输入对齐、曲目按解析结果对齐时，
-    只要丢了一个未匹配项，**所有分数就整体错位一格**——而排出来的顺序看起来完全正常。
-    所以长度不符直接拒绝，不做任何"尽力对齐"。
-
-    也不是"越多的轴越好"：`arc_cost` 对参与的各轴取平均，轴越多每条越被稀释。
-    """
-    if not spec:
-        return None
-    if not isinstance(spec, dict):
-        return "arc_axes 必须是对象：{轴名: [每首的数值]}"
-    if len(spec) > MAX_AXES:
-        return (f"arc_axes 最多 {MAX_AXES} 条轴（传了 {len(spec)} 条）。"
-                f"弧线项对各轴取平均，轴越多每条越被稀释。")
-    for axis, values in spec.items():
-        if not isinstance(values, list):
-            return f"arc_axes['{axis}'] 必须是数组"
-        if len(values) != expected_len:
-            return (f"arc_axes['{axis}'] 的长度必须是 {expected_len}（输入曲目数），"
-                    f"实际 {len(values)}。长度不符会让分数与曲目**静默错位**，故直接拒绝。")
-        bad = [i for i, v in enumerate(values)
-               if isinstance(v, bool) or not isinstance(v, (int, float))]
-        if bad:
-            return f"arc_axes['{axis}'] 第 {bad[:3]} 项不是数字"
-    return None
-
-
 def t_optimize(args: dict) -> str:
     """算出更好的曲序。**只读**——不改动任何歌单。
 
@@ -520,14 +582,9 @@ def t_optimize(args: dict) -> str:
     arc = args.get("arc") or opt_mod.DEFAULT_SHAPE
     refresh = bool(args.get("refresh"))
     isrcs = bool(args.get("isrcs"))
-    axes_spec = args.get("arc_axes") or {}
-    extra_axes = tuple(axes_spec)
 
     missed: list[str] = []
     entries: list[dict] = []
-    # `src_index` = 曲目在**输入**里的下标（playlist 模式下是歌单里的位置）。
-    # arc_axes 的数值按它对齐——按解析结果对齐会因为丢掉未匹配项而**整体错位一格**。
-    src_index = 0
 
     if args.get("playlist"):
         if args.get("tracks") or args.get("blocks"):
@@ -535,72 +592,43 @@ def t_optimize(args: dict) -> str:
         p = am.find_playlist(args["playlist"], dev, user)
         if not p:
             return f"找不到歌单: {args['playlist']}"
-        raw = am.playlist_tracks(p["id"], dev, user)
-        err = _validate_arc_axes(axes_spec, len(raw))
-        if err:
-            return err
         cids = []
-        for t in raw:
+        for t in am.playlist_tracks(p["id"], dev, user):
             pp = (t.get("attributes") or {}).get("playParams") or {}
             cid = pp.get("catalogId") or pp.get("id")
             if cid:
                 cids.append(str(cid))
         cm = catalog_meta(cids, dev, sf)
-        for i, t in enumerate(raw):
-            pp = (t.get("attributes") or {}).get("playParams") or {}
-            cid = pp.get("catalogId") or pp.get("id")
-            if not cid:
-                continue
-            cid = str(cid)
-            m = cm.get(cid) or {}
-            entries.append({"cid": cid, "name": m.get("name"),
-                            "artist": m.get("artistName"), "isrc": m.get("isrc"),
-                            "src_index": i})
-        source = f"现有歌单「{p['attributes'].get('name')}」：{len(entries)}/{len(raw)} 首可排序"
+        entries = [{"cid": c, "name": (cm.get(c) or {}).get("name"),
+                    "artist": (cm.get(c) or {}).get("artistName"),
+                    "isrc": (cm.get(c) or {}).get("isrc")} for c in cids]
+        source = f"现有歌单「{p['attributes'].get('name')}」：{len(entries)} 首"
     else:
         groups = args.get("blocks") or ([args["tracks"]] if args.get("tracks") else [])
         groups = [g for g in groups if g]
         if not groups:
             return "请给出 tracks、blocks 或 playlist 之一。"
-        total_in = sum(len(g) for g in groups)
-        # 长度在**发任何请求之前**就能判定，所以先拒绝——不浪费配额，也不用等几十秒才报错
-        err = _validate_arc_axes(axes_spec, total_in)
-        if err:
-            return err
-        # 逐项解析，才能建立"输入下标 → catalog id"的精确映射。
-        # 请求数与批量调用相同（resolve_tracks 本来就是逐项查）。
-        pairs: list[tuple[int, str, int]] = []
-        for gi, group in enumerate(groups, 1):
-            for item in group:
-                ids, gone = am.resolve_tracks([item], dev, sf, isrcs=isrcs)
-                if gone or not ids:
-                    missed.append(item)
-                else:
-                    pairs.append((src_index, ids[0], gi))
-                src_index += 1
-        cm = catalog_meta([c for _, c, _ in pairs], dev, sf)
         multi = len(groups) > 1
-        for si, c, gi in pairs:
-            m = cm.get(c) or {}
-            entries.append({"cid": c, "name": m.get("name"), "artist": m.get("artistName"),
-                            "isrc": m.get("isrc"),
-                            "block": f"B{gi}" if multi else None, "src_index": si})
-        source = f"给定 {len(groups)} 组共 {total_in} 项：{len(entries)} 首匹配成功"
+        for gi, group in enumerate(groups, 1):
+            ids, gone = am.resolve_tracks(list(group), dev, sf, isrcs=isrcs)
+            missed += gone
+            cm = catalog_meta(ids, dev, sf)
+            for c in ids:
+                m = cm.get(c) or {}
+                entries.append({"cid": c, "name": m.get("name"), "artist": m.get("artistName"),
+                                "isrc": m.get("isrc"), "block": f"B{gi}" if multi else None})
+        source = (f"给定 {len(groups)} 组共 {sum(len(g) for g in groups)} 项："
+                  f"{len(entries)} 首匹配成功")
 
     if not entries:
         return f"{source}，但没有解析出任何可排序的曲目。未匹配：{missed or '（无）'}"
-
-    if extra_axes:
-        for e in entries:
-            e["scores"] = {ax: float(axes_spec[ax][e["src_index"]]) for ax in extra_axes}
 
     # 只有拿到 ISRC 才查得到音频特征；没有的那些会被标记出来而不是静默丢掉。
     feature_input = [(e["cid"], e.get("name") or e["cid"], e.get("artist") or "", e.get("isrc"))
                      for e in entries if e.get("isrc")]
     features = flow_mod.fetch_features("mcp-order", feature_input, refresh)
 
-    _, report = opt_mod.order_from_features(entries, features, arc=arc,
-                                            extra_axes=extra_axes)
+    _, report = opt_mod.order_from_features(entries, features, arc=arc)
 
     lines = [source]
     if missed:
@@ -624,6 +652,7 @@ def t_top(args: dict) -> str:
 HANDLERS = {
     "am_status": t_status,
     "am_search_songs": t_search,
+    "am_resolve_candidates": t_resolve_candidates,
     "am_list_playlists": t_list,
     "am_show_playlist": t_show,
     "am_create_playlist": t_create,
@@ -665,11 +694,13 @@ Response language: {language}
 Use the Apple Music MCP tools to complete the task, not merely to suggest a list:
 1. Interpret the brief. Make reasonable assumptions instead of asking many questions; ask only if a missing choice would materially change the result.
 2. Call am_status before any write. If the user asks for personalization, use am_recently_played or am_top_played as supporting taste signals.
-3. Curate a coherent candidate set. Unless the brief says otherwise, prefer original studio versions, avoid duplicates, keep artist variety (normally no more than two tracks per artist), and shape a deliberate opening, middle, and ending.
-4. Verify ambiguous or uncertain candidates with am_search_songs. Apple catalog search is the source of truth for availability; do not invent catalog IDs.
-5. Call am_create_playlist with dry_run=true using "Title - Artist" strings. Review misses and suspicious matches, revise queries or candidates, and dry-run again when needed.
-6. Once the preview is sound, create the playlist with dry_run=false. If the user explicitly asked only for a plan or preview, stop before this write.
-7. Report the playlist name, ID, track count, unmatched tracks, and any assumptions briefly.
+3. Curate a candidate pool about 1.5–2 times the requested size. Use your direct understanding of the user's words, musical context, and relationships between songs. Do not turn theme fit into arbitrary 0–1 scores.
+4. Call am_resolve_candidates on that pool. Apple catalog data is the source of truth for availability and versions; do not invent catalog IDs. Treat has_lyrics=false as unknown, never as proof that a track is instrumental.
+5. Compare candidates directly within the role they could play: opening, development, peak, release, or landing. Prefer explicit natural-language reasons (essential / strong / bridge / optional / reject) over point scores. Unless the brief says otherwise, prefer original studio versions, avoid duplicates, and normally keep no more than two tracks per artist.
+6. Select the final set and arrange those narrative roles into ordered blocks. am_optimize_order is optional and may refine transitions inside blocks; it must not decide which songs fit the theme.
+7. Call am_create_playlist with dry_run=true using "Title - Artist" strings. Review misses and suspicious matches, revise candidates, and dry-run again when needed.
+8. Once the preview is sound, create the playlist with dry_run=false. If the user explicitly asked only for a plan or preview, stop before this write.
+9. Report the playlist name, ID, track count, unmatched tracks, and the most important curation choices briefly.
 
 The language model in the MCP client performs the curation. This MCP server does not call or require a separate LLM provider."""
 
@@ -708,7 +739,6 @@ def _validate_tool_arguments(name: str, arguments) -> str | None:
     expected_types = {
         "string": lambda value: isinstance(value, str),
         "integer": lambda value: isinstance(value, int) and not isinstance(value, bool),
-        "number": lambda value: isinstance(value, (int, float)) and not isinstance(value, bool),
         "boolean": lambda value: isinstance(value, bool),
         "array": lambda value: isinstance(value, list),
     }
@@ -730,10 +760,15 @@ def _validate_tool_arguments(name: str, arguments) -> str | None:
         if isinstance(value, list):
             if len(value) < schema.get("minItems", 0):
                 return f"argument '{key}' must not be empty"
+            if "maxItems" in schema and len(value) > schema["maxItems"]:
+                return f"argument '{key}' must contain at most {schema['maxItems']} items"
             item_type = schema.get("items", {}).get("type")
             item_checker = expected_types.get(item_type)
             if item_checker and any(not item_checker(item) for item in value):
                 return f"every item in argument '{key}' must be {item_type}"
+            item_min_length = schema.get("items", {}).get("minLength", 0)
+            if item_type == "string" and any(len(item.strip()) < item_min_length for item in value):
+                return f"every item in argument '{key}' must not be empty"
     return None
 
 

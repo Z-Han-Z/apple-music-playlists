@@ -161,18 +161,16 @@ def load_tracks(spec_file, features_file=None):
     return spec, tracks
 
 
-def order_from_features(entries, features, *, arc=DEFAULT_SHAPE, extra_axes=()):
-    """内存里排序：`entries` = [{cid, name, artist, isrc, block?, scores?}]，
-    `features` = {isrc: 特征}。返回 `(ordered_tracks, report_text)`。
+def order_from_features(entries, features, *, arc=DEFAULT_SHAPE):
+    """内存里排序：`entries` = [{cid, name, artist, isrc, block?}]，`features` = {isrc: 特征}。
+
+    返回 `(ordered_tracks, report_text)`。
 
     **不 import playlist_flow、不碰文件**——取特征是调用方（MCP 层）的事。
     算法层因此保持平台无关，也完全可离线测试。
 
     分组：按 `block` **首次出现的顺序**分组，组内重排、组间顺序不动（这是硬约束）。
     不带 block 就是一整块自由重排。
-
-    `extra_axes` 里点名的轴，会从 `entries[i]["scores"]` 取值挂到曲目上，
-    再交给 `arc_cost` 当作额外的弧线轴（见 `arc_cost` 的说明）。
 
     报告是**返回的字符串**，不是 print：MCP 的 tools/call 会把 stdout 重定向掉
     （协议通道不能用），所以打印等于丢掉。
@@ -188,35 +186,23 @@ def order_from_features(entries, features, *, arc=DEFAULT_SHAPE, extra_axes=()):
             grouped[key] = []
             seen_blocks.append(key)
         isrc = e.get("isrc")
-        track = _track(str(e["cid"]), e.get("name"), key,
-                       features.get(isrc) if isrc else None,
-                       isrc=isrc, stage_hint=None if isrc else "no-isrc")
-        for axis in extra_axes:
-            value = (e.get("scores") or {}).get(axis)
-            if value is not None:
-                track[axis] = float(value)
-        grouped[key].append(track)
+        grouped[key].append(_track(
+            str(e["cid"]), e.get("name"), key,
+            features.get(isrc) if isrc else None,
+            isrc=isrc, stage_hint=None if isrc else "no-isrc"))
     blocks = [grouped[k] for k in seen_blocks]
 
     before = [t for b in blocks for t in b]
-    seq, cost = anneal(blocks, shape=arc, extra_axes=extra_axes)
+    seq, cost = anneal(blocks, shape=arc)
 
     counts = Counter(t.get("stage", "ok") for t in seq)
     lines = [
         f"目标形状：{resolve_shape(arc)}",
         coverage_report(counts, len(seq)),
-    ]
-    if extra_axes:
-        # 额外轴必须报**覆盖率**：只有 3/40 首有分数时，这一轴几乎没起作用，
-        # 而报告看起来一切正常——那正是这个项目反复要避免的静默失真。
-        parts = [f"{axis} {sum(1 for t in seq if t.get(axis) is not None)}/{len(seq)}"
-                 for axis in extra_axes]
-        lines.append("额外评分轴（调用方提供，计入弧线）：" + ", ".join(parts))
-    lines += [
-        f"原始顺序 cost = {total_cost(before, arc, extra_axes):.2f} "
-        f"(相邻 {adjacency_cost(before):.2f} + 弧线 {arc_cost(before, arc, extra_axes):.2f})",
+        f"原始顺序 cost = {total_cost(before, arc):.2f} "
+        f"(相邻 {adjacency_cost(before):.2f} + 弧线 {arc_cost(before, arc):.2f})",
         f"优化后   cost = {cost:.2f} "
-        f"(相邻 {adjacency_cost(seq):.2f} + 弧线 {arc_cost(seq, arc, extra_axes):.2f})",
+        f"(相邻 {adjacency_cost(seq):.2f} + 弧线 {arc_cost(seq, arc):.2f})",
         "",
         "优化后的曲序：",
     ]
@@ -251,28 +237,16 @@ def adjacency_cost(seq):
                for r in check_pair(a, b))
 
 
-def arc_cost(seq, shape=DEFAULT_SHAPE, extra_axes=()):
+def arc_cost(seq, shape=DEFAULT_SHAPE):
     """整体形状约束（§3.1 + §4）。
 
     目标曲线来自 `playlist_core.ARCHETYPES` —— 与体检器"认出你是什么形状"用的是
-    **同一份**曲线定义。
+    **同一份**曲线定义。这里以前硬编码 man-in-a-hole（valence 谷底在 60%），
+    而策划文档把"先选一个形状"列为第一步：那一步当时只有诊断价值，工具并没有
+    按你选的形状去排。
 
       valence / energy / loudness → 选定的叙事弧（情绪走向）
       tempo                       → 倒 U（快的放中段；排序惯例，不随形状变）
-      `extra_axes`                → 调用方给的每首分数，走**同一条**目标曲线
-
-    ⚠️ **`extra_axes` 只接受"弧线形状"的轴**（像 valence 那样：值该随叙事弧起伏），
-    典型就是 LLM 读完歌词后给的 **`lyric_valence`**。它**不接受静态质量分**
-    （主题契合、乐评评分、质量先验）——那些是"值越高越好"，与位置无关，
-    塞进来等于让优化器去拟合一条对它毫无意义的曲线。
-
-    **这条警告是被实测打出来的，不是理论。** 一次演示里把 `theme_fit`（主题契合）
-    当弧线轴喂进去，45 首里 43 首位置变了、最大位移 39 位——而主题分最高的几首
-    被推到了第 40/42/43 位。优化器没错，它只是照做：让 theme_fit 去拟合 Cinderella
-    的两端高中间低。静态质量属于**选曲**（哪些歌进来），不属于**排序**（怎么排）。
-
-    某一轴**缺值的曲子会被跳过而不是当成 0**，并且分母只算真正参与的那些曲子——
-    否则"没数据"会被读成"分数极低"，那是最糟的一种静默错误。
     """
     known = [(i, t) for i, t in enumerate(seq) if t["f"]]
     if len(known) < 5:
@@ -281,32 +255,25 @@ def arc_cost(seq, shape=DEFAULT_SHAPE, extra_axes=()):
     mood = shape_target(shape, n)
     specs = [("valence", mood), ("energy", mood), ("loud", mood),
              ("bpm", tempo_target(n))]
-    specs += [(axis, mood) for axis in extra_axes]
-
     total = 0.0
-    denom = 0
     for key, target in specs:
-        pairs = [(i, t[key]) for i, t in known if t.get(key) is not None]
-        if not pairs:
-            continue
-        vs = [v for _, v in pairs]
+        vs = [t[key] for _, t in known]
         lo, hi = min(vs), max(vs)
         rng = (hi - lo) or 1.0
-        for i, v in pairs:
-            total += (((v - lo) / rng) - target[i]) ** 2
-        denom += len(pairs)
-    # 没有额外轴时 denom == len(known) * 4，与旧实现逐字等价
-    return (W_ARC * total / denom) if denom else 0.0
+        for i, t in known:
+            actual = (t[key] - lo) / rng
+            total += (actual - target[i]) ** 2
+    return W_ARC * total / (len(known) * len(specs))
 
 
-def total_cost(seq, shape=DEFAULT_SHAPE, extra_axes=()):
-    return adjacency_cost(seq) + arc_cost(seq, shape, extra_axes)
+def total_cost(seq, shape=DEFAULT_SHAPE):
+    return adjacency_cost(seq) + arc_cost(seq, shape)
 
 
-def anneal(blocks, iters=60000, seed=7, shape=DEFAULT_SHAPE, extra_axes=()):
+def anneal(blocks, iters=60000, seed=7, shape=DEFAULT_SHAPE):
     rng = random.Random(seed)
     seq = [t for blk in blocks for t in blk]
-    cur = total_cost(seq, shape, extra_axes)
+    cur = total_cost(seq, shape)
     best, best_cost = list(seq), cur
     for k in range(iters):
         T = 2.0 * (1 - k / iters) + 0.01
@@ -318,7 +285,7 @@ def anneal(blocks, iters=60000, seed=7, shape=DEFAULT_SHAPE, extra_axes=()):
         start = sum(len(blocks[x]) for x in range(bi))
         a, b = start + i, start + j
         seq[a], seq[b] = seq[b], seq[a]
-        new = total_cost(seq, shape, extra_axes)
+        new = total_cost(seq, shape)
         if new < cur or rng.random() < math.exp((cur - new) / T):
             cur = new
             if new < best_cost:

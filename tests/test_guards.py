@@ -477,60 +477,6 @@ class TestOptimizeToolWiring(unittest.TestCase):
         self.assertIn("am_optimize_order", names)
 
 
-class TestArcAxesValidation(unittest.TestCase):
-    """`arc_axes` 的长度必须严格等于**输入曲目数**。
-
-    静默错位是这个参数最危险的失败方式：评分数组按输入对齐、曲目按解析结果对齐时，
-    只要丢一个未匹配项，**所有分数就整体错位一格**——而排出来的顺序看起来完全正常。
-    所以每一条拒绝路径都要钉住，而且不接受任何"尽力对齐"。
-    """
-
-    def setUp(self):
-        import am_mcp_server as srv
-        self.srv = srv
-        self.v = srv._validate_arc_axes
-
-    def test_absent_is_fine(self):
-        self.assertIsNone(self.v(None, 5))
-        self.assertIsNone(self.v({}, 5))
-
-    def test_correct_length_passes(self):
-        self.assertIsNone(self.v({"lyn": [0.1] * 5}, 5))
-
-    def test_length_mismatch_is_rejected_both_ways(self):
-        self.assertIsNotNone(self.v({"lyn": [0.1] * 3}, 5))
-        self.assertIsNotNone(self.v({"lyn": [0.1] * 6}, 5))
-
-    def test_non_array_is_rejected(self):
-        self.assertIsNotNone(self.v({"lyn": "abc"}, 5))
-
-    def test_axis_count_is_capped(self):
-        over = {f"a{i}": [0.1] * 5 for i in range(self.srv.MAX_AXES + 1)}
-        self.assertIsNotNone(self.v(over, 5))
-
-    def test_max_axes_is_small(self):
-        """轴越多每条越被稀释，上限不该悄悄变大。"""
-        self.assertLessEqual(self.srv.MAX_AXES, 4)
-
-    def test_non_numeric_values_are_rejected(self):
-        self.assertIsNotNone(self.v({"lyn": [0.1, 0.2, None, 0.4, 0.5]}, 5))
-        self.assertIsNotNone(self.v({"lyn": [0.1, 0.2, True, 0.4, 0.5]}, 5))
-
-    def test_tool_schema_exposes_arc_axes(self):
-        tool = next(t for t in self.srv.TOOLS if t["name"] == "am_optimize_order")
-        self.assertIn("arc_axes", tool["inputSchema"]["properties"])
-
-    def test_rejection_costs_nothing(self):
-        """长度在解析之前就能判定，所以不该先花掉配额再报错。
-
-        这条是行为约束：`t_optimize` 必须在 `resolve_tracks` 之前调用校验。
-        """
-        import inspect
-        src = inspect.getsource(self.srv.t_optimize)
-        self.assertLess(src.index("_validate_arc_axes"), src.index("resolve_tracks"),
-                        "校验必须在解析之前发生")
-
-
 class TestMcpServerConsistency(unittest.TestCase):
     """声明了工具却没接上 handler（或反过来）是这类服务器的经典 bug。"""
 

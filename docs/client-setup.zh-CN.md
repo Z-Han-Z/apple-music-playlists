@@ -13,9 +13,10 @@ stdout 输出协议消息，统一使用 UTF-8，运行时零第三方依赖，�
 > 做一张 20 首的周日清晨歌单：温暖的灵魂乐、民谣和安静爵士，以 1970 年代至今为主，
 > 不要现场版，能量缓慢上升，最后柔和落地。
 
-MCP 客户端中的模型把描述转成候选曲目；stdio 服务依次通过 `am_status`、
-`am_search_songs` 和 `am_create_playlist` 的 dry-run 在 Apple Music 中校验，确认匹配合理后
-再正式写入。服务端不调用另一家模型，也不需要额外的 LLM API key。
+MCP 客户端中的模型把描述转成充足的候选池，并直接对照用户原话比较候选；
+stdio 服务通过 `am_status` 和 `am_resolve_candidates` 把候选落到 Apple Music 真实元数据，
+再以 `am_create_playlist` dry-run 校验最终匹配后写入。服务端不调用另一家模型，
+也不需要额外的 LLM API key。
 
 支持 MCP Prompts 的客户端可选择 `create_playlist_from_description`，填写描述以及可选的
 歌单名、曲目数和回复语言。没有 Prompt UI 也不影响核心能力：直接在聊天中发送相同描述，
@@ -131,7 +132,7 @@ Windsurf 把通用 `mcpServers` 对象放到 `~/.codeium/windsurf/mcp_config.jso
 
 ### Cordis / DSH Agent Harness
 
-[`preset/`](../preset/) 内有可直接复制的预设：挂载全部 12 个工具、加载配套 skill，并为较慢的
+[`preset/`](../preset/) 内有可直接复制的预设：挂载全部 13 个工具、加载配套 skill，并为较慢的
 音频特征分析设置两分钟超时。安装步骤见 [`preset/README.md`](../preset/README.md)。
 
 ### Harness Platform
