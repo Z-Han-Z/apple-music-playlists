@@ -28,7 +28,7 @@ python am_playlist.py create --name "My Playlist" --tracks "Song A - Artist X, S
 コマンドとしてインストールする場合：
 
 ```bash
-pip install "apple-music-playlists @ git+https://github.com/Z-Han-Z/apple-music-playlists.git@v1.2.0"
+pip install "apple-music-playlists @ git+https://github.com/Z-Han-Z/apple-music-playlists.git@v1.3.0"
 am-playlist status
 am-playlist login
 ```
@@ -89,7 +89,7 @@ Windsurf、Docker、Cordis/DSH、Harness の設定は
 [docs/client-setup.md](docs/client-setup.md) を参照してください。
 
 ```bash
-docker build -t apple-music-playlists:1.2.0 .
+docker build -t apple-music-playlists:1.3.0 .
 ```
 
 stdio コンテナでは `-i` が必須で、`-d` は使用できません。ホストでログインした後、専用設定ディレクトリを

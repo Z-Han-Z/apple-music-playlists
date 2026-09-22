@@ -678,6 +678,24 @@ def _invalid_arguments(rid, message: str) -> dict:
             "error": {"code": -32602, "message": message}}
 
 
+def _contains_lone_surrogate(value) -> bool:
+    """Return whether decoded JSON contains text that cannot be encoded as UTF-8.
+
+    Standards-compliant MCP clients send UTF-8.  Some manual Windows shell pipelines can decode
+    bytes with the wrong code page and leave lone surrogate characters in an otherwise valid JSON
+    string.  Reject that input at the protocol boundary instead of discovering it during an Apple
+    Music write and reporting an internal error.
+    """
+    if isinstance(value, str):
+        return any(0xD800 <= ord(char) <= 0xDFFF for char in value)
+    if isinstance(value, list):
+        return any(_contains_lone_surrogate(item) for item in value)
+    if isinstance(value, dict):
+        return any(_contains_lone_surrogate(key) or _contains_lone_surrogate(item)
+                   for key, item in value.items())
+    return False
+
+
 def _render_playlist_prompt(arguments: dict) -> str:
     description = arguments["description"].strip()
     name = arguments.get("name", "").strip() or "Propose a concise name that fits the brief"
@@ -708,6 +726,8 @@ The language model in the MCP client performs the curation. This MCP server does
 def _validate_prompt_arguments(arguments) -> str | None:
     if not isinstance(arguments, dict):
         return "prompt arguments must be a JSON object"
+    if _contains_lone_surrogate(arguments):
+        return "prompt arguments must contain valid Unicode text encoded as UTF-8"
     allowed = {item["name"] for item in PROMPTS[0]["arguments"]}
     unknown = sorted(set(arguments) - allowed)
     if unknown:
@@ -725,6 +745,8 @@ def _validate_prompt_arguments(arguments) -> str | None:
 def _validate_tool_arguments(name: str, arguments) -> str | None:
     if not isinstance(arguments, dict):
         return "tool arguments must be a JSON object"
+    if _contains_lone_surrogate(arguments):
+        return "tool arguments must contain valid Unicode text encoded as UTF-8"
     tool = next((item for item in TOOLS if item["name"] == name), None)
     if tool is None:
         return None

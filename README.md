@@ -138,7 +138,7 @@ Docker, Cordis/DSH, and Harness are in **[docs/client-setup.md](docs/client-setu
 Build the non-root local container with:
 
 ```bash
-docker build -t apple-music-playlists:1.2.0 .
+docker build -t apple-music-playlists:1.3.0 .
 ```
 
 The client must run it attached with `docker run --rm -i`; mount only the app config directory and

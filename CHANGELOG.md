@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-09-22
+
 ### Added
 
 - A standard MCP prompt, `create_playlist_from_description`, that turns a natural-language brief
@@ -38,6 +40,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Replaced the experimental LLM-number-to-optimizer bridge with an LLM-native curation workflow:
   generate a generous pool, ground it in Apple Music, compare candidates in natural language,
   assign narrative roles, and use deterministic sequencing only as an optional final pass.
+
+### Fixed
+
+- MCP now rejects lone Unicode surrogate characters as invalid arguments before a tool handler or
+  Apple Music write runs. Valid UTF-8 Chinese and accented text continue to round-trip normally.
 
 ## [1.2.0] - 2026-09-22
 
@@ -231,7 +238,8 @@ First working toolkit.
 - `docs/` — the curation research the sequencing rules are derived from.
 - `skill/` and `preset/` — an agent skill, and a Cordis preset that mounts the MCP server.
 
-[Unreleased]: https://github.com/Z-Han-Z/apple-music-playlists/compare/v1.2.0...HEAD
+[Unreleased]: https://github.com/Z-Han-Z/apple-music-playlists/compare/v1.3.0...HEAD
+[1.3.0]: https://github.com/Z-Han-Z/apple-music-playlists/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/Z-Han-Z/apple-music-playlists/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/Z-Han-Z/apple-music-playlists/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/Z-Han-Z/apple-music-playlists/compare/v0.3.0...v1.0.0

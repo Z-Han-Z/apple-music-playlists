@@ -21,7 +21,7 @@ Apple 网页播放器的公开 developer token，不需要 Apple Developer Progr
 推荐先安装并登录：
 
 ```bash
-pip install "apple-music-playlists @ git+https://github.com/Z-Han-Z/apple-music-playlists.git@v1.2.0"
+pip install "apple-music-playlists @ git+https://github.com/Z-Han-Z/apple-music-playlists.git@v1.3.0"
 am-playlist status
 am-playlist login
 ```
@@ -111,7 +111,7 @@ Codex、Claude、Cursor、VS Code/Copilot、Gemini CLI、Windsurf、Docker、Cor
 ## Docker
 
 ```bash
-docker build -t apple-music-playlists:1.2.0 .
+docker build -t apple-music-playlists:1.3.0 .
 ```
 
 容器使用 stdio，必须保留 `-i`，不要加 `-d`。先在宿主机登录，再把应用专用配置目录挂载到

@@ -10,7 +10,7 @@ import sys
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
@@ -167,6 +167,8 @@ class TestMcpCompatibility(unittest.TestCase):
             ({"name": "create_playlist_from_description",
               "arguments": {"description": "focus", "track_count": 20}}, "must be string"),
             ({"name": "missing", "arguments": {"description": "focus"}}, "unknown prompt"),
+            ({"name": "create_playlist_from_description",
+              "arguments": {"description": "bad-\udc8e"}}, "valid Unicode"),
         ]
         for params, message in cases:
             response = mcp.handle({"jsonrpc": "2.0", "id": 12,
@@ -262,6 +264,19 @@ class TestMcpCompatibility(unittest.TestCase):
         self.assertEqual(response["error"]["code"], -32602)
         self.assertIn("playlist", response["error"]["message"])
 
+    def test_lone_surrogate_is_rejected_before_a_write_handler_runs(self):
+        create = Mock()
+        with patch.dict(mcp.HANDLERS, {"am_create_playlist": create}):
+            response = mcp.handle({
+                "jsonrpc": "2.0", "id": 14, "method": "tools/call",
+                "params": {"name": "am_create_playlist", "arguments": {
+                    "name": "bad-\udc8e", "tracks": ["Song - Artist"],
+                }},
+            })
+        self.assertEqual(response["error"]["code"], -32602)
+        self.assertIn("valid Unicode", response["error"]["message"])
+        create.assert_not_called()
+
     def test_non_object_request_is_rejected(self):
         response = mcp.handle([])
         self.assertEqual(response["error"]["code"], -32600)
@@ -296,7 +311,7 @@ class TestMcpCompatibility(unittest.TestCase):
         )
         messages = [json.loads(line) for line in result.stdout.splitlines()]
         self.assertEqual(messages[0]["error"]["code"], -32700)
-        self.assertEqual(messages[1]["result"]["serverInfo"]["version"], "1.2.0")
+        self.assertEqual(messages[1]["result"]["serverInfo"]["version"], "1.3.0")
         self.assertEqual(result.stderr, "")
 
 

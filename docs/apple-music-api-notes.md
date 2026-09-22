@@ -220,7 +220,7 @@ music-user-token: 无 —— 请先运行 login
 > echo initialize | python am_mcp_server.py
 {"jsonrpc":"2.0","id":1,"result":{"protocolVersion":"2025-11-25",
  "capabilities":{"tools":{"listChanged":false}},
- "serverInfo":{"name":"apple-music-playlists","version":"1.2.0"},
+ "serverInfo":{"name":"apple-music-playlists","version":"1.3.0"},
  "instructions":"Apple Music playlist tools. ... / Apple Music 歌单工具…"}}
 ```
 

@@ -28,7 +28,7 @@ python am_playlist.py create --name "Minha playlist" --tracks "Música A - Artis
 Ou instale os comandos:
 
 ```bash
-pip install "apple-music-playlists @ git+https://github.com/Z-Han-Z/apple-music-playlists.git@v1.2.0"
+pip install "apple-music-playlists @ git+https://github.com/Z-Han-Z/apple-music-playlists.git@v1.3.0"
 am-playlist status
 am-playlist login
 ```
@@ -88,7 +88,7 @@ operação destrutiva. A configuração para Codex, Claude, Cursor, VS Code/Copi
 Windsurf, Docker, Cordis/DSH e Harness está em [docs/client-setup.md](docs/client-setup.md).
 
 ```bash
-docker build -t apple-music-playlists:1.2.0 .
+docker build -t apple-music-playlists:1.3.0 .
 ```
 
 O contêiner stdio precisa de `-i` e não deve usar `-d`. Faça login no host, monte a configuração

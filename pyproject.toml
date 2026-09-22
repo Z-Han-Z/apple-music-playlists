@@ -15,7 +15,7 @@ license-files = ["LICENSE"]
 dependencies = []
 keywords = ["apple-music", "playlist", "mcp", "curation", "music", "cli", "sequencing"]
 classifiers = [
-    "Development Status :: 4 - Beta",
+    "Development Status :: 5 - Production/Stable",
     "Environment :: Console",
     "Intended Audience :: End Users/Desktop",
     "Operating System :: OS Independent",

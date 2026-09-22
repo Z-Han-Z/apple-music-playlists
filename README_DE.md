@@ -29,7 +29,7 @@ python am_playlist.py create --name "Meine Playlist" --tracks "Titel A - Interpr
 Oder als Befehle installieren:
 
 ```bash
-pip install "apple-music-playlists @ git+https://github.com/Z-Han-Z/apple-music-playlists.git@v1.2.0"
+pip install "apple-music-playlists @ git+https://github.com/Z-Han-Z/apple-music-playlists.git@v1.3.0"
 am-playlist status
 am-playlist login
 ```
@@ -91,7 +91,7 @@ VS Code/Copilot, Gemini CLI, Windsurf, Docker, Cordis/DSH und Harness stehen in
 [docs/client-setup.md](docs/client-setup.md).
 
 ```bash
-docker build -t apple-music-playlists:1.2.0 .
+docker build -t apple-music-playlists:1.3.0 .
 ```
 
 Der stdio-Container benötigt `-i` und darf nicht mit `-d` laufen. Nach der Anmeldung auf dem Host

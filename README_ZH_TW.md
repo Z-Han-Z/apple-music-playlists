@@ -27,7 +27,7 @@ python am_playlist.py create --name "我的歌單" --tracks "歌名 A - 藝人 X
 也可安裝成全域命令：
 
 ```bash
-pip install "apple-music-playlists @ git+https://github.com/Z-Han-Z/apple-music-playlists.git@v1.2.0"
+pip install "apple-music-playlists @ git+https://github.com/Z-Han-Z/apple-music-playlists.git@v1.3.0"
 am-playlist status
 am-playlist login
 ```
@@ -85,7 +85,7 @@ Codex、Claude、Cursor、VS Code/Copilot、Gemini CLI、Windsurf、Docker、Cor
 的完整設定請見 [docs/client-setup.zh-CN.md](docs/client-setup.zh-CN.md)。
 
 ```bash
-docker build -t apple-music-playlists:1.2.0 .
+docker build -t apple-music-playlists:1.3.0 .
 ```
 
 stdio 容器必須保留 `-i`、不可使用 `-d`。將應用專用憑證目錄掛載到

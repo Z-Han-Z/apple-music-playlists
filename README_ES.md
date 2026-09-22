@@ -28,7 +28,7 @@ python am_playlist.py create --name "Mi lista" --tracks "Canción A - Artista X,
 O instálalo como comandos:
 
 ```bash
-pip install "apple-music-playlists @ git+https://github.com/Z-Han-Z/apple-music-playlists.git@v1.2.0"
+pip install "apple-music-playlists @ git+https://github.com/Z-Han-Z/apple-music-playlists.git@v1.3.0"
 am-playlist status
 am-playlist login
 ```
@@ -89,7 +89,7 @@ Gemini CLI, Windsurf, Docker, Cordis/DSH y Harness está en
 [docs/client-setup.md](docs/client-setup.md).
 
 ```bash
-docker build -t apple-music-playlists:1.2.0 .
+docker build -t apple-music-playlists:1.3.0 .
 ```
 
 Un contenedor stdio necesita `-i` y no debe ejecutarse con `-d`. Inicia sesión en el host y monta la

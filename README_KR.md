@@ -28,7 +28,7 @@ python am_playlist.py create --name "My Playlist" --tracks "Song A - Artist X, S
 명령으로 설치하려면:
 
 ```bash
-pip install "apple-music-playlists @ git+https://github.com/Z-Han-Z/apple-music-playlists.git@v1.2.0"
+pip install "apple-music-playlists @ git+https://github.com/Z-Han-Z/apple-music-playlists.git@v1.3.0"
 am-playlist status
 am-playlist login
 ```
@@ -88,7 +88,7 @@ annotation을 포함합니다. Codex, Claude, Cursor, VS Code/Copilot, Gemini CL
 Cordis/DSH 및 Harness 설정은 [docs/client-setup.md](docs/client-setup.md)를 참고하세요.
 
 ```bash
-docker build -t apple-music-playlists:1.2.0 .
+docker build -t apple-music-playlists:1.3.0 .
 ```
 
 stdio 컨테이너는 `-i`가 필요하며 `-d`를 사용하면 안 됩니다. 호스트에서 로그인한 뒤 전용 설정 디렉터리를
