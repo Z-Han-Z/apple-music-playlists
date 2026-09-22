@@ -7,6 +7,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-09-22
+
+This is the first stable (non-prerelease) release of the installable, agent-ready toolkit.
+
+### Added
+
+- Complete regional README entry points for English, Simplified Chinese, Traditional Chinese,
+  Japanese, Korean, Spanish, Brazilian Portuguese, German, and French. Every localized README
+  covers installation, authentication, CLI use, MCP, containers, safety, and verification.
+- English credential documentation alongside the existing Chinese guide.
+- Tested client setup guides for Codex, Claude, Cursor, VS Code/GitHub Copilot, Gemini CLI,
+  Windsurf, generic MCP harnesses, Cordis/DSH, and Harness Platform.
+- A non-root, zero-runtime-dependency Docker image definition, Compose configuration, strict
+  `.dockerignore`, and a CI container handshake smoke test.
+- Bilingual MCP server instructions and tool descriptions, plus read-only, destructive,
+  idempotent, and open-world annotations for approval-aware clients.
+
+### Changed
+
+- MCP initialization now negotiates known handshake versions (`2024-11-05` through
+  `2025-11-25`) and falls back to the server's implemented version for unknown proposals instead
+  of echoing an unsupported value.
+- CI now installs the package and checks the generated console scripts before running the offline
+  regression suite.
+- Distribution and container examples are pinned to the `v1.2.0` stable tag.
+
+### Fixed
+
+- Invalid MCP request shapes and missing required tool arguments now return standard JSON-RPC
+  errors instead of leaking handler exceptions.
+- Malformed JSON on stdio now returns a JSON-RPC parse error rather than disappearing silently.
+- Stale MCP version and tool-count comments in the API and Cordis documentation.
+
+### Compatibility note
+
+- Local stdio clients and containerized stdio clients are supported directly. Harness CI/CD can
+  run the CLI or container. Harness AI Worker Agent connectors require an authenticated network
+  URL; the project deliberately does not claim that a local stdio process is a remote connector
+  or ship an unauthenticated HTTP bridge.
+
 ## [1.1.0] - 2026-09-22
 
 Everything below is relative to `v1.0.0` (commit `709123c`), the state before the hardening
@@ -159,7 +199,8 @@ First working toolkit.
 - `docs/` — the curation research the sequencing rules are derived from.
 - `skill/` and `preset/` — an agent skill, and a Cordis preset that mounts the MCP server.
 
-[Unreleased]: https://github.com/Z-Han-Z/apple-music-playlists/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/Z-Han-Z/apple-music-playlists/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/Z-Han-Z/apple-music-playlists/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/Z-Han-Z/apple-music-playlists/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/Z-Han-Z/apple-music-playlists/compare/v0.3.0...v1.0.0
 [0.3.0]: https://github.com/Z-Han-Z/apple-music-playlists/compare/v0.2.0...v0.3.0

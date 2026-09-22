@@ -3,7 +3,7 @@
 #
 # Why an MCP server instead of "just let the agent call the script": the script
 # is a CLI, so every call would be a shell-quoting problem and every result a
-# parsing problem. The MCP bridge exposes six typed tools instead, and its
+# parsing problem. The MCP bridge exposes eleven typed tools instead, and its
 # tool names are namespaced `mcp__applemusic__<name>` by the mcp-client plugin.
 #
 # This file is an AGENT-PLANE composition, mounted ONCE under a standing scope;

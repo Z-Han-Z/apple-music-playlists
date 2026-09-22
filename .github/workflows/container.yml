@@ -1,0 +1,22 @@
+name: container
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build local MCP image
+        run: docker build --tag apple-music-playlists:test .
+      - name: Verify MCP initialize over container stdio
+        shell: bash
+        run: |
+          response="$({ printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"ci","version":"1"}}}'; } | docker run --rm -i apple-music-playlists:test)"
+          grep -q '"name": "apple-music-playlists"' <<<"$response"
+          grep -q '"version": "1.2.0"' <<<"$response"
