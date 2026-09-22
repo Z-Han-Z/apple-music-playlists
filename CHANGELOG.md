@@ -24,6 +24,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   arriving and being discarded. Measured on a real library: 65.1% of songs have lyrics, and the
   gap is concentrated in instrumental genres (soundtrack 11%, jazz 11%, electronic 32%) rather
   than spread evenly.
+- `am_lyrics.py` — a second lyrics source (LRCLIB; free, no key) and its `instrumental` flag,
+  wired in as a stage of `playlist_core.classify_vocality`. Contract details are encoded because
+  they were measured: `/api/search` is fuzzy, while `/api/get` demands artist/track/album/duration
+  to the second (0/8 on a real library; one second off is a 404).
+
+  Measuring by population corrected a claim I had made wrong: LRCLIB hits **73%** of the songs
+  Apple already covers — where it is not needed — but only **27%** of the 552 songs Apple does
+  not, and **every one of those hits is flagged instrumental**. So its value is confirming
+  instrumentals, not filling in lyrics, which is the opposite of why I reached for it.
+
+- `am_optimize_order` accepts `arc_axes`: caller-supplied per-track numbers (typically a
+  `lyric_valence` the host LLM produced after reading lyrics) that enter the arc as extra axes.
+  Values align with the **input** track list, and the length must match exactly — a mismatch is
+  rejected before any request is sent, because scores aligned to the input while tracks align to
+  resolved entries would shift every score by one and the resulting order would still look normal.
 
 ### Changed
 
