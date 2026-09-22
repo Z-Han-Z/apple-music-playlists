@@ -47,6 +47,7 @@ windows-cookies = ["cryptography"]
 # 不需要把文件搬进包目录。
 py-modules = [
     "am_library",
+    "am_lyrics",
     "am_mcp_server",
     "am_meta",
     "am_paths",
