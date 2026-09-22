@@ -1,5 +1,9 @@
 # Apple Music Playlist Toolkit
 
+English | [简体中文](README_ZH_CN.md) | [繁體中文](README_ZH_TW.md) |
+[日本語](README_JP.md) | [한국어](README_KR.md) | [Español](README_ES.md) |
+[Português do Brasil](README_PT_BR.md) | [Deutsch](README_DE.md) | [Français](README_FR.md)
+
 **Build, analyze, and sequence Apple Music playlists from the command line or an MCP-capable agent.**
 
 Pure Python standard library — no `pip install` required to run, and **no Apple Developer Program
@@ -43,6 +47,7 @@ That puts two commands on your PATH:
 
 ```bash
 am-playlist status      # the CLI
+am-playlist login       # one-time Apple ID sign-in
 am-mcp                  # the MCP stdio server
 ```
 
@@ -56,7 +61,7 @@ import them, so the client no longer needs an absolute path to a script.
 
 For development, `pip install -e .` from a clone makes edits take effect without reinstalling.
 
-See **[SETUP.md](SETUP.md)** for the credential walkthrough (three ways to get the user token,
+See **[SETUP.en.md](SETUP.en.md)** for the credential walkthrough (three ways to get the user token,
 including a zero-dependency one).
 
 ---
@@ -106,6 +111,19 @@ any other MCP client with:
 { "mcpServers": { "applemusic": {
     "command": "python", "args": ["/abs/path/am_mcp_server.py"] } } }
 ```
+
+Complete tested examples for Codex, Claude, Cursor, VS Code/Copilot, Gemini CLI, Windsurf,
+Docker, Cordis/DSH, and Harness are in **[docs/client-setup.md](docs/client-setup.md)**.
+
+Build the non-root local container with:
+
+```bash
+docker build -t apple-music-playlists:1.2.0 .
+```
+
+The client must run it attached with `docker run --rm -i`; mount only the app config directory and
+a writable cache as shown in the client guide. Config stays writable so token refresh can persist.
+Never bake Apple credentials into the image.
 
 ---
 
@@ -254,7 +272,8 @@ More in [`docs/apple-music-api-notes.md`](docs/apple-music-api-notes.md) and
 
 | Doc | Contents |
 |---|---|
-| [`SETUP.md`](SETUP.md) | Credentials: what tokens exist, how to get each one, security notes, troubleshooting |
+| [`SETUP.en.md`](SETUP.en.md) | Credentials: what tokens exist, how to get each one, security notes, troubleshooting |
+| [`docs/client-setup.md`](docs/client-setup.md) | Client-specific MCP, Docker, Cordis/DSH, generic harness, and Harness Platform setup |
 | [`docs/apple-music-api-notes.md`](docs/apple-music-api-notes.md) | Token model, endpoint contracts, measured API behaviour, eval of 7 automation approaches |
 | [`docs/how-to-build-a-good-playlist.md`](docs/how-to-build-a-good-playlist.md) | Curation methodology: adjacency physics, arc data, six narrative shapes, the ISO principle |
 | [`docs/playlist-curation-survey.md`](docs/playlist-curation-survey.md) | Survey of published curation guidance (platform rules, DJ methods, academic findings) |
@@ -265,32 +284,7 @@ More in [`docs/apple-music-api-notes.md`](docs/apple-music-api-notes.md) and
 
 ---
 
-## 中文说明
-
-**通用 Apple Music 歌单工具链**：命令行创建 / 编辑歌单、抓音频特征、体检歌单、按听感规则重排曲序。
-需要 Python 3.10+；纯标准库，不需要 `pip install`，也不需要 Apple Developer Program（$99/年）。
-
-**免责声明**：本项目不含任何艺人清单、主题或成品歌单——内容由你提供。
-
-```bash
-python am_playlist.py status                 # 自动抓取 developer token
-python am_playlist.py login                  # 一次性登录（约 6 个月有效）
-python am_playlist.py create --name "歌单名" --tracks "歌名 - 艺人, ..."
-
-python am_playlist.py library                # 导出音乐库（含 ISRC；build_pool 的输入）
-python build_pool.py --tag my-pool --cap 130 # 从自己库里挑候选池并抓音频特征
-python playlist_audit.py  "歌单名"            # 元数据层体检
-python playlist_flow.py   "歌单名"            # 听感层体检（BPM/调性/响度/能量/情绪）
-python playlist_optimize.py 清单.json -o 曲序.json   # 按规则重排曲序
-python playlist_optimize.py 清单.json --arc cinderella  # 指定叙事弧（默认 man-in-a-hole）
-python listening_stats.py top --kind songs --year 2026   # 播放次数排行
-python -m unittest discover -s tests         # 测试（全部离线）
-```
-
-**凭证配置见 [`SETUP.md`](SETUP.md)**；策展方法论见 [`docs/`](docs/)。
-配置文件在 `%APPDATA%\am-playlist\config.json`，缓存在 `%LOCALAPPDATA%\am-playlist\`（POSIX 走
-XDG）——**缓存不写进仓库**，所以克隆下来是干净的。
-仓库内**不含任何令牌**，`.gitignore` 已挡住 `config.json` / `*.p8` / `.env`。
+For the complete Simplified Chinese guide, see **[README_ZH_CN.md](README_ZH_CN.md)**.
 
 ---
 

@@ -1,0 +1,102 @@
+# Apple Music 歌單工具箱
+
+[English](README.md) | [简体中文](README_ZH_CN.md) | 繁體中文 |
+[日本語](README_JP.md) | [한국어](README_KR.md) | [Español](README_ES.md) |
+[Português do Brasil](README_PT_BR.md) | [Deutsch](README_DE.md) | [Français](README_FR.md)
+
+**從命令列或支援 MCP 的 Agent 建立、檢查並重排 Apple Music 歌單。**
+
+需要 Python 3.10+，執行時只使用標準庫，支援 Windows / macOS / Linux。預設可自動取得
+Apple 網頁播放器的公開 developer token，不必加入 Apple Developer Program。本專案不附帶
+藝人清單、主題或現成歌單，曲目由你提供。
+
+## 快速開始
+
+```bash
+git clone https://github.com/Z-Han-Z/apple-music-playlists.git
+cd apple-music-playlists
+python am_playlist.py status
+python am_playlist.py login
+python am_playlist.py create --name "我的歌單" --tracks "歌名 A - 藝人 X, 歌名 B - 藝人 Y"
+```
+
+也可安裝成全域命令：
+
+```bash
+pip install "apple-music-playlists @ git+https://github.com/Z-Han-Z/apple-music-playlists.git@v1.2.0"
+am-playlist status
+am-playlist login
+```
+
+安裝後有 `am-playlist` CLI 與 `am-mcp` MCP stdio 服務。開發模式可在儲存庫中執行
+`pip install -e .`。
+
+## 憑證與安全
+
+首次執行會自動取得 developer token。存取個人音樂庫尚需一次 Apple ID 登入：
+
+```bash
+am-playlist login
+```
+
+可從 Windows Apple Music App 讀取、使用 Playwright 登入，或手動複製
+`media-user-token`。完整步驟請參考 [SETUP.md](SETUP.md)（簡體中文）或
+[SETUP.en.md](SETUP.en.md)（English）。請勿提交 `config.json`、`.p8`、收聽紀錄或產生的歌單。
+
+## 主要功能
+
+- 搜尋 Apple Music catalog，以曲名/藝人或 ISRC 精準配對。
+- 建立、追加、查看與刪除歌單；大批操作可先 `dry_run`。
+- 元資料體檢：藝人集中度、類型、年代、時長、重複曲目與疑似間奏。
+- 音訊特徵體檢：BPM、調性、響度、能量、情緒、相鄰銜接與整體弧線。
+- 模擬退火重排，可保留分組，支援六種敘事弧。
+- 最近播放與 Apple Music Replay 播放次數排行。
+
+```bash
+am-playlist search "歌名 藝人"
+am-playlist playlists
+am-playlist create --name "歌單名" --tracks "歌名 - 藝人, ..."
+python playlist_audit.py "歌單名"
+python playlist_flow.py "歌單名"
+python playlist_optimize.py list.json -o order.json --arc cinderella
+```
+
+## MCP、Agent 與容器
+
+```json
+{
+  "mcpServers": {
+    "applemusic": {
+      "command": "am-mcp",
+      "env": {"PYTHONIOENCODING": "utf-8"}
+    }
+  }
+}
+```
+
+共 11 個 MCP 工具，說明同時包含英文與中文，並標示只讀、寫入和破壞性操作。
+Codex、Claude、Cursor、VS Code/Copilot、Gemini CLI、Windsurf、Docker、Cordis/DSH 與 Harness
+的完整設定請見 [docs/client-setup.zh-CN.md](docs/client-setup.zh-CN.md)。
+
+```bash
+docker build -t apple-music-playlists:1.2.0 .
+```
+
+stdio 容器必須保留 `-i`、不可使用 `-d`。將應用專用憑證目錄掛載到
+`/home/app/.config/am-playlist`，並保持可寫以便更新 token；緩存掛載到 `/home/app/.cache/am-playlist`。
+不要把令牌寫入映像。
+
+## 限制與測試
+
+- 寫入前先執行 `am_status`；刪除前向使用者顯示目標，MCP 還要求 `confirm=true`。
+- Apple 僅允許建立歌單的 API 用戶端繼續修改該歌單。
+- 建立歌單會把曲目加進音樂庫；刪除歌單不會移除曲目。
+
+```bash
+python -m unittest discover -s tests -v
+```
+
+測試完全離線。更多策展方法、API 實測與變更請見 [`docs/`](docs/)、[`skill/`](skill/)
+與 [CHANGELOG.md](CHANGELOG.md)。
+
+MIT License。非 Apple 官方專案；請使用自己的 Apple Music 帳號並遵守 Apple 服務條款。

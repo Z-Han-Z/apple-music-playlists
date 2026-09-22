@@ -25,8 +25,21 @@ import playlist_audit as audit_mod  # noqa: E402
 import playlist_flow as flow_mod  # noqa: E402
 import listening_stats as listening  # noqa: E402
 
-PROTOCOL_VERSION = "2024-11-05"
+PROTOCOL_VERSION = "2025-11-25"
+SUPPORTED_PROTOCOL_VERSIONS = {
+    "2024-11-05",
+    "2025-03-26",
+    "2025-06-18",
+    "2025-11-25",
+}
 SERVER_INFO = {"name": "apple-music-playlists", "version": am.VERSION}
+SERVER_INSTRUCTIONS = (
+    "Apple Music playlist tools. Call am_status before writes and use dry_run before "
+    "large creates/additions. am_delete_playlist is destructive and requires confirm=true. "
+    "Only playlists created by this API client can be modified. / "
+    "Apple Music 歌单工具：写入前先调用 am_status，大批量创建或追加前先 dry_run；"
+    "删除具有破坏性，必须显式传 confirm=true；只有本 API 客户端创建的歌单可修改。"
+)
 
 TOOLS = [
     {
@@ -41,10 +54,11 @@ TOOLS = [
         "inputSchema": {
             "type": "object",
             "properties": {
-                "term": {"type": "string", "description": "搜索词，例如 '晴天 周杰伦' 或 'Bohemian Rhapsody'"},
+                "term": {"type": "string", "minLength": 1, "description": "搜索词，例如 '晴天 周杰伦' 或 'Bohemian Rhapsody'"},
                 "storefront": {"type": "string", "description": "地区代码（如 us / jp / cn）。不给则用配置里记住的账号地区，再兜底 us"},
-                "types": {"type": "string", "description": "songs / albums / artists，默认 songs"},
-                "limit": {"type": "integer", "description": "返回条数，默认 5"},
+                "types": {"type": "string", "enum": ["songs", "albums", "artists"],
+                          "description": "songs / albums / artists，默认 songs"},
+                "limit": {"type": "integer", "minimum": 1, "maximum": 100, "description": "返回条数，默认 5"},
             },
             "required": ["term"],
             "additionalProperties": False,
@@ -60,7 +74,7 @@ TOOLS = [
         "description": "查看某个歌单的曲目列表。",
         "inputSchema": {
             "type": "object",
-            "properties": {"playlist": {"type": "string", "description": "歌单名或 p.xxxx 形式的 ID"}},
+            "properties": {"playlist": {"type": "string", "minLength": 1, "description": "歌单名或 p.xxxx 形式的 ID"}},
             "required": ["playlist"],
             "additionalProperties": False,
         },
@@ -72,11 +86,12 @@ TOOLS = [
         "inputSchema": {
             "type": "object",
             "properties": {
-                "name": {"type": "string", "description": "歌单名称"},
+                "name": {"type": "string", "minLength": 1, "description": "歌单名称"},
                 "description": {"type": "string", "description": "歌单描述，可选"},
                 "tracks": {
                     "type": "array",
                     "items": {"type": "string"},
+                    "minItems": 1,
                     "description": "曲目列表，每项形如 '歌名 - 艺人'；或用 --isrcs 时填 ISRC",
                 },
                 "isrcs": {"type": "boolean", "description": "tracks 是否按 ISRC 精确匹配（更快、更准）"},
@@ -93,8 +108,8 @@ TOOLS = [
         "inputSchema": {
             "type": "object",
             "properties": {
-                "playlist": {"type": "string", "description": "歌单名或 p.xxxx ID"},
-                "tracks": {"type": "array", "items": {"type": "string"}, "description": "'歌名 - 艺人' 列表"},
+                "playlist": {"type": "string", "minLength": 1, "description": "歌单名或 p.xxxx ID"},
+                "tracks": {"type": "array", "items": {"type": "string"}, "minItems": 1, "description": "'歌名 - 艺人' 列表"},
                 "isrcs": {"type": "boolean"},
                 "storefront": {"type": "string", "description": "地区代码。不给则用配置里记住的账号地区，再兜底 us"},
                 "dry_run": {"type": "boolean"},
@@ -110,7 +125,7 @@ TOOLS = [
         "inputSchema": {
             "type": "object",
             "properties": {
-                "playlist": {"type": "string", "description": "歌单名或 p.xxxx ID"},
+                "playlist": {"type": "string", "minLength": 1, "description": "歌单名或 p.xxxx ID"},
                 "confirm": {"type": "boolean", "description": "必须显式传 true 才会真正删除"},
             },
             "required": ["playlist", "confirm"],
@@ -124,7 +139,7 @@ TOOLS = [
                        "只读，用于判断歌单是否符合策展规范（长度 20–30 首最佳、单一主题等）。",
         "inputSchema": {
             "type": "object",
-            "properties": {"playlist": {"type": "string", "description": "歌单名或 p.xxxx ID"}},
+            "properties": {"playlist": {"type": "string", "minLength": 1, "description": "歌单名或 p.xxxx ID"}},
             "required": ["playlist"],
             "additionalProperties": False,
         },
@@ -138,7 +153,7 @@ TOOLS = [
         "inputSchema": {
             "type": "object",
             "properties": {
-                "playlist": {"type": "string", "description": "歌单名或 p.xxxx ID"},
+                "playlist": {"type": "string", "minLength": 1, "description": "歌单名或 p.xxxx ID"},
                 "refresh": {"type": "boolean", "description": "忽略特征缓存重新抓取，默认 false"},
             },
             "required": ["playlist"],
@@ -155,7 +170,7 @@ TOOLS = [
             "properties": {
                 "kind": {"type": "string", "enum": ["tracks", "played", "stations", "added"],
                          "description": "默认 tracks"},
-                "limit": {"type": "integer", "description": "条数，默认 30"},
+                "limit": {"type": "integer", "minimum": 1, "maximum": 100, "description": "条数，默认 30"},
             },
             "additionalProperties": False,
         },
@@ -171,13 +186,43 @@ TOOLS = [
             "properties": {
                 "kind": {"type": "string", "enum": ["songs", "albums", "artists"],
                          "description": "默认 songs"},
-                "year": {"type": "integer", "description": "如 2026；不给则用 all-time"},
-                "limit": {"type": "integer", "description": "条数，默认 30"},
+                "year": {"type": "integer", "minimum": 2015, "maximum": 2100, "description": "如 2026；不给则用 all-time"},
+                "limit": {"type": "integer", "minimum": 1, "maximum": 100, "description": "条数，默认 30"},
             },
             "additionalProperties": False,
         },
     },
 ]
+
+# Keep the wire catalogue useful to English and Chinese agents without making clients
+# infer behaviour from translated prose. Tool annotations are hints, not an authorization
+# mechanism; the server still enforces confirm=true for deletion.
+_ENGLISH_TOOL_DESCRIPTIONS = {
+    "am_status": "Check developer-token validity and Apple Music login status. Run before writes.",
+    "am_search_songs": "Search the Apple Music catalog and return stable catalog IDs.",
+    "am_list_playlists": "List every playlist in the current user's library, including IDs.",
+    "am_show_playlist": "Show the tracks in a playlist selected by name or ID.",
+    "am_create_playlist": "Create a playlist from 'Title - Artist' strings or ISRCs; supports dry-run matching.",
+    "am_add_tracks": "Append resolved tracks to a playlist created by this API client.",
+    "am_delete_playlist": "Delete a playlist. Destructive; confirm=true is mandatory.",
+    "am_audit_playlist": "Read-only metadata audit: length, artists, genres, eras, duplicates, and interludes.",
+    "am_analyze_flow": "Read-only audio-feature and sequencing audit; may fetch and cache remote feature data.",
+    "am_recently_played": "Read recently played or recently added Apple Music content.",
+    "am_top_played": "Read Apple Music Replay play-count rankings by song, album, or artist.",
+}
+_READ_ONLY_TOOLS = {
+    "am_status", "am_search_songs", "am_list_playlists", "am_show_playlist",
+    "am_audit_playlist", "am_analyze_flow", "am_recently_played", "am_top_played",
+}
+for _tool in TOOLS:
+    _name = _tool["name"]
+    _tool["description"] = f"{_ENGLISH_TOOL_DESCRIPTIONS[_name]} / 中文：{_tool['description']}"
+    _tool["annotations"] = {
+        "readOnlyHint": _name in _READ_ONLY_TOOLS,
+        "destructiveHint": _name == "am_delete_playlist",
+        "idempotentHint": _name in _READ_ONLY_TOOLS,
+        "openWorldHint": True,
+    }
 
 
 # ---------------------------------------------------------------- 工具实现
@@ -376,17 +421,77 @@ def send(msg: dict) -> None:
     sys.stdout.flush()
 
 
+def _invalid_arguments(rid, message: str) -> dict:
+    return {"jsonrpc": "2.0", "id": rid,
+            "error": {"code": -32602, "message": message}}
+
+
+def _validate_tool_arguments(name: str, arguments) -> str | None:
+    if not isinstance(arguments, dict):
+        return "tool arguments must be a JSON object"
+    tool = next((item for item in TOOLS if item["name"] == name), None)
+    if tool is None:
+        return None
+    missing = [key for key in tool["inputSchema"].get("required", [])
+               if key not in arguments]
+    if missing:
+        return f"missing required argument(s): {', '.join(missing)}"
+    properties = tool["inputSchema"].get("properties", {})
+    unknown = sorted(set(arguments) - set(properties))
+    if unknown and tool["inputSchema"].get("additionalProperties") is False:
+        return f"unknown argument(s): {', '.join(unknown)}"
+    expected_types = {
+        "string": lambda value: isinstance(value, str),
+        "integer": lambda value: isinstance(value, int) and not isinstance(value, bool),
+        "boolean": lambda value: isinstance(value, bool),
+        "array": lambda value: isinstance(value, list),
+    }
+    for key, value in arguments.items():
+        schema = properties.get(key, {})
+        expected = schema.get("type")
+        checker = expected_types.get(expected)
+        if checker and not checker(value):
+            return f"argument '{key}' must be {expected}"
+        if "enum" in schema and value not in schema["enum"]:
+            return f"argument '{key}' must be one of: {', '.join(map(str, schema['enum']))}"
+        if isinstance(value, str) and len(value) < schema.get("minLength", 0):
+            return f"argument '{key}' must not be empty"
+        if isinstance(value, int) and not isinstance(value, bool):
+            if "minimum" in schema and value < schema["minimum"]:
+                return f"argument '{key}' must be >= {schema['minimum']}"
+            if "maximum" in schema and value > schema["maximum"]:
+                return f"argument '{key}' must be <= {schema['maximum']}"
+        if isinstance(value, list):
+            if len(value) < schema.get("minItems", 0):
+                return f"argument '{key}' must not be empty"
+            item_type = schema.get("items", {}).get("type")
+            item_checker = expected_types.get(item_type)
+            if item_checker and any(not item_checker(item) for item in value):
+                return f"every item in argument '{key}' must be {item_type}"
+    return None
+
+
 def handle(req: dict):
+    if not isinstance(req, dict):
+        return {"jsonrpc": "2.0", "id": None,
+                "error": {"code": -32600, "message": "invalid request"}}
+    if req.get("jsonrpc") != "2.0" or not isinstance(req.get("method"), str):
+        return {"jsonrpc": "2.0", "id": req.get("id"),
+                "error": {"code": -32600, "message": "invalid request"}}
     method = req.get("method")
     rid = req.get("id")
     params = req.get("params") or {}
+    if not isinstance(params, dict):
+        return _invalid_arguments(rid, "params must be a JSON object")
 
     if method == "initialize":
         want = params.get("protocolVersion") or PROTOCOL_VERSION
+        selected = want if want in SUPPORTED_PROTOCOL_VERSIONS else PROTOCOL_VERSION
         return {"jsonrpc": "2.0", "id": rid, "result": {
-            "protocolVersion": want,
+            "protocolVersion": selected,
             "capabilities": {"tools": {"listChanged": False}},
             "serverInfo": SERVER_INFO,
+            "instructions": SERVER_INSTRUCTIONS,
         }}
     if method in ("notifications/initialized", "notifications/cancelled"):
         return None
@@ -400,10 +505,14 @@ def handle(req: dict):
         if fn is None:
             return {"jsonrpc": "2.0", "id": rid,
                     "error": {"code": -32602, "message": f"unknown tool: {name}"}}
+        arguments = params.get("arguments", {})
+        error = _validate_tool_arguments(name, arguments)
+        if error:
+            return _invalid_arguments(rid, error)
         buf = io.StringIO()
         try:
             with contextlib.redirect_stdout(buf):     # 绝不能污染协议通道
-                text = fn(params.get("arguments") or {})
+                text = fn(arguments)
             return {"jsonrpc": "2.0", "id": rid, "result": {
                 "content": [{"type": "text", "text": text}], "isError": False}}
         except am.NeedLogin:
@@ -439,6 +548,8 @@ def main() -> int:
         try:
             req = json.loads(line)
         except json.JSONDecodeError:
+            send({"jsonrpc": "2.0", "id": None,
+                  "error": {"code": -32700, "message": "parse error"}})
             continue
         resp = handle(req)
         if resp is not None:

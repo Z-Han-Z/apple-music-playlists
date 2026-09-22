@@ -5,6 +5,7 @@ from __future__ import annotations
 import contextlib
 import io
 import json
+import subprocess
 import sys
 import unittest
 from pathlib import Path
@@ -112,6 +113,105 @@ class TestDeleteFallback(unittest.TestCase):
                 rc = am.cmd_delete(args)
         self.assertEqual(rc, 0)
         self.assertEqual(api.call_count, 2)
+
+
+class TestMcpCompatibility(unittest.TestCase):
+    def test_initialize_negotiates_known_and_unknown_protocol_versions(self):
+        known = mcp.handle({"jsonrpc": "2.0", "id": 1, "method": "initialize",
+                            "params": {"protocolVersion": "2024-11-05"}})
+        future = mcp.handle({"jsonrpc": "2.0", "id": 2, "method": "initialize",
+                             "params": {"protocolVersion": "2099-01-01"}})
+        self.assertEqual(known["result"]["protocolVersion"], "2024-11-05")
+        self.assertEqual(future["result"]["protocolVersion"], mcp.PROTOCOL_VERSION)
+        self.assertIn("am_status", future["result"]["instructions"])
+
+    def test_tools_expose_bilingual_descriptions_and_risk_annotations(self):
+        tools = {tool["name"]: tool for tool in mcp.TOOLS}
+        self.assertIn("中文", tools["am_status"]["description"])
+        self.assertTrue(tools["am_status"]["annotations"]["readOnlyHint"])
+        self.assertTrue(tools["am_delete_playlist"]["annotations"]["destructiveHint"])
+        self.assertFalse(tools["am_delete_playlist"]["annotations"]["readOnlyHint"])
+
+    def test_missing_required_tool_argument_is_a_json_rpc_error(self):
+        response = mcp.handle({"jsonrpc": "2.0", "id": 3, "method": "tools/call",
+                               "params": {"name": "am_show_playlist", "arguments": {}}})
+        self.assertEqual(response["error"]["code"], -32602)
+        self.assertIn("playlist", response["error"]["message"])
+
+    def test_non_object_request_is_rejected(self):
+        response = mcp.handle([])
+        self.assertEqual(response["error"]["code"], -32600)
+        response = mcp.handle({"id": 8, "method": "ping"})
+        self.assertEqual(response["error"]["code"], -32600)
+
+    def test_tool_argument_types_ranges_and_unknown_fields_are_validated(self):
+        cases = [
+            ({"term": "x", "limit": 0}, "must be >= 1"),
+            ({"term": "x", "limit": True}, "must be integer"),
+            ({"term": "x", "types": "videos"}, "must be one of"),
+            ({"term": "x", "surprise": 1}, "unknown argument"),
+        ]
+        for arguments, message in cases:
+            response = mcp.handle({
+                "jsonrpc": "2.0", "id": 4, "method": "tools/call",
+                "params": {"name": "am_search_songs", "arguments": arguments},
+            })
+            self.assertEqual(response["error"]["code"], -32602)
+            self.assertIn(message, response["error"]["message"])
+
+    def test_stdio_emits_parse_error_then_valid_initialize_response(self):
+        request = (
+            "not-json\n"
+            '{"jsonrpc":"2.0","id":9,"method":"initialize",'
+            '"params":{"protocolVersion":"2025-11-25"}}\n'
+        )
+        result = subprocess.run(
+            [sys.executable, str(Path(__file__).resolve().parent.parent / "am_mcp_server.py")],
+            input=request, text=True, encoding="utf-8", capture_output=True, check=True,
+            cwd=Path(__file__).resolve().parent.parent,
+        )
+        messages = [json.loads(line) for line in result.stdout.splitlines()]
+        self.assertEqual(messages[0]["error"]["code"], -32700)
+        self.assertEqual(messages[1]["result"]["serverInfo"]["version"], "1.2.0")
+        self.assertEqual(result.stderr, "")
+
+
+class TestStableReleaseAssets(unittest.TestCase):
+    ROOT = Path(__file__).resolve().parent.parent
+    LOCALES = (
+        "README.md", "README_ZH_CN.md", "README_ZH_TW.md", "README_JP.md",
+        "README_KR.md", "README_ES.md", "README_PT_BR.md", "README_DE.md",
+        "README_FR.md",
+    )
+
+    def test_every_locale_has_complete_operational_entry_points(self):
+        for name in self.LOCALES:
+            text = (self.ROOT / name).read_text(encoding="utf-8")
+            for required in ("pip install", "am-playlist login", "am-mcp",
+                             "docker build", "python -m unittest", "SETUP"):
+                self.assertIn(required, text, f"{name} is missing {required}")
+
+    def test_every_locale_links_to_every_other_locale(self):
+        for name in self.LOCALES:
+            text = (self.ROOT / name).read_text(encoding="utf-8")
+            for target in self.LOCALES:
+                if target != name:
+                    self.assertIn(target, text, f"{name} does not link to {target}")
+
+    def test_container_runs_as_non_root_and_excludes_secrets(self):
+        dockerfile = (self.ROOT / "Dockerfile").read_text(encoding="utf-8")
+        ignore = (self.ROOT / ".dockerignore").read_text(encoding="utf-8")
+        self.assertIn("USER app", dockerfile)
+        self.assertIn("ENTRYPOINT", dockerfile)
+        for secret in ("config.json", "*.p8", ".env"):
+            self.assertIn(secret, ignore)
+
+    def test_client_guide_covers_supported_surfaces_and_harness_boundary(self):
+        text = (self.ROOT / "docs" / "client-setup.md").read_text(encoding="utf-8")
+        for client in ("Codex", "Claude", "Cursor", "VS Code", "Gemini CLI",
+                       "Windsurf", "Cordis", "Harness Platform", "Docker"):
+            self.assertIn(client, text)
+        self.assertIn("require a network URL and API key", text)
 
 
 if __name__ == "__main__":

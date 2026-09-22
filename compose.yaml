@@ -1,0 +1,19 @@
+services:
+  applemusic-mcp:
+    build:
+      context: .
+      args:
+        APP_UID: ${APP_UID:-1000}
+        APP_GID: ${APP_GID:-1000}
+    image: apple-music-playlists:local
+    stdin_open: true
+    environment:
+      PYTHONIOENCODING: utf-8
+    volumes:
+      - type: bind
+        source: ${AM_PLAYLIST_CONFIG_DIR:?Set AM_PLAYLIST_CONFIG_DIR to the host am-playlist config directory}
+        target: /home/app/.config/am-playlist
+      - am-playlist-cache:/home/app/.cache/am-playlist
+
+volumes:
+  am-playlist-cache:

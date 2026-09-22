@@ -218,14 +218,17 @@ music-user-token: 无 —— 请先运行 login
 
 ```
 > echo initialize | python am_mcp_server.py
-{"jsonrpc":"2.0","id":1,"result":{"protocolVersion":"2024-11-05",
+{"jsonrpc":"2.0","id":1,"result":{"protocolVersion":"2025-11-25",
  "capabilities":{"tools":{"listChanged":false}},
- "serverInfo":{"name":"apple-music-playlists","version":"1.1.0"}}}
+ "serverInfo":{"name":"apple-music-playlists","version":"1.2.0"},
+ "instructions":"Apple Music playlist tools. ... / Apple Music 歌单工具…"}}
 ```
 
 暴露 11 个工具：`am_status`、`am_search_songs`、`am_list_playlists`、`am_show_playlist`、
 `am_create_playlist`（主入口）、`am_add_tracks`、`am_delete_playlist`、`am_audit_playlist`、
 `am_analyze_flow`、`am_recently_played`、`am_top_played`。
+服务端兼容 `2024-11-05` 至 `2025-11-25` 的握手版本；客户端提出未支持版本时，
+会回退到当前实现版本，而不是错误地声称支持。工具还提供双语描述与风险 annotations。
 
 ### 4.3 DSH 预设「音乐歌单」
 
