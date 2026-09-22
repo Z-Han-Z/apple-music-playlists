@@ -124,6 +124,53 @@ class TestMcpCompatibility(unittest.TestCase):
         self.assertEqual(known["result"]["protocolVersion"], "2024-11-05")
         self.assertEqual(future["result"]["protocolVersion"], mcp.PROTOCOL_VERSION)
         self.assertIn("am_status", future["result"]["instructions"])
+        self.assertIn("prompts", future["result"]["capabilities"])
+
+    def test_playlist_prompt_is_listed_with_required_description(self):
+        response = mcp.handle({"jsonrpc": "2.0", "id": 10, "method": "prompts/list"})
+        prompts = response["result"]["prompts"]
+        self.assertEqual([item["name"] for item in prompts],
+                         ["create_playlist_from_description"])
+        arguments = {item["name"]: item for item in prompts[0]["arguments"]}
+        self.assertTrue(arguments["description"]["required"])
+        self.assertIn("track_count", arguments)
+
+    def test_playlist_prompt_renders_an_actionable_tool_workflow(self):
+        response = mcp.handle({
+            "jsonrpc": "2.0", "id": 11, "method": "prompts/get",
+            "params": {
+                "name": "create_playlist_from_description",
+                "arguments": {
+                    "description": "雨夜开车，华语独立音乐，不要现场版",
+                    "name": "雨幕公路",
+                    "track_count": "18",
+                    "language": "简体中文",
+                },
+            },
+        })
+        text = response["result"]["messages"][0]["content"]["text"]
+        self.assertIn("雨夜开车", text)
+        self.assertIn("雨幕公路", text)
+        self.assertIn("18 tracks", text)
+        for tool in ("am_status", "am_search_songs", "am_create_playlist"):
+            self.assertIn(tool, text)
+        self.assertIn("dry_run=true", text)
+
+    def test_playlist_prompt_rejects_invalid_arguments(self):
+        cases = [
+            ({"name": "create_playlist_from_description", "arguments": {}},
+             "missing required"),
+            ({"name": "create_playlist_from_description",
+              "arguments": {"description": " "}}, "must not be empty"),
+            ({"name": "create_playlist_from_description",
+              "arguments": {"description": "focus", "track_count": 20}}, "must be string"),
+            ({"name": "missing", "arguments": {"description": "focus"}}, "unknown prompt"),
+        ]
+        for params, message in cases:
+            response = mcp.handle({"jsonrpc": "2.0", "id": 12,
+                                   "method": "prompts/get", "params": params})
+            self.assertEqual(response["error"]["code"], -32602)
+            self.assertIn(message, response["error"]["message"])
 
     def test_tools_expose_bilingual_descriptions_and_risk_annotations(self):
         tools = {tool["name"]: tool for tool in mcp.TOOLS}
@@ -188,7 +235,8 @@ class TestStableReleaseAssets(unittest.TestCase):
         for name in self.LOCALES:
             text = (self.ROOT / name).read_text(encoding="utf-8")
             for required in ("pip install", "am-playlist login", "am-mcp",
-                             "docker build", "python -m unittest", "SETUP"):
+                             "docker build", "python -m unittest", "SETUP",
+                             "create_playlist_from_description"):
                 self.assertIn(required, text, f"{name} is missing {required}")
 
     def test_every_locale_links_to_every_other_locale(self):

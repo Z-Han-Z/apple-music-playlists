@@ -4,7 +4,12 @@
 [日本語](README_JP.md) | [한국어](README_KR.md) | [Español](README_ES.md) |
 [Português do Brasil](README_PT_BR.md) | [Deutsch](README_DE.md) | Français
 
-**Créez, analysez et ordonnez des playlists Apple Music en ligne de commande ou depuis un agent MCP.**
+**Décrivez la playlist voulue ; l'agent MCP la sélectionne, vérifie chaque titre dans Apple Music, la prévisualise puis la crée.**
+
+L'interface principale est le service stdio local `am-mcp`. Le modèle du client MCP interprète la
+description ; ce service recherche dans le catalogue, résout précisément les titres et agit sur le
+compte. Aucun autre LLM ni clé API supplémentaire n'est requis. Les clients compatibles Prompts
+peuvent choisir `create_playlist_from_description`; sinon, envoyez la même description dans le chat.
 
 Nécessite Python 3.10+ et fonctionne sous Windows, macOS et Linux. À l'exécution, seule la
 bibliothèque standard est utilisée. Par défaut, le developer token public du lecteur web Apple est

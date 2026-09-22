@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- A standard MCP prompt, `create_playlist_from_description`, that turns a natural-language brief
+  into an explicit status → curation → catalog search → dry-run → create workflow.
+
+### Changed
+
+- Repositioned MCP stdio as the primary product path: the host client's LLM curates from the
+  user's description while this server validates candidates against Apple Music and performs the
+  account operations. No separate LLM provider or API key is embedded in the server.
+- Kept the CLI as the authentication, diagnostics, scripting, and advanced-maintenance interface.
+
 ## [1.2.0] - 2026-09-22
 
 This is the first stable (non-prerelease) release of the installable, agent-ready toolkit.

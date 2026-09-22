@@ -5,7 +5,21 @@ description: Use when creating, curating, auditing, or reordering Apple Music pl
 
 # Apple Music 歌单：创建、体检、排序
 
-一套通用工具链。**本项目不含任何艺人清单或主题**——内容由使用者提供。
+## 首选路径：从自然语言描述直接创建
+
+用户描述场景、情绪、流派、年代、语言、偏好或排除项后，由当前 Agent 完成策划，MCP stdio
+服务负责 Apple Music catalog 校验和账号写入。不要要求用户先整理曲目数组，也不要在服务端
+另接一个 LLM。支持 MCP Prompt 的宿主可调用 `create_playlist_from_description`；不支持 Prompt
+UI 时遵循同一流程：
+
+1. 理解描述，只在缺失信息会实质改变结果时提问；否则做合理假设。
+2. 调用 `am_status`；需要个性化时再参考 `am_recently_played` / `am_top_played`。
+3. 策划有开场、中段和收尾的候选曲目，默认 25 首、优先录音室原版、避免重复，同一艺人通常不超过两首。
+4. 用 `am_search_songs` 校验不确定或有版本歧义的候选，不臆造 catalog ID。
+5. 调用 `am_create_playlist(dry_run=true)`，处理遗漏或可疑匹配后，再正式创建并简要报告结果。
+
+若用户明确只要建议或预览，则停在写入之前。CLI 主要用于登录、诊断、脚本、体检和高级维护。
+本项目不含固定艺人清单或主题，内容来自用户描述和 Agent 策划。
 
 **代码位置**：本 skill 所在仓库的根目录。若已按 `preset/` 的说明挂载了 MCP，工具名形如
 `mcp__applemusic__am_create_playlist`。
