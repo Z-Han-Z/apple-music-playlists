@@ -41,23 +41,29 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from playlist_flow import camelot, fold_tempo, harmonic_ok  # noqa: E402
-
-ROOT = Path(__file__).resolve().parent
-REF_DIR = ROOT / "refs"
+import am_paths as ap  # noqa: E402
+# 从**平台无关**的 core 取乐理与规则判定，而不是从 playlist_flow。
+# playlist_flow 会 import am_playlist（Apple 层），从它取会让这个纯算法模块
+# 间接依赖某个音乐平台——接第二个平台时算法层不该认识任何平台的代码。
+from playlist_core import camelot, check_pair, fold_tempo  # noqa: E402
 
 
 def resolve_feature_cache(explicit=None) -> Path | None:
-    """特征缓存文件：显式路径优先，否则取 refs/ 下**最新写入**的那个。
+    """特征缓存文件：显式路径优先，否则取缓存目录下**最新写入**的那个。
 
-    （原来写的是 glob 取第一个，多张歌单的缓存放在一起就会拿错。）
+    这终究是"猜"——多张歌单的缓存混在一起时会拿错，所以调用方应该把
+    选中的文件路径打出来。缓存目录顺序见 am_paths.read_dirs()
+    （先用户目录，再旧版的仓库内 refs/）。
     """
     if explicit and Path(explicit).exists():
         return Path(explicit)
-    if not REF_DIR.exists():
+    files: list[Path] = []
+    for d in ap.read_dirs():
+        if d.exists():
+            files.extend(d.glob("features-*.json"))
+    if not files:
         return None
-    files = sorted(REF_DIR.glob("features-*.json"), key=lambda p: p.stat().st_mtime)
-    return files[-1] if files else None
+    return max(files, key=lambda p: p.stat().st_mtime)
 
 
 def parse_spec(spec: dict) -> list[dict]:
@@ -71,11 +77,23 @@ def parse_spec(spec: dict) -> list[dict]:
     raise ValueError("清单里既没有 blocks 也没有 tracks")
 
 # ---- 权重（调这些就能改"更在意顺耳还是更在意弧线"） ----
-W_TWO_SLOW = 6.0
-W_SMALL_DROP = 3.0
-W_BOTH_SIMILAR = 3.0
-W_BIG_TEMPO_JUMP = 1.5
-W_ENERGY_CLASH = 2.0
+# 键名与 playlist_core.RULES 一一对应：这样"哪条规则被触发"和"它有多重"
+# 用的是同一套词汇，不会再出现两处各写一份判定。
+WEIGHTS = {
+    "two_slow": 6.0,
+    "small_drop": 3.0,
+    "both_similar": 3.0,
+    "big_jump": 1.5,
+    "energy_clash": 2.0,
+}
+
+# 旧名字保留成别名（文档和既有脚本里在用）
+W_TWO_SLOW = WEIGHTS["two_slow"]
+W_SMALL_DROP = WEIGHTS["small_drop"]
+W_BOTH_SIMILAR = WEIGHTS["both_similar"]
+W_BIG_TEMPO_JUMP = WEIGHTS["big_jump"]
+W_ENERGY_CLASH = WEIGHTS["energy_clash"]
+
 W_ARC = 12.0
 
 
@@ -115,25 +133,15 @@ def load_tracks(spec_file, features_file=None):
 
 
 def adjacency_cost(seq):
-    c = 0.0
-    for a, b in zip(seq, seq[1:]):
-        if not a["f"] or not b["f"]:
-            continue
-        ta, tb = a["bpm"], b["bpm"]
-        ka, kb = a["key"], b["key"]
-        ea, eb = a["energy"], b["energy"]
-        pct = (tb - ta) / ta * 100 if ta else 0
-        if ta < 100 and tb < 100:
-            c += W_TWO_SLOW
-        if ta > tb and 0 < -pct < 12:
-            c += W_SMALL_DROP
-        if abs(pct) < 6 and harmonic_ok(ka, kb):
-            c += W_BOTH_SIMILAR
-        if abs(pct) > 40:
-            c += W_BIG_TEMPO_JUMP
-        if abs(ea - eb) > 0.35 and not harmonic_ok(ka, kb):
-            c += W_ENERGY_CLASH
-    return c
+    """相邻衔接的惩罚之和。
+
+    **判定全部走 playlist_core.check_pair** —— 与体检器同源。
+    这里只负责把命中的规则折算成权重，不再自己判一遍。
+    """
+    return sum(WEIGHTS[r]
+               for a, b in zip(seq, seq[1:])
+               if a.get("f") and b.get("f")
+               for r in check_pair(a, b))
 
 
 def arc_cost(seq):

@@ -43,6 +43,16 @@ including a zero-dependency one).
 | `playlist_optimize.py` | Simulated-annealing **track ordering** against the measured rules |
 | `listening_stats.py` | **Listening history**: recently played, and per-track/album/artist **play counts** (Apple Music Replay backend) |
 | `profile_library.py` | **Taste profile**: what your most-played music actually sounds like (BPM / energy / valence spread, mood quadrants) |
+| `am_library.py` | **Your library**: paged export of every catalog-backed song you own, enriched with ISRC / year / genre |
+| `build_pool.py` | **Candidate pool**: pick a pool out of your library (most-played → favourite artists → variety filler) and fetch its features |
+
+Supporting modules:
+
+| File | Purpose |
+|---|---|
+| `playlist_core.py` | **Platform-neutral core**: Camelot, BPM folding, the four adjacency rules, the six narrative shapes. Imports nothing from this project and nothing third-party |
+| `am_paths.py` | Platform-neutral paths and version — where config and cache live |
+| `am_meta.py` | The single `catalog_meta` implementation (batched catalog lookups) |
 
 All three analysis modules are importable as libraries:
 
@@ -67,6 +77,26 @@ any other MCP client with:
 { "mcpServers": { "applemusic": {
     "command": "python", "args": ["/abs/path/am_mcp_server.py"] } } }
 ```
+
+---
+
+## Tests
+
+```bash
+python -m unittest discover -s tests -v
+```
+
+104 tests, all **offline** — no network, no credentials. Two kinds:
+
+- **Behaviour**: the pure math that decides what "sounds good" — Camelot mapping, BPM folding,
+  arc classification, each adjacency penalty asserted in isolation, annealing determinism and the
+  block-order constraint. All six narrative archetypes must classify as themselves.
+- **Structural regressions**, each pinned to a bug that actually shipped: no hardcoded catalog
+  region, exactly one `catalog_meta`, no non-`None` `--storefront` default, cache outside the
+  repo, every MCP tool wired to a handler, and the optimizer free of platform imports.
+
+They earn their keep immediately — the suite caught a syntax error in a file written minutes
+earlier, before it was ever run.
 
 ---
 
@@ -106,10 +136,26 @@ Derived from the research collected in [`docs/`](docs/) — including a PLOS ONE
 - Adjacent tracks must not be similar in **both** tempo and key
 - No unjustified large BPM jumps (>40%); no jarring energy shifts under incompatible keys
 
+These four have **exactly one definition**, in `playlist_core.check_pair()`, and both the audit and
+the optimizer call it. They used to be implemented twice, and the copies disagreed: the audit
+called a track "slow" below the tempo's 25th percentile while the optimizer used a fixed 100 BPM,
+and the audit never checked the BPM-jump rule at all. That is a tool diagnosing against one
+standard and repairing against another — so the count it reported could not be trusted.
+
+> **Note on the "slow" threshold.** It is absolute (100 BPM), not data-driven, deliberately: the
+> optimizer evaluates the same sequence thousands of times while annealing, and a percentile
+> threshold would drift as the permutation changes, so the cost would never settle. The cost is
+> that a uniformly slow playlist flags *every* adjacent pair — that is real, not a sequencing
+> failure, and the report says so.
+
 **Global arc** (matching the professional consensus)
 - `valence`, `energy`, `loudness` → **U-shaped** (high at both ends, lower in the middle)
 - `tempo` → **inverted U**
 - overall shape defaults to **man-in-a-hole** (fall, then rise)
+
+> **Known gap.** The report *classifies* your playlist against all six narrative shapes, but the
+> optimizer only ever *targets* man-in-a-hole (a valence valley at 60%). Choosing a different target
+> shape is not wired up, even though the curation doc presents shape selection as the first decision.
 
 The optimizer preserves your grouping (movements / eras / moods) and only reorders *within*
 groups, so thematic structure survives the loudness tuning. Drop the grouping and it reorders
@@ -165,13 +211,18 @@ python am_playlist.py status                 # 自动抓取 developer token
 python am_playlist.py login                  # 一次性登录（约 6 个月有效）
 python am_playlist.py create --name "歌单名" --tracks "歌名 - 艺人, ..."
 
+python am_playlist.py library                # 导出音乐库（含 ISRC；build_pool 的输入）
+python build_pool.py --tag my-pool --cap 130 # 从自己库里挑候选池并抓音频特征
 python playlist_audit.py  "歌单名"            # 元数据层体检
 python playlist_flow.py   "歌单名"            # 听感层体检（BPM/调性/响度/能量/情绪）
 python playlist_optimize.py 清单.json -o 曲序.json   # 按规则重排曲序
 python listening_stats.py top --kind songs --year 2026   # 播放次数排行
+python -m unittest discover -s tests         # 104 项测试，全部离线
 ```
 
 **凭证配置见 [`SETUP.md`](SETUP.md)**；策展方法论见 [`docs/`](docs/)。
+配置文件在 `%APPDATA%\am-playlist\config.json`，缓存在 `%LOCALAPPDATA%\am-playlist\`（POSIX 走
+XDG）——**缓存不写进仓库**，所以克隆下来是干净的。
 仓库内**不含任何令牌**，`.gitignore` 已挡住 `config.json` / `*.p8` / `.env`。
 
 ---

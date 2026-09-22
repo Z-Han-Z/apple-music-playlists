@@ -52,44 +52,23 @@ RB = "https://api.reccobeats.com"
 # （见 am_paths.read_dirs）——否则 clone 下来就在仓库里留一堆个人中间产物。
 CACHE_DIR = am.cache_dir()
 
-# Spotify 的 key 是 0-11 的半音序号；mode 0=小调 1=大调
-PITCH = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
-CAMELOT_MINOR = {0: "5A", 1: "12A", 2: "7A", 3: "2A", 4: "9A", 5: "4A",
-                 6: "11A", 7: "6A", 8: "1A", 9: "8A", 10: "3A", 11: "10A"}
-CAMELOT_MAJOR = {0: "8B", 1: "3B", 2: "10B", 3: "5B", 4: "12B", 5: "7B",
-                 6: "2B", 7: "9B", 8: "4B", 9: "11B", 10: "6B", 11: "1B"}
-
-
-def camelot(key: int, mode: int) -> str:
-    return (CAMELOT_MAJOR if mode == 1 else CAMELOT_MINOR).get(key, "?")
-
-
-# 速度估计的倍频（octave）歧义是通病：同一首歌可能被估成 90 或 180。
-# 把 BPM 折进 [70,160) 再比较，才能判断"两首慢歌""降幅够不够"这类相对关系。
-def fold_tempo(bpm: float) -> float:
-    if not bpm or bpm <= 0:
-        return 0.0
-    x = float(bpm)
-    while x >= 160:
-        x /= 2
-    while x < 70:
-        x *= 2
-    return round(x, 1)
-
-
-def harmonic_ok(a: str, b: str) -> bool:
-    """Camelot 的四种"最容易的移动"：同码 / ±1 同字母 / 同号 A↔B。"""
-    if a == "?" or b == "?":
-        return False
-    na, la = int(a[:-1]), a[-1]
-    nb, lb = int(b[:-1]), b[-1]
-    if na == nb:
-        return True                      # 同码，或同号 A↔B
-    if la == lb and abs(na - nb) == 1:
-        return True                      # 编号 ±1
-    if la == lb and {na, nb} == {1, 12}:
-        return True                      # 环形相邻 12A↔1A
-    return False
+# 乐理与相邻规则的**唯一**实现在 playlist_core.py（平台无关模块）。
+# 这里把名字重新导出，`pf.camelot(...)` 这类既有调用不受影响。
+from playlist_core import (  # noqa: E402
+    ARCHETYPES,
+    CAMELOT_MAJOR,
+    CAMELOT_MINOR,
+    PITCH,
+    RULE_LABELS,
+    RULES,
+    camelot,
+    classify_shape,
+    fold_tempo,
+    harmonic_ok,
+    norm,
+    scan_adjacency,
+    slow_cut,
+)
 
 
 def rb_get(path: str, retries: int = 3) -> dict | None:
@@ -165,40 +144,8 @@ def fetch_features(pid: str, tracks: list[tuple[str, str, str, str]], refresh: b
     return cache
 
 
-def norm(vals: list[float]) -> list[float]:
-    lo, hi = min(vals), max(vals)
-    if hi == lo:
-        return [0.5] * len(vals)
-    return [(v - lo) / (hi - lo) for v in vals]
-
-
-# 六种叙事弧的理想曲线（5 点，0=最低 1=最高），来源见 docs/how-to-build-a-good-playlist.md
-ARCHETYPES = {
-    "Rags to riches（持续上升）": [0.0, 0.25, 0.5, 0.75, 1.0],
-    "Tragedy（持续下降）": [1.0, 0.75, 0.5, 0.25, 0.0],
-    "Man in a hole（落-起）": [0.70, 0.20, 0.0, 0.35, 1.0],
-    "Icarus（起-落）": [0.0, 0.60, 1.0, 0.50, 0.0],
-    "Cinderella（起-落-起）": [0.0, 0.70, 1.0, 0.30, 1.0],
-    "Oedipus（落-起-落）": [1.0, 0.30, 0.80, 0.20, 0.0],
-}
-
-
-def classify_shape(vals: list[float]) -> tuple[str, list[float], dict[str, float]]:
-    """把整条曲线的 5 段均值与六种叙事弧比 MSE，返回 (最佳形状, 段均值, 各形状得分)。
-
-    ⚠️ 这是启发式：段数少、曲线平缓、或曲子是"多段复合弧"时会误判。
-    所以调用方应该把段均值一起打出来，让人自己判断。
-    """
-    k = 5
-    step = max(1, len(vals) // k)
-    segs = [statistics.mean(vals[i * step:(i + 1) * step]) for i in range(k)]
-    z = norm(segs)
-    scores = {
-        name: sum((a - b) ** 2 for a, b in zip(z, ideal)) / k
-        for name, ideal in ARCHETYPES.items()
-    }
-    best = min(scores, key=scores.get)
-    return best, segs, scores
+# norm / ARCHETYPES / classify_shape 已移到 playlist_core.py 并在文件上方重新导出。
+# 段数逻辑（5 段而非 3 段）是"好听"判断的核心，属于平台无关层，不该绑在 Apple 报告代码里。
 
 
 def analyze(rows: list[dict]) -> None:
@@ -249,41 +196,43 @@ def analyze(rows: list[dict]) -> None:
     print(f"     全曲中位 BPM={statistics.median(tempo):.1f}  V={statistics.median(valence):.2f}")
 
     # ---------- 3. 相邻衔接检查 ----------
-    print(f"\n【3】相邻衔接（§2.1 / §2.3）")
-    problems = {"two_slow": [], "small_drop": [], "both_similar": [], "big_jump": []}
-    bpm_med = statistics.median(tempo)
-    slow_cut = min(100.0, statistics.quantiles(tempo, n=4)[0] if len(tempo) >= 4 else 100.0)
-    for i in range(n - 1):
-        a, b = rows[i], rows[i + 1]
-        ta, tb = tempo[i], tempo[i + 1]
-        ka, kb = keys[i], keys[i + 1]
-        ea, eb = energy[i], energy[i + 1]
-        pct = (tb - ta) / ta * 100 if ta else 0
-        if ta < slow_cut and tb < slow_cut:
-            problems["two_slow"].append((i + 1, a["name"], b["name"], ta, tb))
-        if ta > tb and 0 < -pct < 12:      # 变慢了，但降幅不到 12% → "只慢一点"
-            problems["small_drop"].append((i + 1, a["name"], b["name"], ta, tb, -pct))
-        if abs(pct) < 6 and harmonic_ok(ka, kb):
-            problems["both_similar"].append((i + 1, a["name"], b["name"], ta, tb, ka, kb))
-        if abs(ea - eb) > 0.35 and not harmonic_ok(ka, kb):
-            problems["big_jump"].append((i + 1, a["name"], b["name"], ea, eb, ka, kb))
+    # 判定全部走 playlist_core.check_pair —— 体检器与优化器**必须**用同一套规则。
+    # 这里曾经自己判一遍，而且"慢歌"用的是 tempo 的 25 分位（优化器用的是固定
+    # 100BPM），于是工具用一套定义诊断、用另一套定义修；另外它也从来没检查过
+    # BPM 大跳（优化器却会惩罚），导致那一项"能被优化但不会被报告"。
+    print(f"\n【3】相邻衔接（规则定义见 playlist_core.check_pair）")
+    pair_tracks = [{"name": r["name"], "bpm": tempo[i], "key": keys[i], "energy": energy[i]}
+                   for i, r in enumerate(rows)]
+    hits = scan_adjacency(pair_tracks)
 
-    def show(tag, items, fmt):
+    def show(rule, fmt):
+        items = hits[rule]
+        label = RULE_LABELS[rule]
         if not items:
-            print(f"     ✅ {tag}：无")
+            print(f"     ✅ {label}：无")
             return
-        print(f"     ⚠️  {tag}：{len(items)} 处（共 {n-1} 个衔接）")
-        for it in items:
-            print("          " + fmt(it))
+        print(f"     ⚠️  {label}：{len(items)} 处（共 {n-1} 个衔接）")
+        for pos, d in items:
+            print("          " + fmt(pos, d))
 
-    show(f"两首慢歌相邻（§2.1 明确禁止；阈值 {slow_cut:.0f}BPM）", problems["two_slow"],
-         lambda x: f"#{x[0]}→#{x[0]+1}  {x[1][:22]} ({x[3]:.0f}BPM) → {x[2][:22]} ({x[4]:.0f}BPM)")
-    show("「只慢一点」（降幅<12%，会让慢歌显得拖）", problems["small_drop"],
-         lambda x: f"#{x[0]}→#{x[0]+1}  {x[1][:20]} {x[3]:.0f}→{x[4]:.0f}BPM（降 {x[5]:.0f}%）")
-    show("相邻在 tempo 和 key 上同时相似（§2.3）", problems["both_similar"],
-         lambda x: f"#{x[0]}→#{x[0]+1}  {x[1][:20]} {x[3]:.0f}→{x[4]:.0f}BPM {x[5]}→{x[6]}")
-    show("能量骤变且调性不兼容（突兀）", problems["big_jump"],
-         lambda x: f"#{x[0]}→#{x[0]+1}  {x[1][:20]} E {x[3]:.2f}→{x[4]:.2f} ({x[5]}→{x[6]})")
+    show("two_slow", lambda p, d: f"#{p-1}→#{p}  {d['a']['name'][:22]} "
+                                  f"({d['a']['bpm']:.0f}BPM) → {d['b']['name'][:22]} "
+                                  f"({d['b']['bpm']:.0f}BPM)")
+    show("small_drop", lambda p, d: f"#{p-1}→#{p}  {d['a']['name'][:20]} "
+                                    f"{d['a']['bpm']:.0f}→{d['b']['bpm']:.0f}BPM"
+                                    f"（降 {-d['pct']:.0f}%）")
+    show("both_similar", lambda p, d: f"#{p-1}→#{p}  {d['a']['name'][:20]} "
+                                      f"{d['a']['bpm']:.0f}→{d['b']['bpm']:.0f}BPM "
+                                      f"{d['a']['key']}→{d['b']['key']}")
+    show("big_jump", lambda p, d: f"#{p-1}→#{p}  {d['a']['name'][:20]} "
+                                  f"{d['a']['bpm']:.0f}→{d['b']['bpm']:.0f}BPM"
+                                  f"（{d['pct']:+.0f}%）")
+    show("energy_clash", lambda p, d: f"#{p-1}→#{p}  {d['a']['name'][:20]} "
+                                      f"E {d['a']['energy']:.2f}→{d['b']['energy']:.2f} "
+                                      f"({d['a']['key']}→{d['b']['key']})")
+    print(f"     （「慢歌」阈值 = {slow_cut():.0f}BPM，与优化器同源。"
+          f"若某条规则大面积命中，先想清楚是不是定义使然——"
+          f"比如整张都是慢歌，two_slow 命中每一对是**真实**的，不是排序失败。）")
 
     # ---------- 4. 形状 ----------
     # 原来只切 3 段，把"六幕的 Cinderella（起-落-起）"误判成 Icarus。

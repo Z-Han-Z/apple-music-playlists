@@ -22,6 +22,7 @@ description: Use when creating, curating, auditing, or reordering Apple Music pl
 | 建歌单 / 加歌 / 查曲目 | MCP 工具（`am_*`）或 `am_playlist.py` |
 | "这张歌单怎么样" | `am_audit_playlist`（元数据层）+ `am_analyze_flow`（听感层） |
 | "帮我排一下顺序" | `playlist_optimize.py`（见 §三） |
+| "我库里有什么" / 挑候选曲池 | `am_playlist.py library` + `build_pool.py`（见 §五） |
 | 排查 API 报错 | 先看 §四 |
 
 **MCP 工具（11 个）**
@@ -51,18 +52,25 @@ python am_playlist.py status                 # token 状态
 python am_playlist.py login                  # 一次性获取 user token
 python am_playlist.py login --from-clipboard # 从剪贴板读（先在 DevTools 复制 cookie）
 python am_playlist.py logout [--keep-developer]
-python am_playlist.py search "关键词" --storefront us
+python am_playlist.py search "关键词"          # 地区自动用配置里记住的账号地区
 python am_playlist.py list
 python am_playlist.py show "歌单名"
 python am_playlist.py create --name "X" --tracks "歌名 - 艺人, ..." [--dry-run]
 python am_playlist.py create --name "X" --json tracks.json     # 批量/脚本化
 python am_playlist.py add --playlist "X" --tracks "..."
 python am_playlist.py delete "X" --yes
+python am_playlist.py library                # 导出整个音乐库（含 ISRC）
 
+python build_pool.py --tag my-pool --cap 130 # 从自己库里挑候选池 + 抓特征
 python playlist_audit.py     "歌单名"              # 元数据层体检
 python playlist_flow.py      "歌单名" [--refresh]  # 听感层体检（联网抓特征）
 python playlist_optimize.py  清单.json [-o 输出.json] [--features 缓存.json]
+python -m unittest discover -s tests         # 104 项测试，全部离线
 ```
+
+**`--storefront` 不要写死。** 不给参数就用配置里记住的账号地区。`search` 曾经的默认值是
+`"us"`，于是"显式参数优先"那一支永远先命中，配置里的地区形同虚设——而 MCP 的
+`am_search_songs` 是解析过的，同一个查询在 CLI 和 MCP 里会得到不同地区的结果。
 
 **`--json` 输入格式**（顺序保留；三种写法可混用）：
 
@@ -87,6 +95,11 @@ python playlist_optimize.py  清单.json [-o 输出.json] [--features 缓存.jso
 **专业音乐人排专辑时偏向 `man in a hole`。** 30 首以上建议用"两个连续的 man-in-a-hole"——
 一个 40 分钟的大弧太难撑。**先选形状并写下来**，它是后面所有决定的裁判。
 
+> ⚠️ **但目前的实现只支持一种目标形状。** 体检会把你和六种叙事弧都对比、报出最接近的那个，
+> 而优化器**只会朝 man-in-a-hole 优化**（valence 谷底在 60%）。所以"先选形状"现在只有
+> 诊断价值，还没接上目标。实测那张六幕歌单被判为 **Cinderella**，却是按 man-in-a-hole
+> 的目标排出来的——二者本来就有张力，别假装没有。
+
 ### 3.2 四条硬性相邻规则
 
 1. **不要两首慢歌相邻**
@@ -95,6 +108,15 @@ python playlist_optimize.py  清单.json [-o 输出.json] [--features 缓存.jso
    （Camelot：同码 / ±1 同字母 / 同号 A↔B 互换 = 兼容）
 4. **不要 BPM 无理由大跳（>40%）**；能量骤变 + 调性不兼容 = 突兀
 
+> **这四条只有一份定义**，在 `playlist_core.check_pair()`，体检器和优化器都调它。
+> 以前两边各写了一遍，而且**不一样**：体检器把"慢歌"定义为 tempo 的 25 分位，优化器用固定
+> 100BPM；体检器还**从来没检查过 BPM 大跳**（优化器却会惩罚它）。等于用一套标准诊断、
+> 用另一套标准修——所以它报出来的数字当时是靠不住的。
+>
+> 统一成绝对阈值 100BPM 是有意的：优化器要在退火中反复求值**同一序列**，分位数会随当前
+> 排列漂移，cost 就永远不收敛。代价是整张都慢的歌单会把每一对相邻都标成违规——那是真实的，
+> 报告里也会这么写。
+
 > **⚠️ 规则 1 有一个数学边界，那不是排列失败。**
 > 在一段**刻意安静**的段落里（"深夜""前奏""夜明け前"），如果慢歌比快歌多出 1 首以上，
 > **无论怎么排都必然剩下相邻的慢歌对**——2 首快歌最多把 5 首慢歌切成 3 段，
@@ -102,6 +124,11 @@ python playlist_optimize.py  清单.json [-o 输出.json] [--features 缓存.jso
 > 实测：把 `W_TWO_SLOW` 从 6 提到 16，违规数**一模一样还是 2 处**，只是惩罚被放大，
 > 总 cost 反而从 15.93 涨到 35.92。**遇到这种情况不要继续加权重**——
 > 那是段落选曲的问题（接受它，或往这段补几首快歌），不是排序问题。
+>
+> 规则统一之后复测：`two_slow` **仍然是 2 处**，所以这个数字本身是稳的。
+> 但统一也**新暴露出 2 处 BPM 大跳**（85→134、85→120），两处都落在段落交界上。
+> 优化器只能组内重排，跨段的跳变是"六幕结构"这个决定本身的代价，不是排序没排好。
+> **结构从来不是免费的。**
 
 ### 3.3 整体弧线
 
@@ -185,7 +212,7 @@ tempo    → 倒 U 型（两端慢、中段快）
 | 坑 | 事实 |
 |---|---|
 | **搜索词不要带 `" - "`** | 拿 `"Title - Artist"` 整串去搜，前几条**全是 Live/Remastered**；用空格分隔才正常。`resolve_tracks()` 已做转换 |
-| **版本后缀要扣分** | Live / Remastered / Demo / 现场 / 伴奏——查询里没提到却在曲名里出现就扣分（`VERSION_NOISE`） |
+| **版本后缀要扣分** | Live / Remastered / Demo / 现场 / 伴奏——查询里没提到却在曲名里出现就扣分（`VERSION_NOISE`）。**拉丁词按整词匹配**：子串匹配会把 `Alive` / `Olive` / `Deliver` 当成现场版扣分。CJK 没有词边界，仍用子串。`Remix` 必须显式进表——只列 `mix` 会漏掉它 |
 | **BPM 有倍频歧义** | 同一首可能被估成 90 或 180。**比较前把 BPM 折进 [70,160)**，否则"两首慢歌相邻"会误报约 4 倍 |
 | **时长能筛掉间奏** | `durationInMillis < 120000` 的基本是间奏/前奏曲，不是歌 |
 | **艺人搜不到 ≠ 歌不在本区** | 某日本企划在 cn 的**艺人检索为空**，但用 ISRC 反查 **cn 曲库命中 9 首**。判断某歌在不在某区要按 ISRC 查 |
@@ -238,7 +265,33 @@ python listening_stats.py recent --kind tracks --limit 30          # 最近播�
 
 ---
 
-## 五、参考文件
+## 五、缓存、测试与目录
+
+**缓存写在用户目录，不写进仓库**（所以 clone 下来是干净的）：
+
+| 内容 | 位置 |
+|---|---|
+| 配置（含 token） | `%APPDATA%\am-playlist\config.json`（POSIX：`$XDG_CONFIG_HOME`） |
+| 缓存 / 导出 | `%LOCALAPPDATA%\am-playlist\`（POSIX：`$XDG_CACHE_HOME`） |
+
+读取时按 `am_paths.read_dirs()` 的顺序回退（用户目录 → 旧的仓库内 `refs/`），
+所以老缓存仍然能用；但新文件**只写用户目录**。`config_dir()` 的路径不能改——
+token 在里面，改了所有人得重新登录（有测试盯着这条）。
+
+**库缓存有 schema 校验。** 旧的 `refs/library-songs.json` 没有 `isrc` 字段，会被明确拒绝并
+重拉。直接沿用会让特征链静默失效——"有特征"的比例变成 0%，而且不报错。
+
+```bash
+python -m unittest discover -s tests -v   # 104 项，全部离线，不需要 token
+```
+
+测试分两类：**行为**（Camelot、BPM 折叠、弧线分类、每条相邻惩罚单独断言、退火确定性与分组
+约束）和**结构性回归**（每条都对应一个真出过的 bug：写死的地区、多份 `catalog_meta`、
+非 None 的 `--storefront` 默认值、缓存落进仓库、MCP 工具没接 handler、优化器引入平台依赖）。
+
+---
+
+## 六、参考文件
 
 - `reference.md`（同目录）—— API 契约速查：端点、请求体、Camelot 映射表、字段清单、错误码
 - 仓库 `docs/how-to-build-a-good-playlist.md` —— 策展原则的完整依据与实证数据

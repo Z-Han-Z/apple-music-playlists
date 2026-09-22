@@ -22,10 +22,10 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 SOURCES = sorted(p for p in ROOT.glob("*.py"))
-# 这两个文件不能被 import：
-#   build_pool.py      整段逻辑写在模块顶层，import 就会执行
-#   make_day_playlist.py 是本地私人脚本（已 gitignore），别人的 clone 里根本没有
-NOT_IMPORTABLE = {"build_pool.py", "make_day_playlist.py"}
+# make_day_playlist.py 是本地私人脚本（已 gitignore），别人的 clone 里根本没有。
+# build_pool.py 曾经也在这里（整段逻辑写在模块顶层，import 就会执行）——
+# 改造成正规 CLI 之后它就应该是可 import 的，所以从这个名单里去掉了。
+NOT_IMPORTABLE = {"make_day_playlist.py"}
 
 
 def _code_lines(path: Path):
@@ -127,9 +127,17 @@ class TestPlatformNeutralCore(unittest.TestCase):
         self.assertEqual(bad, set(), f"am_paths 引入了非标准库依赖：{bad}")
 
     def test_optimizer_does_not_import_apple_layer(self):
-        src = (ROOT / "playlist_optimize.py").read_text(encoding="utf-8")
-        self.assertNotIn("import am_playlist", src)
-        self.assertNotIn("import am_meta", src)
+        """优化器必须是纯算法层。
+
+        既不能直接依赖 Apple 层，也不能**经由** playlist_flow 间接依赖
+        （playlist_flow 会 import am_playlist）。以前它正是从 playlist_flow
+        取 camelot/fold_tempo/harmonic_ok 的——那等于让算法层认识某个平台。
+        """
+        imported = _project_imports(ROOT / "playlist_optimize.py")
+        for banned in ("am_playlist", "am_meta", "playlist_flow", "playlist_audit"):
+            self.assertNotIn(banned, imported, f"优化器不该 import {banned}")
+        self.assertIn("playlist_core", imported,
+                      "优化器应该只依赖平台无关的 playlist_core")
 
 
 class TestPaths(unittest.TestCase):
@@ -180,6 +188,46 @@ class TestSourcesCompile(unittest.TestCase):
                 importlib.import_module(p.stem)
             except Exception as e:      # noqa: BLE001
                 self.fail(f"{p.name} 无法 import: {type(e).__name__}: {e}")
+
+
+class TestBuildPoolIsDistributable(unittest.TestCase):
+    """build_pool.py 曾经有两个让人根本跑不起来的问题：
+
+      1. 整段逻辑写在模块顶层（没有 main()、没有 __main__ 守卫），import 就执行；
+      2. 读 refs/library-songs.json —— 而**仓库里没有任何代码生成过这个文件**，
+         它还被 gitignore 了。于是对新克隆的人来说必然 FileNotFoundError。
+
+    现在它必须是：可 import、有 main()、用 argparse、不依赖仓库内 refs/。
+    """
+
+    def setUp(self):
+        self.src = (ROOT / "build_pool.py").read_text(encoding="utf-8")
+
+    def test_is_a_proper_cli(self):
+        self.assertIn("def main(", self.src)
+        self.assertIn('if __name__ == "__main__":', self.src)
+        self.assertIn("argparse.ArgumentParser", self.src)
+
+    def test_import_is_side_effect_free(self):
+        """import 就能跑完整个流程的话，测试和下游模块都别想用这个文件。"""
+        import importlib
+        importlib.import_module("build_pool")   # 不抛异常即通过
+
+    def test_no_repo_local_refs_path(self):
+        for line in self.src.splitlines():
+            if line.lstrip().startswith("#"):
+                continue
+            self.assertNotIn('"refs"', line,
+                             f"build_pool 不该再用仓库内的 refs/：{line.strip()}")
+
+    def test_uses_the_shared_library_accessor(self):
+        """缓存文件名必须由 am_library 决定，不能在这里再拼一次。"""
+        self.assertIn("import am_library", self.src)
+        for line in self.src.splitlines():
+            if line.lstrip().startswith("#"):
+                continue
+            self.assertNotIn("library-songs.json", line,
+                             f"缓存文件名不该在 build_pool 里硬编码：{line.strip()}")
 
 
 class TestMcpServerConsistency(unittest.TestCase):

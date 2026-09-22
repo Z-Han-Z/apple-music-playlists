@@ -779,6 +779,24 @@ def cmd_show(args) -> int:
     return 0
 
 
+def cmd_library(args) -> int:
+    import am_library as lib
+
+    cfg = load_config()
+    dev = get_developer_token(cfg, verbose=args.verbose)
+    user = require_user(cfg)
+    sf = resolve_storefront(None, cfg, dev, user)
+    items = lib.ensure_library_songs(dev, user, sf, refresh=args.refresh,
+                                     limit=args.limit, quiet=args.quiet)
+    if args.json:
+        print(json.dumps(items, ensure_ascii=False, indent=1))
+        return 0
+    print(lib.library_report(items))
+    print(f"\n缓存文件：{lib.cache_path()}")
+    print("（--refresh 重抓；这份缓存是 build_pool.py 的输入）")
+    return 0
+
+
 def _gather_track_ids(args, dev: str) -> list[str]:
     """把 --tracks / --json 的输入变成有序的 catalog song id 列表。
 
@@ -1024,6 +1042,13 @@ def main() -> int:
 
     p = sub.add_parser("list", help="列出我的歌单")
     p.add_argument("--limit", type=int, default=100); p.set_defaults(fn=cmd_list)
+
+    p = sub.add_parser("library", help="导出我的音乐库（含 ISRC，是 build_pool.py 的输入）")
+    p.add_argument("--refresh", action="store_true", help="忽略缓存，重新拉取")
+    p.add_argument("--limit", type=int, default=None, help="最多取多少首（默认全部）")
+    p.add_argument("--json", action="store_true", help="直接输出 JSON")
+    p.add_argument("--quiet", action="store_true")
+    p.set_defaults(fn=cmd_library)
 
     p = sub.add_parser("show", help="查看歌单曲目")
     p.add_argument("playlist"); p.set_defaults(fn=cmd_show)

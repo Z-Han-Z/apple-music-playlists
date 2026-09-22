@@ -25,12 +25,30 @@ from collections import Counter
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import am_paths as ap  # noqa: E402
 import am_playlist as am  # noqa: E402
 import playlist_flow as pf  # noqa: E402
 from am_meta import catalog_meta  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent
-REF = ROOT / "refs"
+
+
+def profile_path(year: int) -> Path:
+    """画像缓存写到**用户目录**（旧版写在仓库内 refs/，见 am_paths）。"""
+    return ap.cache_dir() / f"profile-{year}.json"
+
+
+def load_profile(year: int) -> list[dict] | None:
+    """读画像缓存：先用户目录，再回退到旧版的仓库内 refs/。"""
+    name = profile_path(year).name
+    for d in ap.read_dirs():
+        p = d / name
+        if p.exists():
+            try:
+                return json.loads(p.read_text(encoding="utf-8"))
+            except Exception:
+                continue
+    return None
 
 
 def replay_top(period: str, dev: str, user: str, want: int) -> list[dict]:
@@ -69,11 +87,12 @@ def main() -> int:
     user = am.require_user(cfg)
     sf = am.resolve_storefront(None, cfg, dev, user)
 
-    cache_f = REF / f"profile-{a.year}.json"
-    if cache_f.exists() and not a.refresh:
-        prof = json.loads(cache_f.read_text(encoding="utf-8"))
-        print(f"读缓存 {cache_f.name}（{len(prof)} 条）—— 加 --refresh 可重抓")
-        return report(prof)
+    cache_f = profile_path(a.year)
+    if not a.refresh:
+        prof = load_profile(a.year)
+        if prof is not None:
+            print(f"读缓存 {cache_f.name}（{len(prof)} 条）—— 加 --refresh 可重抓")
+            return report(prof)
 
     print(f"取 {a.year} 播放次数 Top {a.top} …")
     tops = replay_top(f"year-{a.year}", dev, user, a.top)
@@ -103,7 +122,7 @@ def main() -> int:
             print(f"  …{i}/{len(tops)}")
         time.sleep(0.3)
 
-    REF.mkdir(exist_ok=True)
+    cache_f.parent.mkdir(parents=True, exist_ok=True)
     cache_f.write_text(json.dumps(prof, ensure_ascii=False, indent=1), encoding="utf-8")
     print(f"已存 {cache_f.name}\n")
     return report(prof)
