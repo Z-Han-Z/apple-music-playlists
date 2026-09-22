@@ -348,5 +348,77 @@ class TestOrderFromFeatures(unittest.TestCase):
             po.order_from_features([], {})
 
 
+class TestExtraArcAxes(unittest.TestCase):
+    """调用方提供的额外弧线轴 —— "让 LLM 的判断进排序"的入口。
+
+    ⚠️ 它只接受**弧线形状**的轴（值该随叙事弧起伏，如 lyric_valence），
+    不接受静态质量分。这条限制是实测打出来的：把 theme_fit 当弧线轴喂进去，
+    主题分最高的曲目被推到了末尾——因为优化器照做，让 theme_fit 去拟合弧线。
+    """
+
+    @staticmethod
+    def _seq_with_axis(values):
+        tracks = []
+        for i, v in enumerate(values):
+            tracks.append({"cid": f"c{i}", "name": f"t{i}", "block": "A",
+                           "f": {"tempo": 120}, "stage": "ok",
+                           "bpm": 120.0, "key": "8B", "energy": 0.5,
+                           "valence": 0.5, "loud": -10.0, "lyn": v})
+        return tracks
+
+    def test_no_extra_axes_is_unchanged(self):
+        """不加轴时的值与旧实现必须逐字相同（分母退化回 len(known)*4）。"""
+        seq = self._seq_with_axis([0.1, 0.9, 0.4, 0.6, 0.2, 0.8])
+        self.assertAlmostEqual(po.arc_cost(seq, "cinderella"),
+                               po.arc_cost(seq, "cinderella", ()), places=12)
+
+    def test_axis_changes_the_cost(self):
+        seq = self._seq_with_axis([0.1, 0.9, 0.4, 0.6, 0.2, 0.8])
+        self.assertNotAlmostEqual(po.arc_cost(seq, "cinderella"),
+                                  po.arc_cost(seq, "cinderella", ("lyn",)), places=6)
+
+    def test_missing_values_are_skipped_not_zeroed(self):
+        """缺值绝不能当成 0——那会把"没数据"读成"分数极低"。"""
+        full = self._seq_with_axis([0.1, 0.9, 0.4, 0.6, 0.2, 0.8])
+        partial = self._seq_with_axis([0.1, 0.9, 0.4, 0.6, 0.2, 0.8])
+        partial[3].pop("lyn")
+        # 只少一个值：结果应当变化，但不应等于"那个值当 0"的结果
+        zeroed = self._seq_with_axis([0.1, 0.9, 0.4, 0.0, 0.2, 0.8])
+        a = po.arc_cost(partial, "cinderella", ("lyn",))
+        b = po.arc_cost(zeroed, "cinderella", ("lyn",))
+        self.assertNotAlmostEqual(a, b, places=6)
+
+    def test_axis_with_no_values_at_all_is_ignored(self):
+        seq = self._seq_with_axis([0.1, 0.9, 0.4, 0.6, 0.2, 0.8])
+        for t in seq:
+            t.pop("lyn")
+        self.assertAlmostEqual(po.arc_cost(seq, "cinderella", ("lyn",)),
+                               po.arc_cost(seq, "cinderella"), places=12)
+
+    def test_order_from_features_threads_the_axis(self):
+        entries = [{"cid": f"c{i}", "name": f"t{i}", "artist": "X", "isrc": f"I{i}",
+                    "scores": {"lyn": v}}
+                   for i, v in enumerate([0.1, 0.9, 0.4, 0.6, 0.2, 0.8])]
+        feats = {f"I{i}": {"_cid": f"c{i}", "_name": f"t{i}", "_artist": "X", "tempo": 120,
+                           "key": 0, "mode": 1, "energy": 0.5, "valence": 0.5,
+                           "loudness": -10} for i in range(6)}
+        seq, report = po.order_from_features(entries, feats, extra_axes=("lyn",))
+        self.assertTrue(all("lyn" in t for t in seq))
+        self.assertIn("额外评分轴", report)
+        self.assertIn("lyn 6/6", report)
+
+    def test_report_shows_axis_coverage(self):
+        """轴覆盖率必须报出来：只有 3/40 有分数时这一轴几乎没起作用，
+        而报告看起来一切正常——那正是最该防的静默失真。"""
+        entries = [{"cid": f"c{i}", "name": f"t{i}", "artist": "X", "isrc": f"I{i}",
+                    "scores": {"lyn": 0.5} if i < 3 else {}}
+                   for i in range(6)]
+        feats = {f"I{i}": {"_cid": f"c{i}", "_name": f"t{i}", "_artist": "X", "tempo": 120,
+                           "key": 0, "mode": 1, "energy": 0.5, "valence": 0.5,
+                           "loudness": -10} for i in range(6)}
+        _, report = po.order_from_features(entries, feats, extra_axes=("lyn",))
+        self.assertIn("lyn 3/6", report)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
