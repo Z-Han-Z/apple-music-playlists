@@ -311,7 +311,7 @@ python listening_stats.py recent --kind tracks --limit 30          # 最近播�
 所以老缓存仍然能用；但新文件**只写用户目录**。`config_dir()` 的路径不能改——
 token 在里面，改了所有人得重新登录（有测试盯着这条）。
 
-**库缓存有 schema 校验。** 旧的 `refs/library-songs.json` 没有 `isrc` 字段，会被明确拒绝并
+**库缓存有 schema 校验。** 旧版 refs 目录里的 library-songs.json 没有 `isrc` 字段，会被明确拒绝并
 重拉。直接沿用会让特征链静默失效——"有特征"的比例变成 0%，而且不报错。
 
 ```bash

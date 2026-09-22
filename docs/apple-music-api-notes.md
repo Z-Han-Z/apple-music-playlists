@@ -175,7 +175,7 @@ D（macOS AppleScript）在 Mac 上确实更省事——本机应用、不需要
 ```
 <PROJECT_ROOT>\
 ├── am_playlist.py       # 命令行工具（纯标准库，零依赖）
-├── am_mcp_server.py     # MCP stdio 服务，把同样的能力暴露成 6 个工具
+├── am_mcp_server.py     # MCP stdio 服务，把同样的能力暴露成 11 个工具
 ├── refs\                # 调研过程抓下来的 Apple 官方文档 JSON / bundle 证据
 └── tools\               # 调研用的小脚本（文档解析、cookie 列举）
 
@@ -218,13 +218,14 @@ music-user-token: 无 —— 请先运行 login
 
 ```
 > echo initialize | python am_mcp_server.py
-{"jsonrpc":"2.0","id":1,"result":{"protocolVersion":"2025-06-18",
+{"jsonrpc":"2.0","id":1,"result":{"protocolVersion":"2024-11-05",
  "capabilities":{"tools":{"listChanged":false}},
- "serverInfo":{"name":"apple-music-playlists","version":"1.0.0"}}}
+ "serverInfo":{"name":"apple-music-playlists","version":"1.1.0"}}}
 ```
 
-暴露 6 个工具：`am_status`、`am_search_songs`、`am_list_playlists`、`am_show_playlist`、
-`am_create_playlist`（主入口）、`am_add_tracks`。
+暴露 11 个工具：`am_status`、`am_search_songs`、`am_list_playlists`、`am_show_playlist`、
+`am_create_playlist`（主入口）、`am_add_tracks`、`am_delete_playlist`、`am_audit_playlist`、
+`am_analyze_flow`、`am_recently_played`、`am_top_played`。
 
 ### 4.3 DSH 预设「音乐歌单」
 

@@ -322,7 +322,10 @@ class TestDocsDoNotLie(unittest.TestCase):
         import am_mcp_server as srv
         actual = len(srv.TOOLS)
         claims = [("README.md", r"\*\*(\d+) tools\*\*"),
-                  ("skill/SKILL.md", r"MCP 工具（(\d+) 个）")]
+                  ("skill/SKILL.md", r"MCP 工具（(\d+) 个）"),
+                  ("preset/README.md", r"获得 (\d+) 个 Apple Music 工具"),
+                  ("docs/apple-music-api-notes.md", r"暴露成 (\d+) 个工具"),
+                  ("docs/apple-music-api-notes.md", r"暴露 (\d+) 个工具")]
         for rel, pat in claims:
             self.assertEqual(self._claim(rel, pat), actual,
                              f"{rel} 写的 MCP 工具数与实际（{actual}）不符")

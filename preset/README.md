@@ -1,7 +1,7 @@
 # 安装这个预设
 
 这个目录是一份 **Cordis agent preset 模板**，它把一个 MCP 服务挂到某个 Agent 上，
-让该会话直接获得 9 个 Apple Music 工具（`mcp__applemusic__am_*`）。
+让该会话直接获得 11 个 Apple Music 工具（`mcp__applemusic__am_*`）。
 
 模板里的两处占位符需要替换：
 
@@ -17,7 +17,7 @@
 ### 1. 克隆并确认能跑
 
 ```bash
-git clone https://github.com/<you>/apple-music-playlists.git
+git clone https://github.com/Z-Han-Z/apple-music-playlists.git
 cd apple-music-playlists
 python am_playlist.py status
 ```

@@ -3,7 +3,7 @@
 **Build, analyze, and sequence Apple Music playlists from the command line or an MCP-capable agent.**
 
 Pure Python standard library — no `pip install` required to run, and **no Apple Developer Program
-membership needed**. Works on Windows / macOS / Linux.
+membership needed**. Requires Python 3.10+ and works on Windows / macOS / Linux.
 
 > This is a **general-purpose** playlist toolkit. It ships no artist lists, no themes, and no
 > curated content — you bring the tracks.
@@ -17,7 +17,7 @@ membership needed**. Works on Windows / macOS / Linux.
 ## Quick start
 
 ```bash
-git clone https://github.com/<you>/apple-music-playlists.git
+git clone https://github.com/Z-Han-Z/apple-music-playlists.git
 cd apple-music-playlists
 
 python am_playlist.py status     # auto-fetches the developer token
@@ -238,7 +238,7 @@ More in [`docs/apple-music-api-notes.md`](docs/apple-music-api-notes.md) and
 ## 中文说明
 
 **通用 Apple Music 歌单工具链**：命令行创建 / 编辑歌单、抓音频特征、体检歌单、按听感规则重排曲序。
-纯标准库，不需要 `pip install`，也不需要 Apple Developer Program（$99/年）。
+需要 Python 3.10+；纯标准库，不需要 `pip install`，也不需要 Apple Developer Program（$99/年）。
 
 **免责声明**：本项目不含任何艺人清单、主题或成品歌单——内容由你提供。
 

@@ -19,8 +19,6 @@ playlist_audit.py — 按调研到的策展原则给歌单做体检。
 
 from __future__ import annotations
 
-import json
-import re
 import sys
 from collections import Counter
 from pathlib import Path
@@ -53,9 +51,7 @@ def audit(name: str) -> int:
     title = p.get("attributes", {}).get("name")
 
     # 歌单内曲目：先拿 library-songs 的 catalog id
-    st, body = am.api("GET", f"/me/library/playlists/{pid}/tracks", dev=dev, user=user,
-                      query={"limit": 100})
-    lib = json.loads(body).get("data", [])
+    lib = am.playlist_tracks(pid, dev, user)
     cat_ids, names = [], []
     for t in lib:
         a = t.get("attributes", {})
@@ -81,8 +77,11 @@ def audit(name: str) -> int:
     def verdict(ok, warn, bad, cond_ok, cond_warn):
         return ok if cond_ok else (warn if cond_warn else bad)
     v = verdict("✅ 符合 Apple 官方 15–50 首", "⚠️ 超出 Apple 官方 50 首上限", "❌ 少于 15 首",
-                n <= 50, n >= 15)
+                15 <= n <= 50, n > 50)
     print(f"     Apple 官方（15–50 首）：{v}")
+    if not names:
+        print("     歌单是空的，无法继续做艺人、时长、开场和结尾分析。")
+        return 0
     if 20 <= n <= 30:
         print(f"     OneStopWatch（20–30 首最佳）：✅ {n} 首在最佳区间")
     elif n > 30:

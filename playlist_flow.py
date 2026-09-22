@@ -265,9 +265,7 @@ def run(target: str, refresh: bool = False) -> int:
     pid = p["id"]
     print(f"歌单：{p['attributes'].get('name')}  id={pid}")
 
-    st, body = am.api("GET", f"/me/library/playlists/{pid}/tracks", dev=dev, user=user,
-                      query={"limit": 100})
-    lib = json.loads(body).get("data", [])
+    lib = am.playlist_tracks(pid, dev, user)
     cat_ids, dur = [], {}
     no_id = 0
     for t in lib:

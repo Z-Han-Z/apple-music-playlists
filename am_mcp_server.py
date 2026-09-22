@@ -227,9 +227,8 @@ def t_list(_args: dict) -> str:
     cfg = am.load_config()
     dev = am.get_developer_token(cfg)
     user = am.require_user(cfg)
-    st, body = am.api("GET", "/me/library/playlists", dev=dev, user=user, query={"limit": 100})
     lines = []
-    for p in json.loads(body).get("data", []):
+    for p in am.list_playlists(dev, user):
         a = p.get("attributes", {})
         lines.append(f"{p['id']}\t{a.get('name')}\t{a.get('dateAdded','')[:10]}")
     return "\n".join(lines) or "音乐库里还没有歌单"
@@ -242,10 +241,8 @@ def t_show(args: dict) -> str:
     p = am.find_playlist(args["playlist"], dev, user)
     if not p:
         return f"找不到歌单: {args['playlist']}"
-    st, body = am.api("GET", f"/me/library/playlists/{p['id']}/tracks", dev=dev, user=user,
-                      query={"limit": 100})
     lines = [f"{p['attributes'].get('name')} ({p['id']})"]
-    for i, t in enumerate(json.loads(body).get("data", []), 1):
+    for i, t in enumerate(am.playlist_tracks(p["id"], dev, user), 1):
         a = t.get("attributes", {})
         lines.append(f"{i:>3}. {a.get('name')} — {a.get('artistName')}")
     return "\n".join(lines)
@@ -281,14 +278,20 @@ def t_create(args: dict) -> str:
     payload["relationships"] = {"tracks": {"data": [{"id": i, "type": "songs"} for i in batch]}}
 
     st, body = am.api("POST", "/me/library/playlists", dev=dev, user=user, body=payload)
-    created = json.loads(body).get("data", [{}])[0]
+    created, waited = am.created_playlist_from_response(body, args["name"], dev, user)
+    if not created:
+        suffix = (f"；首批 {len(batch)} 首很可能已写入，"
+                  f"但剩余 {len(rest)} 首因无法确定歌单 ID 而未追加"
+                  if rest else "；请稍后在客户端确认")
+        return f"{head}\n创建请求已成功返回，但 30s 内没能回查到新歌单{suffix}"
     pid = created.get("id")
     for i in range(0, len(rest), am.MAX_TRACKS_PER_REQUEST):
         chunk = rest[i:i + am.MAX_TRACKS_PER_REQUEST]
         am.api("POST", f"/me/library/playlists/{pid}/tracks", dev=dev, user=user,
                body={"data": [{"id": x, "type": "songs"} for x in chunk]})
+    synced = f"（等待 {waited:.0f}s 同步后回查到）" if waited else ""
     return (f"{head}\n✓ 已创建歌单「{created.get('attributes',{}).get('name')}」"
-            f" id={pid}，写入 {len(ids)} 首。\n"
+            f" id={pid}，写入 {len(ids)} 首。{synced}\n"
             f"（客户端/iCloud 同步可能有几十秒延迟）")
 
 

@@ -203,6 +203,68 @@ def api(method: str, path: str, *, dev: str, user: str | None = None,
     return http(method, url, headers=headers, body=body)
 
 
+def paged_data(path: str, *, dev: str, user: str | None = None,
+               root: str = API_ROOT, query: dict | None = None,
+               limit: int | None = None) -> list[dict]:
+    """读取 Apple JSON:API 列表的所有分页。
+
+    Apple 的 `next` 通常是带 `/v1` 前缀的相对 URL，而 `api()` 的
+    root 已经包含 `/v1`，所以这里统一解析后再交给 `api()`。
+    `limit` 是对最终结果的上限，不是单页大小。
+    """
+    out: list[dict] = []
+    current_path = path
+    current_query = dict(query or {})
+    current_query.setdefault("limit", 100)
+    seen: set[str] = set()
+
+    while True:
+        if limit is not None:
+            remaining = limit - len(out)
+            if remaining <= 0:
+                break
+            if current_query is not None:
+                current_query["limit"] = min(int(current_query.get("limit", 100)), remaining)
+
+        _, body = api("GET", current_path, dev=dev, user=user, root=root,
+                      query=current_query)
+        doc = json.loads(body)
+        page = doc.get("data", [])
+        if not isinstance(page, list):
+            raise ValueError(f"分页接口未返回 data 数组: {current_path}")
+        out.extend(page if limit is None else page[:limit - len(out)])
+
+        nxt = doc.get("next")
+        if not nxt or (limit is not None and len(out) >= limit):
+            break
+        if nxt in seen:
+            raise RuntimeError(f"分页 next 重复，拒绝无限循环: {nxt}")
+        seen.add(nxt)
+
+        parsed = urllib.parse.urlsplit(nxt)
+        next_path = parsed.path
+        root_path = urllib.parse.urlsplit(root).path.rstrip("/")
+        if next_path == root_path:
+            next_path = "/"
+        elif root_path and next_path.startswith(root_path + "/"):
+            next_path = next_path[len(root_path):]
+        if not next_path.startswith("/"):
+            next_path = "/" + next_path
+        current_path = next_path + (("?" + parsed.query) if parsed.query else "")
+        current_query = None
+    return out
+
+
+def list_playlists(dev: str, user: str, limit: int | None = None) -> list[dict]:
+    return paged_data("/me/library/playlists", dev=dev, user=user, limit=limit)
+
+
+def playlist_tracks(pid: str, dev: str, user: str,
+                    limit: int | None = None) -> list[dict]:
+    return paged_data(f"/me/library/playlists/{pid}/tracks", dev=dev, user=user,
+                      limit=limit)
+
+
 # ---------------------------------------------------------------- token
 
 def jwt_claims(token: str) -> dict:
@@ -390,13 +452,16 @@ def harvest_from_windows_app() -> str | None:
             key = ctypes.string_at(blobout.pbData, blobout.cbData)
             ctypes.windll.kernel32.LocalFree(blobout.pbData)
 
-            tmp = os.path.join(tempfile.gettempdir(), "am_cookies_copy.db")
-            shutil.copy2(db, tmp)
-            con = sqlite3.connect(tmp)
-            rows = con.execute(
-                "select name, encrypted_value from cookies where name='media-user-token'").fetchall()
-            con.close()
-            os.remove(tmp)
+            # Cookie DB 可能被 Apple Music 锁定，所以必须拷贝后读。
+            # 用独立临时目录避免并发冲突，也保证异常时会清掉
+            # 这份包含其它 cookie 的敏感副本。
+            with tempfile.TemporaryDirectory(prefix="am-cookies-") as td:
+                tmp = os.path.join(td, "Cookies")
+                shutil.copy2(db, tmp)
+                with sqlite3.connect(tmp) as con:
+                    rows = con.execute(
+                        "select name, encrypted_value from cookies "
+                        "where name='media-user-token'").fetchall()
         except Exception:
             continue
 
@@ -618,12 +683,26 @@ def find_playlist(name_or_id: str, dev: str, user: str) -> dict | None:
         st, body = api("GET", f"/me/library/playlists/{name_or_id}", dev=dev, user=user)
         d = json.loads(body).get("data", [])
         return d[0] if d else None
-    st, body = api("GET", "/me/library/playlists", dev=dev, user=user,
-                   query={"limit": 100})
-    for p in json.loads(body).get("data", []):
+    for p in list_playlists(dev, user):
         if p.get("attributes", {}).get("name") == name_or_id:
             return p
     return None
+
+
+def created_playlist_from_response(body: str, name: str, dev: str, user: str,
+                                   *, attempts: int = 8, delay: float = 4.0
+                                   ) -> tuple[dict | None, float]:
+    """从创建响应取歌单；空响应时等待 iCloud 同步后按名字回查。"""
+    data = json_or_empty(body)
+    if data and data.get("data"):
+        return data["data"][0], 0.0
+    for attempt in range(attempts):
+        found = find_playlist(name, dev, user)
+        if found:
+            return found, attempt * delay
+        if attempt + 1 < attempts:
+            time.sleep(delay)
+    return None, attempts * delay
 
 
 def read_clipboard() -> str | None:
@@ -748,9 +827,7 @@ def cmd_list(args) -> int:
     cfg = load_config()
     dev = get_developer_token(cfg)
     user = require_user(cfg)
-    st, body = api("GET", "/me/library/playlists", dev=dev, user=user,
-                   query={"limit": args.limit})
-    for p in json.loads(body).get("data", []):
+    for p in list_playlists(dev, user, limit=args.limit):
         a = p.get("attributes", {})
         n = p.get("relationships", {}).get("tracks", {}).get("data")
         print(f"  {p['id']:<22} {a.get('name')}  ({a.get('dateAdded','')[:10]})"
@@ -766,9 +843,7 @@ def cmd_show(args) -> int:
     if not p:
         print(f"找不到歌单: {args.playlist}")
         return 4
-    st, body = api("GET", f"/me/library/playlists/{p['id']}/tracks", dev=dev, user=user,
-                   query={"limit": 100})
-    for i, t in enumerate(json.loads(body).get("data", []), 1):
+    for i, t in enumerate(playlist_tracks(p["id"], dev, user), 1):
         a = t.get("attributes", {})
         print(f"  {i:>3}. {a.get('name')} — {a.get('artistName')}")
     return 0
@@ -834,7 +909,8 @@ def _gather_track_ids(args, dev: str) -> list[str]:
         return []
 
     fixed = [pinned(x) for x in entries]
-    queries = [as_query(x) for x in entries if pinned(x) is None]
+    indexed_queries = [(i, as_query(x)) for i, x in enumerate(entries) if fixed[i] is None]
+    queries = [q for _, q in indexed_queries if q]
 
     resolved: list[str] = []
     if queries:
@@ -846,8 +922,19 @@ def _gather_track_ids(args, dev: str) -> list[str]:
     if any(fixed):
         print(f"（其中 {sum(1 for f in fixed if f)} 首使用指定 ID，跳过搜索）")
 
+    # resolve_tracks 返回的 ids 只包含成功项。不能直接从第一个空位
+    # 开始回填：前面某首匹配失败时，后面的歌会跨过中间的固定 ID。
+    from collections import Counter
+    missed_counts = Counter(missed if queries else [])
     it = iter(resolved)
-    out = [f if f else next(it, "") for f in fixed]
+    out = list(fixed)
+    for index, query in indexed_queries:
+        if not query:
+            continue
+        if missed_counts[query]:
+            missed_counts[query] -= 1
+            continue
+        out[index] = next(it, "")
     return [i for i in out if i]
 
 
@@ -878,30 +965,18 @@ def cmd_create(args) -> int:
 
     # 实测：Apple 有时对创建请求返回 201/204 但**响应体为空**。写入是成功的，
     # 只是没有回显资源；这时按名字回查一次拿 id，否则后续批量追加会没有目标。
-    data = json_or_empty(body)
-    if data and data.get("data"):
-        created = data["data"][0]
+    created, waited = created_playlist_from_response(body, args.name, dev, user)
+    if created:
         pid = created.get("id")
         name = created.get("attributes", {}).get("name", args.name)
         can_edit = created.get("attributes", {}).get("canEdit")
         print(f"✓ 歌单已创建: {name}  id={pid} (canEdit={can_edit})")
+        if waited:
+            print(f"  · 等了 {waited:.0f}s 才同步出来")
     else:
-        print(f"  · 创建返回 HTTP {st} 但响应体为空，按名字回查 id…")
-        # 实测：新歌单有 iCloud 传播延迟，立刻回查会查不到（几十秒后才出现）。
-        pid = None
-        for attempt in range(8):
-            found = find_playlist(args.name, dev, user)
-            if found:
-                pid = found["id"]
-                break
-            time.sleep(4)
-        if pid:
-            print(f"✓ 歌单已创建: {args.name}  id={pid}（等了 {attempt*4}s 才同步出来）")
-        else:
-            print("  · 创建请求已发出，但 30s 内没能回查到。写入很可能已成功，"
-                  "稍后自行确认：")
-            print(f"      python am_playlist.py show \"{args.name}\"")
-            return 0
+        print(f"  · 创建返回 HTTP {st} 但响应体为空，且 30s 内没能回查到。")
+        print(f"      python am_playlist.py show \"{args.name}\"")
+        return 1 if rest else 0
 
     for i in range(0, len(rest), MAX_TRACKS_PER_REQUEST):
         chunk = rest[i:i + MAX_TRACKS_PER_REQUEST]
@@ -925,19 +1000,20 @@ def cmd_delete(args) -> int:
     if not args.yes:
         print(f"将删除歌单「{name}」({p['id']}) —— 加 --yes 确认执行")
         return 4
-    st, body = api("DELETE", f"/me/library/playlists/{p['id']}", dev=dev, user=user,
-                   root=AMP_ROOT)
-    if st not in (200, 202, 204):
-        # 实测：DELETE 在 api.music.apple.com 上固定返回 401，但在 amp-api 上正常。
-        # 万一 amp-api 也不行，再回退到官方主机试一次，并把两个结果都报出来。
-        st2, body2 = api("DELETE", f"/me/library/playlists/{p['id']}", dev=dev, user=user)
-        if st2 in (200, 202, 204):
-            print(f"✓ 已删除歌单「{name}」（HTTP {st2}，经 api.music.apple.com）")
-            return 0
-        print(f"✗ 删除失败：amp-api → HTTP {st}；api → HTTP {st2}")
-        print("  这是 Apple 已知问题（DELETE 在官方主机上返回 401）。替代办法："
-              "在 iPhone/Mac/客户端里手动删除，或用 rename 改成占位名。")
-        return 1
+    try:
+        st, _ = api("DELETE", f"/me/library/playlists/{p['id']}", dev=dev, user=user,
+                    root=AMP_ROOT)
+    except ApiError as amp_err:
+        # http() 对非 2xx 直接抛异常，所以回退必须写在 except 里。
+        try:
+            st2, _ = api("DELETE", f"/me/library/playlists/{p['id']}", dev=dev, user=user)
+        except ApiError as api_err:
+            print(f"✗ 删除失败：amp-api → HTTP {amp_err.status}；"
+                  f"api → HTTP {api_err.status}")
+            print("  可在 iPhone/Mac/客户端里手动删除。")
+            return 1
+        print(f"✓ 已删除歌单「{name}」（HTTP {st2}，经 api.music.apple.com）")
+        return 0
     print(f"✓ 已删除歌单「{name}」（HTTP {st}）")
     return 0
 
@@ -1036,7 +1112,9 @@ def main() -> int:
     p.set_defaults(fn=cmd_search)
 
     p = sub.add_parser("list", help="列出我的歌单")
-    p.add_argument("--limit", type=int, default=100); p.set_defaults(fn=cmd_list)
+    p.add_argument("--limit", type=int, default=None,
+                   help="最多显示多少个（默认全部）")
+    p.set_defaults(fn=cmd_list)
 
     p = sub.add_parser("library", help="导出我的音乐库（含 ISRC，是 build_pool.py 的输入）")
     p.add_argument("--refresh", action="store_true", help="忽略缓存，重新拉取")
