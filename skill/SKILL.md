@@ -67,7 +67,7 @@ python playlist_optimize.py  清单.json [-o 输出.json] [--features 缓存.jso
 **`--json` 输入格式**（顺序保留；三种写法可混用）：
 
 ```json
-{"tracks": ["1648876333", "夏霞 - Atarayo", {"id": "1606920717", "name": "空と遊園地"}]}
+{"tracks": ["1440857781", "Song Title - Artist Name", {"id": "1440857782", "name": "optional label"}]}
 ```
 - 纯数字字符串 / `{"id": ...}` = **钉死 catalog id**，跳过搜索（要精确版本时用）
 - `"歌名 - 艺人"` = 走搜索匹配
