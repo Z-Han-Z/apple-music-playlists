@@ -12,6 +12,7 @@
 
 import sys
 import unittest
+from collections import Counter
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -234,6 +235,42 @@ class TestArcCostHonoursTheChosenShape(unittest.TestCase):
         blocks = _blocks()
         s1, c1 = po.anneal(blocks, iters=800, seed=11, shape="cinderella")
         self.assertAlmostEqual(po.total_cost(s1, "cinderella"), c1, places=6)
+
+
+class TestOptimizerRecordsCoverageReasons(unittest.TestCase):
+    """优化器必须记下每首曲子**为什么**没特征，而不是只留一个 None。
+
+    没有这个，"优化后 cost = 1.15"这类数字就没法解释它描述了多少曲目：
+    覆盖率 60% 时，四成位置其实没被评估过。
+    """
+
+    def test_load_tracks_tags_each_missing_reason(self):
+        import json as _json
+        import tempfile
+        with tempfile.TemporaryDirectory() as td:
+            td = Path(td)
+            (td / "feats.json").write_text(_json.dumps({
+                "a": {"_cid": "1", "_name": "ok", "tempo": 120, "key": 0, "mode": 1,
+                      "energy": 0.5, "valence": 0.5, "loudness": -10},
+                "b": {"_cid": "2", "_name": "miss", "_miss": True},
+                "c": {"_cid": "3", "_name": "notempo", "energy": 0.5},
+            }), encoding="utf-8")
+            (td / "spec.json").write_text(
+                _json.dumps({"tracks": ["1", "2", "3", "4"]}), encoding="utf-8")
+
+            _, tracks = po.load_tracks(str(td / "spec.json"), str(td / "feats.json"))
+            stages = {t["cid"]: t["stage"] for t in tracks}
+            self.assertEqual(stages["1"], "ok")
+            self.assertEqual(stages["2"], "source-miss")
+            self.assertEqual(stages["3"], "no-features")
+            self.assertEqual(stages["4"], "not-in-cache")
+
+    def test_coverage_report_counts_match_the_tracks(self):
+        counts = Counter(t.get("stage", "ok") for t in [
+            {"stage": "ok"}, {"stage": "ok"}, {"stage": "source-miss"}])
+        txt = po.coverage_report(counts, 3)
+        self.assertIn("2/3", txt)
+        self.assertIn("⚠️", txt)          # 67% < 90%
 
 
 if __name__ == "__main__":

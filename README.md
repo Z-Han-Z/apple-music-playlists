@@ -121,7 +121,25 @@ Apple Music track  ──►  ISRC
 ```
 
 Results are cached locally, so the network cost is paid once per playlist.
-Coverage measured: 37/39 on a recent-release test set; 14/14 on Japanese-language tracks.
+
+**Coverage is reported, never silently dropped.** Every consumer prints a funnel saying *why* each
+track could not be measured:
+
+```
+音频特征覆盖：1395/1581 可用（88%）
+  ·  186 首 没有 ISRC —— 特征链的硬边界，换特征源也解决不了
+  · 1395 首 不在特征缓存里（这批还没抓过）
+```
+
+That distinction is the point. **No ISRC** means the chain cannot start at all — a different
+feature source will not help. **Not in the source** means the ISRC is fine and switching sources
+(or analysing the audio locally) would fix it. Collapsing both into "missing features" discards the
+only information that tells you what to do next.
+
+It matters more than it looks: `tempo` / `key` / `energy` / `valence` are the only things the
+adjacency rules and the arc can act on, so **coverage is the ceiling on how good an ordering can
+be**. At 60% coverage, four positions in ten were never evaluated — while the cost number still
+looks excellent. The optimizer therefore prints coverage above its cost lines, and warns below 90%.
 
 ---
 

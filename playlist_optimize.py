@@ -40,6 +40,7 @@ import json
 import math
 import random
 import sys
+from collections import Counter
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -55,6 +56,8 @@ from playlist_core import (  # noqa: E402
     SHAPE_ALIASES,
     camelot,
     check_pair,
+    classify_coverage,
+    coverage_report,
     fold_tempo,
     resolve_shape,
     shape_target,
@@ -130,13 +133,21 @@ def load_tracks(spec_file, features_file=None):
             cid = str(cid)
             f = by_cid.get(cid)
             if not f or "tempo" not in f:
+                # 记下**为什么**没特征。优化器只看得见特征缓存，所以它能分清
+                # "源没收录"和"压根没抓过"，但说不出"没有 ISRC"——那是上游的事。
+                # 关键是不再压成一个笼统的 None：覆盖率报告要据此给出可行动的分解。
+                stage = ("source-miss" if (f or {}).get("_miss")
+                         else "not-in-cache" if not f
+                         else "no-features")
                 tracks.append({"cid": cid, "block": blk["id"],
-                               "name": (f or {}).get("_name", cid), "f": None})
+                               "name": (f or {}).get("_name", cid), "f": None,
+                               "stage": stage})
                 continue
             tracks.append({
                 "cid": cid, "block": blk["id"],
                 "name": f.get("_name", cid),
                 "f": f,
+                "stage": "ok",
                 "bpm": fold_tempo(f.get("tempo", 0)),
                 "key": camelot(f.get("key", 0), f.get("mode", 0)),
                 "energy": f.get("energy", 0.0),
@@ -256,8 +267,13 @@ def optimize(spec_file, features_file=None, out_file=None, shape=DEFAULT_SHAPE):
 
     # 把解析后的完整形状名打出来：报告里要能看出"朝哪个形状排的"，
     # 否则体检说"你是 Cinderella、而排序目标是 man-in-a-hole"时没法发现。
+    # 覆盖率必须打在最前面。它决定了后面那些 cost 数字到底描述了多少曲目——
+    # 覆盖率 60% 时"优化后 cost = 1.15"只说明四成位置没被评估过，
+    # 而报告以前完全不提这件事。
+    counts = Counter(t.get("stage", "ok") for t in tracks)
     head = (f"目标形状：{resolve_shape(shape)}\n"
-            f"载入 {len(tracks)} 首（{sum(1 for t in tracks if t['f'])} 首有特征）\n"
+            f"载入 {len(tracks)} 首\n"
+            f"{coverage_report(counts, len(tracks))}\n"
             f"原始顺序 cost = {total_cost(before, shape):.2f} "
             f"(相邻 {adjacency_cost(before):.2f} + 弧线 {arc_cost(before, shape):.2f})\n"
             f"优化后   cost = {cost:.2f} "

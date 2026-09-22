@@ -190,5 +190,73 @@ class TestShapeTargets(unittest.TestCase):
         self.assertEqual(core.tempo_target(1), [0.5])
 
 
+class TestCoverageFunnel(unittest.TestCase):
+    """特征覆盖漏斗：每一层**为什么**掉，都要能说出来。
+
+    以前这是一个 `if not f or f.get("_miss") or "tempo" not in f: continue`——
+    三种完全不同的原因压成一个笼统的"没特征"。接第二个平台时这个区别要命：
+    网易云 / QQ 不返回 ISRC，no-isrc 会从 12% 逼近 100%，而那是换特征源
+    **也解决不了**的，跟"特征源没收录"正好相反。
+    """
+
+    def test_each_stage(self):
+        self.assertEqual(core.classify_coverage(has_id=False), "no-id")
+        self.assertEqual(core.classify_coverage(has_meta=False), "no-meta")
+        self.assertEqual(core.classify_coverage(isrc=None), "no-isrc")
+        self.assertEqual(core.classify_coverage(isrc="X", in_cache=False), "not-in-cache")
+        self.assertEqual(core.classify_coverage(isrc="X", feat={"_miss": True}), "source-miss")
+        self.assertEqual(core.classify_coverage(isrc="X", feat={"energy": 0.5}), "no-features")
+        self.assertEqual(core.classify_coverage(isrc="X", feat={"tempo": 120}), "ok")
+
+    def test_no_isrc_outranks_source_miss(self):
+        """顺序不能重排。缺 ISRC 是硬边界（换源无用），源没收录是可修的。"""
+        self.assertEqual(core.classify_coverage(isrc=None, in_cache=False, feat=None),
+                         "no-isrc")
+
+    def test_meta_outranks_isrc(self):
+        self.assertEqual(core.classify_coverage(has_meta=False, isrc=None), "no-meta")
+
+    def test_vocabulary_and_labels_agree(self):
+        for stage in core.COVERAGE_STAGES:
+            self.assertIn(stage, core.COVERAGE_LABELS)
+        self.assertEqual(core.COVERAGE_STAGES[-1], "ok", "ok 必须是最后一层")
+
+    def test_every_declared_stage_is_reachable(self):
+        produced = {
+            core.classify_coverage(has_id=False),
+            core.classify_coverage(has_meta=False),
+            core.classify_coverage(isrc=None),
+            core.classify_coverage(isrc="X", in_cache=False),
+            core.classify_coverage(isrc="X", feat={"_miss": True}),
+            core.classify_coverage(isrc="X", feat={}),
+            core.classify_coverage(isrc="X", feat={"tempo": 1}),
+        }
+        self.assertEqual(produced, set(core.COVERAGE_STAGES))
+
+
+class TestCoverageReport(unittest.TestCase):
+    def test_percentage_and_reasons(self):
+        txt = core.coverage_report({"ok": 88, "no-isrc": 7, "source-miss": 5}, 100)
+        self.assertIn("88/100", txt)
+        self.assertIn("88%", txt)
+        self.assertIn("7 首", txt)
+        self.assertIn("ISRC", txt)
+
+    def test_warns_when_coverage_is_low(self):
+        """这是重点：覆盖率低的时候，报告里的 cost 只描述了一部分曲目。"""
+        txt = core.coverage_report({"ok": 60, "no-isrc": 40}, 100)
+        self.assertIn("⚠️", txt)
+        self.assertIn("只描述", txt)
+
+    def test_no_warning_when_coverage_is_healthy(self):
+        self.assertNotIn("⚠️", core.coverage_report({"ok": 98, "source-miss": 2}, 100))
+
+    def test_zero_total_does_not_divide_by_zero(self):
+        self.assertIn("没有曲目", core.coverage_report({}, 0))
+
+    def test_missing_keys_are_treated_as_zero(self):
+        self.assertIn("50/100", core.coverage_report({"ok": 50}, 100))
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

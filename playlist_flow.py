@@ -34,6 +34,7 @@ import statistics
 import sys
 import time
 import urllib.request
+from collections import Counter
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -59,7 +60,9 @@ from playlist_core import (  # noqa: E402
     RULE_LABELS,
     RULES,
     camelot,
+    classify_coverage,
     classify_shape,
+    coverage_report,
     fold_tempo,
     harmonic_ok,
     norm,
@@ -244,7 +247,6 @@ def analyze(rows: list[dict]) -> None:
 
     # ---------- 5. 调性分布 ----------
     print(f"\n【5】调性分布（Camelot）")
-    from collections import Counter
     for k, c in Counter(keys).most_common(8):
         print(f"     {k:>4}  {c:>2} 首")
 
@@ -267,12 +269,15 @@ def run(target: str, refresh: bool = False) -> int:
                       query={"limit": 100})
     lib = json.loads(body).get("data", [])
     cat_ids, dur = [], {}
+    no_id = 0
     for t in lib:
         a = t.get("attributes", {})
         cid = (a.get("playParams") or {}).get("catalogId") or (a.get("playParams") or {}).get("id")
         if cid:
             cat_ids.append(str(cid))
             dur[str(cid)] = a.get("durationInMillis", 0)
+        else:
+            no_id += 1
 
     # 曾经这里写死 "/catalog/cn/songs"：非 cn 账号会静默拿回空元数据，
     # 于是整个体检降级成"有效曲目太少，无法分析"。地区必须解析出来。
@@ -286,18 +291,29 @@ def run(target: str, refresh: bool = False) -> int:
 
     feats = fetch_features(pid, tracks, refresh)
 
-    rows = []
-    for cid, name, artist, isrc in tracks:
-        f = feats.get(isrc or "")
-        if not f or f.get("_miss") or "tempo" not in f:
+    # 覆盖率漏斗：每一首为什么进不了分析，都要归到**具体某一层**。
+    # 以前这里是一个 `if not f or f.get("_miss") or "tempo" not in f: continue`，
+    # 三种完全不同的原因被压成同一个"没特征"。
+    rows, counts = [], Counter()
+    if no_id:
+        counts["no-id"] = no_id
+    for c in cat_ids:
+        m = meta.get(c)
+        isrc = (m or {}).get("isrc")
+        f = feats.get(isrc) if isrc else None
+        stage = classify_coverage(has_meta=m is not None, isrc=isrc,
+                                  in_cache=bool(isrc) and isrc in feats, feat=f)
+        counts[stage] += 1
+        if stage != "ok":
             continue
-        rows.append({"cid": cid, "name": name, "artist": artist, "f": f, "dur_ms": dur.get(cid, 0)})
+        rows.append({"cid": c, "name": (m or {}).get("name") or f"id:{c}",
+                     "artist": (m or {}).get("artistName") or "?",
+                     "f": f, "dur_ms": dur.get(c, 0)})
 
-    miss = len(tracks) - len(rows)
-    if miss:
-        print(f"\n⚠️ {miss} 首没有特征，已从下面的分析中排除")
+    print()
+    print(coverage_report(counts, len(lib)))
     if len(rows) < 3:
-        print("有效曲目太少，无法分析")
+        print("\n有效曲目太少，无法分析")
         return 1
     analyze(rows)
     return 0

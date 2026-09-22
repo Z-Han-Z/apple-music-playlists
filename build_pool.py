@@ -37,6 +37,7 @@ import am_playlist as am  # noqa: E402
 import playlist_flow as pf  # noqa: E402
 import profile_library as prof_mod  # noqa: E402
 from am_meta import catalog_meta  # noqa: E402
+from playlist_core import classify_coverage, coverage_report  # noqa: E402
 
 # Windows 控制台默认 GBK；唯一实现在 am_paths
 ap.enable_utf8_stdout()
@@ -131,10 +132,16 @@ def build(tag: str, cap: int, year: int, top_n: int,
     print(f"抓音频特征（{len(tracks)} 首，有缓存则跳过）…")
     feats = pf.fetch_features(f"pool-{tag}", tracks, refresh=False)
 
+    # 覆盖率按**具体原因**分解，而不是只说"N 首没特征"。
+    # "没有 ISRC"和"特征源没收录"是相反的两件事：前者换源无用，后者换源能解决。
+    counts = Counter()
     out = []
     for p in picked:
-        f = feats.get(p.get("isrc") or "")
-        if f and "tempo" in f:
+        isrc = p.get("isrc")
+        f = feats.get(isrc) if isrc else None
+        stage = classify_coverage(isrc=isrc, in_cache=bool(isrc) and isrc in feats, feat=f)
+        counts[stage] += 1
+        if stage == "ok":
             p["f"] = f
             out.append(p)
 
@@ -142,9 +149,7 @@ def build(tag: str, cap: int, year: int, top_n: int,
     dest.parent.mkdir(parents=True, exist_ok=True)
     dest.write_text(json.dumps(out, ensure_ascii=False, indent=1), encoding="utf-8")
     print(f"\n候选池落盘: {len(out)}/{len(picked)} 首有特征 → {dest}")
-    if len(out) < len(picked):
-        print(f"（{len(picked) - len(out)} 首查不到音频特征，已被排除。"
-              f"ReccoBeats 未收录的曲目通常集中在冷门/新发行上。）")
+    print(coverage_report(counts, len(picked)))
     return 0
 
 

@@ -261,3 +261,90 @@ def tempo_target(n: int) -> list[float]:
     if n == 1:
         return [0.5]
     return [1.0 - abs(i / (n - 1) - 0.5) * 2 for i in range(n)]
+
+
+# ---------------------------------------------------------------- 特征覆盖漏斗
+#
+# 为什么这一节存在：**"有多少曲目能拿到音频特征"是决定整个工具能力的数字。**
+# 相邻规则和弧线只能作用在有特征的曲目上；覆盖率掉到 60%，排出来的顺序
+# 就有四成位置没被评估过，而报告里的 cost 数字会**看起来很好**。
+#
+# 以前这件事散落在几处 `continue` 里，而且被压成一个笼统的 miss：
+#   · playlist_flow   `if not f or f.get("_miss") or "tempo" not in f: continue`
+#   · build_pool      "N 首查不到音频特征，已被排除"
+#   · profile_library 反而做对了，它分了 "no-isrc" 和 "reccobeats" 两种
+# 只有 profile_library 做对，恰恰说明这不是能力问题，而是定义没有归属。
+#
+# 接第二个平台时这一节最要紧：网易云/QQ 不返回 ISRC，no-isrc 会从 12% 直接
+# 逼近 100%，而**那是换特征源也解决不了的**——和"特征源没收录"完全是两回事。
+# 压成一个数字就把唯一能指导决策的信息丢掉了。
+
+COVERAGE_STAGES = (
+    "no-id",          # 没有平台曲目 id
+    "no-meta",        # 拿不到元数据（地区未上架 / 已下架）
+    "no-isrc",        # 没有 ISRC —— 特征链的硬边界
+    "not-in-cache",   # 不在特征缓存里（还没抓过）
+    "source-miss",    # 有 ISRC，但特征源没收录
+    "no-features",    # 特征源返回了记录，但里面没有 tempo
+    "ok",
+)
+
+COVERAGE_LABELS = {
+    "no-id": "没有平台曲目 id（如库内自行上传的内容）",
+    "no-meta": "拿不到元数据（地区未上架 / 已下架）",
+    "no-isrc": "没有 ISRC —— **特征链的硬边界**，换特征源也解决不了",
+    "not-in-cache": "不在特征缓存里（这批还没抓过）",
+    "source-miss": "有 ISRC，但特征源未收录（可换源，或本地分析）",
+    "no-features": "特征源返回了记录，但缺 tempo 字段",
+    "ok": "可用",
+}
+
+# 低于这个覆盖率就该明说"排序只覆盖了一部分曲目"
+LOW_COVERAGE = 0.90
+
+
+def classify_coverage(*, has_id: bool = True, has_meta: bool = True,
+                      isrc: str | None = None, in_cache: bool = True,
+                      feat: dict | None = None) -> str:
+    """一首曲子为什么能/不能被音频特征覆盖。**按漏斗顺序，先命中先返回。**
+
+    顺序本身是有意义的，不能重排：`no-isrc` 必须排在 `source-miss` 前面。
+    前者是"特征链根本没法开始"（换平台可能更糟，换特征源无用），
+    后者是"有 ISRC 但这家源没收录"（换源就能解决）。这两件事的可行动性相反。
+    """
+    if not has_id:
+        return "no-id"
+    if not has_meta:
+        return "no-meta"
+    if not isrc:
+        return "no-isrc"
+    if not in_cache:
+        return "not-in-cache"
+    if feat is None or feat.get("_miss"):
+        return "source-miss"
+    if "tempo" not in feat:
+        return "no-features"
+    return "ok"
+
+
+def coverage_report(counts: dict[str, int], total: int,
+                    warn_below: float = LOW_COVERAGE) -> str:
+    """把漏斗变成一个能读、能据以决策的几行字。"""
+    if total <= 0:
+        return "音频特征覆盖：（没有曲目可统计）"
+    c = {k: int(counts.get(k, 0)) for k in COVERAGE_STAGES}
+    ok = c["ok"]
+    pct = ok / total * 100
+    lines = [f"音频特征覆盖：{ok}/{total} 可用（{pct:.0f}%）"]
+    for stage in COVERAGE_STAGES:
+        if stage == "ok" or not c[stage]:
+            continue
+        lines.append(f"  · {c[stage]:>4} 首 {COVERAGE_LABELS[stage]}")
+    lost = total - ok
+    if lost and pct < warn_below * 100:
+        lines.append(
+            f"  ⚠️ 覆盖率 {pct:.0f}% 低于 {warn_below * 100:.0f}%："
+            f"相邻规则与弧线**只在能测量的曲目之间**生效，"
+            f"剩下 {lost} 首的位置实际上没有被评估过——"
+            f"报告里的 cost 只描述前一部分。")
+    return "\n".join(lines)
