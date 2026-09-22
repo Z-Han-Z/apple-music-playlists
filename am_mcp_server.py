@@ -227,6 +227,18 @@ TOOLS = [
                 "arc": {"type": "string", "enum": list(SHAPE_ALIASES),
                         "description": "目标叙事弧，默认 man-in-a-hole（先落再起）。"
                                        "用 cinderella 表示起-落-起，等等"},
+                "arc_axes": {
+                    "type": "object",
+                    "description": "额外弧线轴（可选）：{轴名: [每首的数值]}，"
+                                   "数组**按输入曲目对齐**，长度必须严格等于输入项数（不符会被拒绝，"
+                                   "因为错位会静默污染排序）。"
+                                   "典型用法：你（LLM）读完歌词后给每首一个 lyric_valence，"
+                                   "服务端把它当作与 valence 并列的弧线轴。"
+                                   "⚠️ **只放「值该随叙事弧起伏」的量**——别放静态质量分"
+                                   "（主题契合、乐评评分、质量先验）：那些是「越高越好」、与位置无关，"
+                                   "塞进来等于让优化器去拟合一条无意义的曲线。"
+                                   "实测把主题契合当弧线轴喂进去，主题分最高的曲子被推到了末尾。",
+                },
                 "isrcs": {"type": "boolean", "description": "tracks/blocks 是否按 ISRC 精确匹配，默认 false"},
                 "refresh": {"type": "boolean", "description": "忽略音频特征缓存重抓，默认 false"},
             },
@@ -463,6 +475,38 @@ def t_flow(args: dict) -> str:
     return flow_mod.flow_report(args["playlist"], bool(args.get("refresh")))
 
 
+MAX_AXES = 4
+
+
+def _validate_arc_axes(spec, expected_len: int) -> str | None:
+    """校验调用方给的额外弧线轴。**长度必须严格等于输入曲目数。**
+
+    静默错位是这个参数最危险的失败方式：评分数组按输入对齐、曲目按解析结果对齐时，
+    只要丢了一个未匹配项，**所有分数就整体错位一格**——而排出来的顺序看起来完全正常。
+    所以长度不符直接拒绝，不做任何"尽力对齐"。
+
+    也不是"越多的轴越好"：`arc_cost` 对参与的各轴取平均，轴越多每条越被稀释。
+    """
+    if not spec:
+        return None
+    if not isinstance(spec, dict):
+        return "arc_axes 必须是对象：{轴名: [每首的数值]}"
+    if len(spec) > MAX_AXES:
+        return (f"arc_axes 最多 {MAX_AXES} 条轴（传了 {len(spec)} 条）。"
+                f"弧线项对各轴取平均，轴越多每条越被稀释。")
+    for axis, values in spec.items():
+        if not isinstance(values, list):
+            return f"arc_axes['{axis}'] 必须是数组"
+        if len(values) != expected_len:
+            return (f"arc_axes['{axis}'] 的长度必须是 {expected_len}（输入曲目数），"
+                    f"实际 {len(values)}。长度不符会让分数与曲目**静默错位**，故直接拒绝。")
+        bad = [i for i, v in enumerate(values)
+               if isinstance(v, bool) or not isinstance(v, (int, float))]
+        if bad:
+            return f"arc_axes['{axis}'] 第 {bad[:3]} 项不是数字"
+    return None
+
+
 def t_optimize(args: dict) -> str:
     """算出更好的曲序。**只读**——不改动任何歌单。
 
@@ -476,9 +520,14 @@ def t_optimize(args: dict) -> str:
     arc = args.get("arc") or opt_mod.DEFAULT_SHAPE
     refresh = bool(args.get("refresh"))
     isrcs = bool(args.get("isrcs"))
+    axes_spec = args.get("arc_axes") or {}
+    extra_axes = tuple(axes_spec)
 
     missed: list[str] = []
     entries: list[dict] = []
+    # `src_index` = 曲目在**输入**里的下标（playlist 模式下是歌单里的位置）。
+    # arc_axes 的数值按它对齐——按解析结果对齐会因为丢掉未匹配项而**整体错位一格**。
+    src_index = 0
 
     if args.get("playlist"):
         if args.get("tracks") or args.get("blocks"):
@@ -486,43 +535,72 @@ def t_optimize(args: dict) -> str:
         p = am.find_playlist(args["playlist"], dev, user)
         if not p:
             return f"找不到歌单: {args['playlist']}"
+        raw = am.playlist_tracks(p["id"], dev, user)
+        err = _validate_arc_axes(axes_spec, len(raw))
+        if err:
+            return err
         cids = []
-        for t in am.playlist_tracks(p["id"], dev, user):
+        for t in raw:
             pp = (t.get("attributes") or {}).get("playParams") or {}
             cid = pp.get("catalogId") or pp.get("id")
             if cid:
                 cids.append(str(cid))
         cm = catalog_meta(cids, dev, sf)
-        entries = [{"cid": c, "name": (cm.get(c) or {}).get("name"),
-                    "artist": (cm.get(c) or {}).get("artistName"),
-                    "isrc": (cm.get(c) or {}).get("isrc")} for c in cids]
-        source = f"现有歌单「{p['attributes'].get('name')}」：{len(entries)} 首"
+        for i, t in enumerate(raw):
+            pp = (t.get("attributes") or {}).get("playParams") or {}
+            cid = pp.get("catalogId") or pp.get("id")
+            if not cid:
+                continue
+            cid = str(cid)
+            m = cm.get(cid) or {}
+            entries.append({"cid": cid, "name": m.get("name"),
+                            "artist": m.get("artistName"), "isrc": m.get("isrc"),
+                            "src_index": i})
+        source = f"现有歌单「{p['attributes'].get('name')}」：{len(entries)}/{len(raw)} 首可排序"
     else:
         groups = args.get("blocks") or ([args["tracks"]] if args.get("tracks") else [])
         groups = [g for g in groups if g]
         if not groups:
             return "请给出 tracks、blocks 或 playlist 之一。"
-        multi = len(groups) > 1
+        total_in = sum(len(g) for g in groups)
+        # 长度在**发任何请求之前**就能判定，所以先拒绝——不浪费配额，也不用等几十秒才报错
+        err = _validate_arc_axes(axes_spec, total_in)
+        if err:
+            return err
+        # 逐项解析，才能建立"输入下标 → catalog id"的精确映射。
+        # 请求数与批量调用相同（resolve_tracks 本来就是逐项查）。
+        pairs: list[tuple[int, str, int]] = []
         for gi, group in enumerate(groups, 1):
-            ids, gone = am.resolve_tracks(list(group), dev, sf, isrcs=isrcs)
-            missed += gone
-            cm = catalog_meta(ids, dev, sf)
-            for c in ids:
-                m = cm.get(c) or {}
-                entries.append({"cid": c, "name": m.get("name"), "artist": m.get("artistName"),
-                                "isrc": m.get("isrc"), "block": f"B{gi}" if multi else None})
-        source = (f"给定 {len(groups)} 组共 {sum(len(g) for g in groups)} 项："
-                  f"{len(entries)} 首匹配成功")
+            for item in group:
+                ids, gone = am.resolve_tracks([item], dev, sf, isrcs=isrcs)
+                if gone or not ids:
+                    missed.append(item)
+                else:
+                    pairs.append((src_index, ids[0], gi))
+                src_index += 1
+        cm = catalog_meta([c for _, c, _ in pairs], dev, sf)
+        multi = len(groups) > 1
+        for si, c, gi in pairs:
+            m = cm.get(c) or {}
+            entries.append({"cid": c, "name": m.get("name"), "artist": m.get("artistName"),
+                            "isrc": m.get("isrc"),
+                            "block": f"B{gi}" if multi else None, "src_index": si})
+        source = f"给定 {len(groups)} 组共 {total_in} 项：{len(entries)} 首匹配成功"
 
     if not entries:
         return f"{source}，但没有解析出任何可排序的曲目。未匹配：{missed or '（无）'}"
+
+    if extra_axes:
+        for e in entries:
+            e["scores"] = {ax: float(axes_spec[ax][e["src_index"]]) for ax in extra_axes}
 
     # 只有拿到 ISRC 才查得到音频特征；没有的那些会被标记出来而不是静默丢掉。
     feature_input = [(e["cid"], e.get("name") or e["cid"], e.get("artist") or "", e.get("isrc"))
                      for e in entries if e.get("isrc")]
     features = flow_mod.fetch_features("mcp-order", feature_input, refresh)
 
-    _, report = opt_mod.order_from_features(entries, features, arc=arc)
+    _, report = opt_mod.order_from_features(entries, features, arc=arc,
+                                            extra_axes=extra_axes)
 
     lines = [source]
     if missed:
@@ -630,6 +708,7 @@ def _validate_tool_arguments(name: str, arguments) -> str | None:
     expected_types = {
         "string": lambda value: isinstance(value, str),
         "integer": lambda value: isinstance(value, int) and not isinstance(value, bool),
+        "number": lambda value: isinstance(value, (int, float)) and not isinstance(value, bool),
         "boolean": lambda value: isinstance(value, bool),
         "array": lambda value: isinstance(value, list),
     }
