@@ -26,14 +26,12 @@ from collections import Counter
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import am_paths as ap  # noqa: E402
 import am_playlist as am  # noqa: E402
 from am_meta import catalog_meta  # noqa: E402
 
-if sys.stdout.encoding and sys.stdout.encoding.lower() not in ("utf-8", "utf8"):
-    try:
-        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-    except Exception:
-        pass
+# Windows 控制台默认 GBK；唯一实现在 am_paths
+ap.enable_utf8_stdout()
 
 
 def mmss(ms: int) -> str:
@@ -186,7 +184,13 @@ def audit_report(name: str) -> str:
     return buf.getvalue().strip() or "（体检没有输出）"
 
 
+def main(argv: list[str] | None = None) -> int:
+    argv = sys.argv[1:] if argv is None else argv
+    if not argv or argv[0] in ("-h", "--help"):
+        print(__doc__)
+        return 0 if argv else 2
+    return audit(argv[0])
+
+
 if __name__ == "__main__":
-    if len(sys.argv) < 2:
-        raise SystemExit(__doc__)
-    sys.exit(audit(sys.argv[1]))
+    sys.exit(main())

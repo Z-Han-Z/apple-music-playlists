@@ -230,6 +230,66 @@ class TestBuildPoolIsDistributable(unittest.TestCase):
                              f"缓存文件名不该在 build_pool 里硬编码：{line.strip()}")
 
 
+class TestCliEntryPoints(unittest.TestCase):
+    """每个命令行入口要么用 argparse，要么自己处理 -h/--help。
+
+    以前 `python playlist_audit.py --help` 会把 "--help" 当成歌单名，
+    回一句"找不到歌单: --help"——对一个要给别人用的工具来说太糙了。
+    另外 `SystemExit(__doc__)` 本身就是错的：传字符串给 SystemExit 会
+    退出码 1 并把文档打到 stderr，不是打印用法。
+    """
+
+    def test_audit_help_and_usage(self):
+        import playlist_audit as pa
+        self.assertEqual(pa.main(["--help"]), 0)
+        self.assertEqual(pa.main(["-h"]), 0)
+        self.assertEqual(pa.main([]), 2)
+
+    def test_optimizer_help_and_usage(self):
+        import playlist_optimize as po
+        self.assertEqual(po.main([]), 2)
+        self.assertEqual(po.main(["--help"]), 0)
+        self.assertEqual(po.main(["--list-shapes"]), 0)
+
+    def test_flow_help_and_usage(self):
+        import playlist_flow as pf
+        self.assertEqual(pf.main([]), 2)
+        self.assertEqual(pf.main(["--help"]), 0)
+        self.assertEqual(pf.main(["-h"]), 0)
+
+    def test_no_source_raises_systemexit_with_a_string(self):
+        """SystemExit(<文档字符串>) 是个容易复发的写法。"""
+        for p in SOURCES:
+            src = p.read_text(encoding="utf-8")
+            self.assertNotIn("SystemExit(__doc__)", src, f"{p.name} 又用了 SystemExit(__doc__)")
+
+
+class TestUtf8Output(unittest.TestCase):
+    """每个命令行入口都必须开 UTF-8 输出。
+
+    实测依据：同一条命令里，调用过它的脚本中文正常，没调用的打印出一串乱码。
+    "有的调了、有的没调"本身就是 bug——而在 Windows 上中文乱码会让整个
+    报告没法读。
+    """
+
+    ENTRY_POINTS = ("am_playlist.py", "playlist_audit.py", "playlist_flow.py",
+                    "playlist_optimize.py", "listening_stats.py",
+                    "profile_library.py", "build_pool.py")
+
+    def test_every_entry_point_enables_utf8(self):
+        for name in self.ENTRY_POINTS:
+            src = (ROOT / name).read_text(encoding="utf-8")
+            self.assertIn("enable_utf8_stdout", src,
+                          f"{name} 没有开 UTF-8 输出（Windows 上中文会乱码）")
+
+    def test_reconfigure_logic_lives_in_one_place(self):
+        """reconfigure 只该在 am_paths 里出现一次，别的文件只调用它。"""
+        hits = [p.name for p in SOURCES
+                if "reconfigure(encoding" in p.read_text(encoding="utf-8")]
+        self.assertEqual(hits, ["am_paths.py"],
+                         f"reconfigure 的实现在别的文件里也出现了：{hits}")
+
+
 class TestMcpServerConsistency(unittest.TestCase):
     """声明了工具却没接上 handler（或反过来）是这类服务器的经典 bug。"""
 

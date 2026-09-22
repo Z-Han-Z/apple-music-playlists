@@ -38,13 +38,11 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import am_paths as ap  # noqa: E402
 import am_playlist as am  # noqa: E402
 
-if sys.stdout.encoding and sys.stdout.encoding.lower() not in ("utf-8", "utf8"):
-    try:
-        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-    except Exception:
-        pass
+# Windows 控制台默认 GBK；唯一实现在 am_paths
+ap.enable_utf8_stdout()
 
 # music-summaries 走 web 主机更稳
 ROOT = am.AMP_ROOT

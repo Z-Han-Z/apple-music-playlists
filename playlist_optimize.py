@@ -44,6 +44,9 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import am_paths as ap  # noqa: E402
+
+# Windows 控制台默认 GBK；唯一实现在 am_paths
+ap.enable_utf8_stdout()
 # 从**平台无关**的 core 取乐理与规则判定，而不是从 playlist_flow。
 # playlist_flow 会 import am_playlist（Apple 层），从它取会让这个纯算法模块
 # 间接依赖某个音乐平台——接第二个平台时算法层不该认识任何平台的代码。
@@ -272,11 +275,14 @@ def optimize(spec_file, features_file=None, out_file=None, shape=DEFAULT_SHAPE):
     return ids, head + body
 
 
-def main() -> int:
-    argv = sys.argv[1:]
+def main(argv: list[str] | None = None) -> int:
+    argv = sys.argv[1:] if argv is None else list(argv)
     if not argv:
         print(__doc__)
         return 2
+    if argv[0] in ("-h", "--help"):
+        print(__doc__)
+        return 0
 
     if "--list-shapes" in argv or "--shapes" in argv:
         print("可选的目标形状（--arc <名字>）：")

@@ -15,10 +15,29 @@ am_paths.py — 与音乐平台无关的路径与版本常量。
 from __future__ import annotations
 
 import os
+import sys
 from pathlib import Path
 
 APP = "am-playlist"
 VERSION = "1.1.0"
+
+
+def enable_utf8_stdout() -> None:
+    """让 stdout/stderr 走 UTF-8。每个命令行入口调用一次。
+
+    Windows 控制台默认 GBK，中文输出会变成乱码——**尤其是被重定向或捕获时**。
+    这一点是实测出来的：同一条命令里，调用过它的脚本中文正常，没调用的那个
+    是一串乱码。所以"有的脚本调了、有的没调"本身就是 bug。
+
+    只在 Windows 上动手；失败就算了——输出编码不该让工具崩掉。
+    """
+    if os.name != "nt":
+        return
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
 
 # 仓库根目录（= 本文件所在目录）。只作为**读**回退，绝不往这里写新文件。
 REPO_DIR = Path(__file__).resolve().parent

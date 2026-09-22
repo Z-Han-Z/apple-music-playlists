@@ -51,15 +51,10 @@ import zlib
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from am_paths import VERSION, cache_dir, config_dir  # noqa: E402
+from am_paths import VERSION, cache_dir, config_dir, enable_utf8_stdout  # noqa: E402
 
-# Windows 控制台默认 GBK，强制 UTF-8 以免中文乱码
-if os.name == "nt":
-    for _s in (sys.stdout, sys.stderr):
-        try:
-            _s.reconfigure(encoding="utf-8", errors="replace")
-        except Exception:
-            pass
+# Windows 控制台默认 GBK，强制 UTF-8 以免中文乱码（唯一实现在 am_paths）
+enable_utf8_stdout()
 
 # ---------------------------------------------------------------- 常量
 

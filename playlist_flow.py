@@ -41,11 +41,8 @@ import am_paths as ap  # noqa: E402
 import am_playlist as am  # noqa: E402
 from am_meta import catalog_meta  # noqa: E402
 
-if sys.stdout.encoding and sys.stdout.encoding.lower() not in ("utf-8", "utf8"):
-    try:
-        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-    except Exception:
-        pass
+# Windows 控制台默认 GBK；唯一实现在 am_paths
+ap.enable_utf8_stdout()
 
 RB = "https://api.reccobeats.com"
 # 缓存写进**用户目录**，不写进仓库。refs/ 曾经是缓存目录，现在只作只读回退
@@ -321,12 +318,14 @@ def flow_report(target: str, refresh: bool = False) -> str:
     return buf.getvalue().strip() or "（体检没有输出）"
 
 
-def main() -> int:
-    args = [a for a in sys.argv[1:] if not a.startswith("--")]
+def main(argv: list[str] | None = None) -> int:
+    """CLI 契约与其它入口保持一致：显式 --help 退出 0，什么都不给退出 2。"""
+    argv = sys.argv[1:] if argv is None else list(argv)
+    args = [a for a in argv if not a.startswith("-")]
     if not args:
         print(__doc__)
-        return 2
-    return run(args[0], "--refresh" in sys.argv)
+        return 0 if any(a in ("-h", "--help") for a in argv) else 2
+    return run(args[0], "--refresh" in argv)
 
 
 if __name__ == "__main__":

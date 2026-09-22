@@ -30,6 +30,9 @@ import am_playlist as am  # noqa: E402
 import playlist_flow as pf  # noqa: E402
 from am_meta import catalog_meta  # noqa: E402
 
+# Windows 控制台默认 GBK；唯一实现在 am_paths
+ap.enable_utf8_stdout()
+
 ROOT = Path(__file__).resolve().parent
 
 

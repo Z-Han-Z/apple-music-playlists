@@ -38,6 +38,9 @@ import playlist_flow as pf  # noqa: E402
 import profile_library as prof_mod  # noqa: E402
 from am_meta import catalog_meta  # noqa: E402
 
+# Windows 控制台默认 GBK；唯一实现在 am_paths
+ap.enable_utf8_stdout()
+
 
 def build(tag: str, cap: int, year: int, top_n: int,
           refresh_library: bool = False, quiet: bool = False) -> int:
