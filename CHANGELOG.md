@@ -30,6 +30,14 @@ First tagged release. Everything below is relative to the untagged `1.0.0` state
 - **`docs/platform-adapters.md`** — the boundary between the platform-neutral core and a
   platform adapter, what an adapter must provide, and what breaks on a service that
   exposes no ISRC.
+- **Paginated list helpers** — `paged_data()`, `list_playlists()`, `playlist_tracks()`.
+  They follow Apple's `next` cursor with a repeat-guard, so lists are read in full.
+- **`created_playlist_from_response()`** — after creating a playlist, poll for it to appear
+  instead of assuming the response carries an id, which covers iCloud propagation lag.
+- **Continuous integration** — the offline suite runs on Linux / macOS / Windows across
+  Python 3.10 and 3.13.
+- **`AGENTS.md`** — repository conventions for automated contributors, including the
+  architectural invariants that keep the core platform-neutral.
 
 ### Changed
 
@@ -43,6 +51,8 @@ First tagged release. Everything below is relative to the untagged `1.0.0` state
 - `--storefront` no longer carries a literal default, so the region remembered in config
   actually applies.
 - `profile_library.py` writes its profile cache to the user directory.
+- The MCP server and both audits now go through the shared list helpers instead of issuing
+  their own single-page `limit=100` requests.
 
 ### Fixed
 
@@ -75,6 +85,16 @@ First tagged release. Everything below is relative to the untagged `1.0.0` state
 - Unreachable code after `return "us"` in `resolve_storefront`.
 - Four documentation pointers that had survived a file rename, and a doc that contradicted
   itself about whether missing feature data was still silently dropped.
+- **Playlists longer than 100 tracks were silently truncated.** `playlist_audit` and
+  `playlist_flow` each read a single page. This also made the coverage denominator wrong for
+  long playlists — the funnel would have reported a confident 100% while seeing only the
+  first page.
+- **The length verdict in `playlist_audit` was inverted.** It passed `cond_ok = n <= 50`, so
+  a 10-track playlist was reported as "✅ compliant with Apple's 15–50" rather than
+  "❌ fewer than 15". Empty playlists now stop early instead of analysing nothing.
+- Stale MCP tool counts in `docs/apple-music-api-notes.md` and `preset/README.md` (they said
+  6 and 9; the server exposes 11), the protocol version in the docs' handshake example, and
+  the clone URL placeholder.
 
 ### Behaviour changes
 
