@@ -12,8 +12,8 @@ playlist_optimize.py — 用模拟退火算出一个「好听」的曲序。
                 相邻不该在 tempo 和 key 上「同时」相似
                 不要 BPM 无理由地大跳（>40%）
                 能量骤变且调性不兼容 = 突兀
-  软性（整体）  valence/energy/loudness 走 U 型、tempo 走倒 U 型
-                valence 走 Man in a hole（先落再起）
+  软性（整体）  valence/energy/loudness 朝**选定的叙事弧**（--arc，默认 man-in-a-hole）
+                tempo 走倒 U 型（快的放中段；排序惯例，不随形状变）
   结构约束      分组顺序固定（"有意思"那一层不能为了顺耳牺牲掉）
 
 输入文件两种写法都支持：
@@ -29,7 +29,9 @@ playlist_optimize.py — 用模拟退火算出一个「好听」的曲序。
 
 用法：
     python playlist_optimize.py <清单.json> [-o 输出.json] [--features 缓存.json]
-    python playlist_optimize.py            # 不给参数时打印本说明
+                                [--arc man-in-a-hole|cinderella|icarus|...]
+    python playlist_optimize.py --list-shapes   # 列出六个可选形状
+    python playlist_optimize.py                 # 不给参数时打印本说明
 """
 
 from __future__ import annotations
@@ -45,7 +47,16 @@ import am_paths as ap  # noqa: E402
 # 从**平台无关**的 core 取乐理与规则判定，而不是从 playlist_flow。
 # playlist_flow 会 import am_playlist（Apple 层），从它取会让这个纯算法模块
 # 间接依赖某个音乐平台——接第二个平台时算法层不该认识任何平台的代码。
-from playlist_core import camelot, check_pair, fold_tempo  # noqa: E402
+from playlist_core import (  # noqa: E402
+    DEFAULT_SHAPE,
+    SHAPE_ALIASES,
+    camelot,
+    check_pair,
+    fold_tempo,
+    resolve_shape,
+    shape_target,
+    tempo_target,
+)
 
 
 def resolve_feature_cache(explicit=None) -> Path | None:
@@ -144,44 +155,43 @@ def adjacency_cost(seq):
                for r in check_pair(a, b))
 
 
-def arc_cost(seq):
-    """
-    整体形状约束（§3.1 + §4）：
-      valence  → Man in a hole：谷底在 60% 处（先落再起）
-      energy   → U 型：谷底在中间
-      loudness → U 型：谷底在中间
-      tempo    → 倒 U 型：峰值在中间
+def arc_cost(seq, shape=DEFAULT_SHAPE):
+    """整体形状约束（§3.1 + §4）。
+
+    目标曲线来自 `playlist_core.ARCHETYPES` —— 与体检器"认出你是什么形状"用的是
+    **同一份**曲线定义。这里以前硬编码 man-in-a-hole（valence 谷底在 60%），
+    而策划文档把"先选一个形状"列为第一步：那一步当时只有诊断价值，工具并没有
+    按你选的形状去排。
+
+      valence / energy / loudness → 选定的叙事弧（情绪走向）
+      tempo                       → 倒 U（快的放中段；排序惯例，不随形状变）
     """
     known = [(i, t) for i, t in enumerate(seq) if t["f"]]
     if len(known) < 5:
         return 0.0
     n = len(seq)
-    specs = [("valence", "V", 0.60), ("energy", "U", 0.50),
-             ("loud", "U", 0.50), ("bpm", "A", 0.50)]
+    mood = shape_target(shape, n)
+    specs = [("valence", mood), ("energy", mood), ("loud", mood),
+             ("bpm", tempo_target(n))]
     total = 0.0
-    for key, kind, center in specs:
+    for key, target in specs:
         vs = [t[key] for _, t in known]
         lo, hi = min(vs), max(vs)
         rng = (hi - lo) or 1.0
         for i, t in known:
-            p = i / (n - 1)
-            d = abs(p - center)
-            scale = center if p <= center else (1 - center)
-            r = (d / scale) if scale else 0.0          # 中心=0，两端=1
-            target = (1.0 - r) if kind == "A" else r    # A = 倒 U（中间高）
             actual = (t[key] - lo) / rng
-            total += (actual - target) ** 2
+            total += (actual - target[i]) ** 2
     return W_ARC * total / (len(known) * len(specs))
 
 
-def total_cost(seq):
-    return adjacency_cost(seq) + arc_cost(seq)
+def total_cost(seq, shape=DEFAULT_SHAPE):
+    return adjacency_cost(seq) + arc_cost(seq, shape)
 
 
-def anneal(blocks, iters=60000, seed=7):
+def anneal(blocks, iters=60000, seed=7, shape=DEFAULT_SHAPE):
     rng = random.Random(seed)
     seq = [t for blk in blocks for t in blk]
-    cur = total_cost(seq)
+    cur = total_cost(seq, shape)
     best, best_cost = list(seq), cur
     for k in range(iters):
         T = 2.0 * (1 - k / iters) + 0.01
@@ -193,7 +203,7 @@ def anneal(blocks, iters=60000, seed=7):
         start = sum(len(blocks[x]) for x in range(bi))
         a, b = start + i, start + j
         seq[a], seq[b] = seq[b], seq[a]
-        new = total_cost(seq)
+        new = total_cost(seq, shape)
         if new < cur or rng.random() < math.exp((cur - new) / T):
             cur = new
             if new < best_cost:
@@ -226,10 +236,11 @@ def report(seq, blocks_spec):
     return ids
 
 
-def optimize(spec_file, features_file=None, out_file=None):
+def optimize(spec_file, features_file=None, out_file=None, shape=DEFAULT_SHAPE):
     """跑模拟退火，返回 (ids, 报告文本)。
 
     分组清单只做组内重排（保留分组顺序）；平铺清单整张自由重排。
+    shape 是目标叙事弧（见 playlist_core.SHAPE_ALIASES）。
     """
     import contextlib
     import io
@@ -238,13 +249,16 @@ def optimize(spec_file, features_file=None, out_file=None):
     blocks = [[t for t in tracks if t["block"] == blk["id"]] for blk in spec]
 
     before = [t for blk in blocks for t in blk]
-    seq, cost = anneal(blocks)
+    seq, cost = anneal(blocks, shape=shape)
 
-    head = (f"载入 {len(tracks)} 首（{sum(1 for t in tracks if t['f'])} 首有特征）\n"
-            f"原始顺序 cost = {total_cost(before):.2f} "
-            f"(相邻 {adjacency_cost(before):.2f} + 弧线 {arc_cost(before):.2f})\n"
+    # 把解析后的完整形状名打出来：报告里要能看出"朝哪个形状排的"，
+    # 否则体检说"你是 Cinderella、而排序目标是 man-in-a-hole"时没法发现。
+    head = (f"目标形状：{resolve_shape(shape)}\n"
+            f"载入 {len(tracks)} 首（{sum(1 for t in tracks if t['f'])} 首有特征）\n"
+            f"原始顺序 cost = {total_cost(before, shape):.2f} "
+            f"(相邻 {adjacency_cost(before):.2f} + 弧线 {arc_cost(before, shape):.2f})\n"
             f"优化后   cost = {cost:.2f} "
-            f"(相邻 {adjacency_cost(seq):.2f} + 弧线 {arc_cost(seq):.2f})")
+            f"(相邻 {adjacency_cost(seq):.2f} + 弧线 {arc_cost(seq, shape):.2f})")
 
     buf = io.StringIO()
     with contextlib.redirect_stdout(buf):
@@ -263,20 +277,31 @@ def main() -> int:
     if not argv:
         print(__doc__)
         return 2
+
+    if "--list-shapes" in argv or "--shapes" in argv:
+        print("可选的目标形状（--arc <名字>）：")
+        for short, full in SHAPE_ALIASES.items():
+            print(f"  {short:<16} {full}")
+        print(f"\n默认：{DEFAULT_SHAPE}")
+        return 0
+
     spec_file = argv[0]
     features_file = out_file = None
+    shape = DEFAULT_SHAPE
     i = 1
     while i < len(argv):
         if argv[i] in ("-o", "--out") and i + 1 < len(argv):
             out_file = argv[i + 1]; i += 2
         elif argv[i] == "--features" and i + 1 < len(argv):
             features_file = argv[i + 1]; i += 2
+        elif argv[i] == "--arc" and i + 1 < len(argv):
+            shape = argv[i + 1]; i += 2
         else:
             i += 1
     if out_file is None:
         out_file = Path(spec_file).with_name(Path(spec_file).stem + "-order.json")
     try:
-        _, text = optimize(spec_file, features_file, out_file)
+        _, text = optimize(spec_file, features_file, out_file, shape=shape)
     except (FileNotFoundError, ValueError) as e:
         print(f"错误: {e}")
         return 1

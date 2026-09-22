@@ -131,5 +131,64 @@ class TestSingleSourceOfTruth(unittest.TestCase):
                          f"playlist_core 依赖了不该依赖的东西：{mods}")
 
 
+class TestShapeTargets(unittest.TestCase):
+    """目标形状（"朝哪个形状排"）—— 与形状识别共用 ARCHETYPES 那一份曲线。"""
+
+    def test_short_names_resolve(self):
+        for short in core.SHAPE_ALIASES:
+            self.assertIn(core.resolve_shape(short), core.ARCHETYPES)
+
+    def test_full_keys_also_accepted(self):
+        for full in core.ARCHETYPES:
+            self.assertEqual(core.resolve_shape(full), full)
+
+    def test_unknown_name_raises_and_lists_options(self):
+        with self.assertRaises(ValueError) as cm:
+            core.resolve_shape("nope")
+        self.assertIn("cinderella", str(cm.exception))
+
+    def test_five_points_returns_the_ideal_curve(self):
+        """5 点以内插 5 点必须原样返回，否则"朝某个形状排"本身就是偏的。"""
+        for short, full in core.SHAPE_ALIASES.items():
+            self.assertEqual(core.shape_target(short, 5), core.ARCHETYPES[full])
+
+    def test_endpoints_are_preserved_when_interpolating(self):
+        for short, full in core.SHAPE_ALIASES.items():
+            ideal = core.ARCHETYPES[full]
+            for n in (2, 3, 7, 30, 45):
+                t = core.shape_target(short, n)
+                self.assertEqual(len(t), n)
+                self.assertAlmostEqual(t[0], ideal[0], places=9, msg=f"{short}/{n}")
+                self.assertAlmostEqual(t[-1], ideal[-1], places=9, msg=f"{short}/{n}")
+
+    def test_targets_stay_in_unit_range(self):
+        for short in core.SHAPE_ALIASES:
+            for n in (1, 2, 5, 13, 60):
+                for v in core.shape_target(short, n):
+                    self.assertGreaterEqual(v, 0.0)
+                    self.assertLessEqual(v, 1.0)
+
+    def test_degenerate_lengths(self):
+        self.assertEqual(core.shape_target("cinderella", 0), [])
+        self.assertEqual(len(core.shape_target("cinderella", 1)), 1)
+
+    def test_tempo_target_is_inverted_u(self):
+        t = core.tempo_target(5)
+        self.assertAlmostEqual(t[0], 0.0)
+        self.assertAlmostEqual(t[2], 1.0)          # 峰值在中间
+        self.assertAlmostEqual(t[-1], 0.0)
+
+    def test_tempo_target_does_not_depend_on_shape(self):
+        """tempo 的目标只随长度变。它反映"快的放中段"这条排序惯例，
+        和情绪走向是两件事，不该被搅在一起。"""
+        self.assertEqual(core.tempo_target(9), core.tempo_target(9))
+        import inspect
+        self.assertEqual(list(inspect.signature(core.tempo_target).parameters), ["n"])
+
+    def test_tempo_target_degenerate(self):
+        self.assertEqual(core.tempo_target(0), [])
+        self.assertEqual(core.tempo_target(1), [0.5])
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

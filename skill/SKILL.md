@@ -64,7 +64,8 @@ python am_playlist.py library                # 导出整个音乐库（含 ISRC�
 python build_pool.py --tag my-pool --cap 130 # 从自己库里挑候选池 + 抓特征
 python playlist_audit.py     "歌单名"              # 元数据层体检
 python playlist_flow.py      "歌单名" [--refresh]  # 听感层体检（联网抓特征）
-python playlist_optimize.py  清单.json [-o 输出.json] [--features 缓存.json]
+python playlist_optimize.py  清单.json [-o 输出.json] [--features 缓存.json] [--arc 形状]
+python playlist_optimize.py  --list-shapes   # 六个可选形状
 python -m unittest discover -s tests         # 104 项测试，全部离线
 ```
 
@@ -95,10 +96,21 @@ python -m unittest discover -s tests         # 104 项测试，全部离线
 **专业音乐人排专辑时偏向 `man in a hole`。** 30 首以上建议用"两个连续的 man-in-a-hole"——
 一个 40 分钟的大弧太难撑。**先选形状并写下来**，它是后面所有决定的裁判。
 
-> ⚠️ **但目前的实现只支持一种目标形状。** 体检会把你和六种叙事弧都对比、报出最接近的那个，
-> 而优化器**只会朝 man-in-a-hole 优化**（valence 谷底在 60%）。所以"先选形状"现在只有
-> 诊断价值，还没接上目标。实测那张六幕歌单被判为 **Cinderella**，却是按 man-in-a-hole
-> 的目标排出来的——二者本来就有张力，别假装没有。
+**`--arc` 就是这一步的实现。** 六个形状：`rags-to-riches` / `tragedy` / `man-in-a-hole`（默认）/
+`icarus` / `cinderella` / `oedipus`。目标曲线和体检用来分类的曲线是
+`playlist_core.ARCHETYPES` 里的**同一张表**——所以"你是什么形状"和"你朝哪个形状排"不会跑偏。
+
+```bash
+python playlist_optimize.py 清单.json --arc cinderella
+python playlist_optimize.py --list-shapes
+```
+
+**valence / energy / loudness 跟选定的形状走，tempo 不跟。** 叙事弧描述的是情绪走向，
+而"快的放中段"是排序惯例——让 tempo 也跟着起落起，等于把两个独立的原则搅成一个。
+
+实测过为什么值得接上：那张 45 首歌单的前 30 首，在 `man-in-a-hole`（优化器原来**硬编码**的
+目标）下 arc cost 是 **2.95**，**六个形状里最差**；换成 `cinderella` 是 **1.19**。
+工具当时瞄的正是最不合身的那一个。
 
 ### 3.2 四条硬性相邻规则
 

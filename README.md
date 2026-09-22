@@ -148,14 +148,31 @@ standard and repairing against another — so the count it reported could not be
 > that a uniformly slow playlist flags *every* adjacent pair — that is real, not a sequencing
 > failure, and the report says so.
 
-**Global arc** (matching the professional consensus)
-- `valence`, `energy`, `loudness` → **U-shaped** (high at both ends, lower in the middle)
-- `tempo` → **inverted U**
-- overall shape defaults to **man-in-a-hole** (fall, then rise)
+**Global arc** — you choose the target shape:
 
-> **Known gap.** The report *classifies* your playlist against all six narrative shapes, but the
-> optimizer only ever *targets* man-in-a-hole (a valence valley at 60%). Choosing a different target
-> shape is not wired up, even though the curation doc presents shape selection as the first decision.
+```bash
+python playlist_optimize.py stack.json --arc cinderella
+python playlist_optimize.py --list-shapes
+```
+
+| Axis | Target |
+|---|---|
+| `valence`, `energy`, `loudness` | the chosen narrative archetype |
+| `tempo` | inverted U — fast in the middle |
+
+Six shapes: `rags-to-riches`, `tragedy`, `man-in-a-hole` (default), `icarus`, `cinderella`,
+`oedipus`. The target curve and the shape the audit *classifies* come from the same table in
+`playlist_core.ARCHETYPES`, so "what shape is this" and "what shape am I aiming for" cannot drift
+apart.
+
+Tempo deliberately does **not** follow the chosen shape. The archetypes describe an emotional
+trajectory (valence / arousal); "put the fast ones in the middle" is a sequencing convention.
+Making tempo follow Cinderella too would conflate two independent principles.
+
+Measuring this on a real arc playlist is what justified wiring it up: under `man-in-a-hole` — the
+shape the optimizer used to hardcode — that playlist's opening 30 tracks score an arc cost of
+**2.95**, the *worst* of the six. The same tracks score **1.19** under `cinderella`. The tool had
+been aiming at the one shape that fit least.
 
 The optimizer preserves your grouping (movements / eras / moods) and only reorders *within*
 groups, so thematic structure survives the loudness tuning. Drop the grouping and it reorders
@@ -217,6 +234,7 @@ python build_pool.py --tag my-pool --cap 130 # 从自己库里挑候选池并抓
 python playlist_audit.py  "歌单名"            # 元数据层体检
 python playlist_flow.py   "歌单名"            # 听感层体检（BPM/调性/响度/能量/情绪）
 python playlist_optimize.py 清单.json -o 曲序.json   # 按规则重排曲序
+python playlist_optimize.py 清单.json --arc cinderella  # 指定叙事弧（默认 man-in-a-hole）
 python listening_stats.py top --kind songs --year 2026   # 播放次数排行
 python -m unittest discover -s tests         # 104 项测试，全部离线
 ```

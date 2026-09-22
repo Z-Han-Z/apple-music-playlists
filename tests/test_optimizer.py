@@ -16,6 +16,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+import playlist_core as core  # noqa: E402
 import playlist_optimize as po  # noqa: E402
 
 
@@ -169,6 +170,70 @@ class TestTotalCost(unittest.TestCase):
         for name in ("W_TWO_SLOW", "W_SMALL_DROP", "W_BOTH_SIMILAR",
                      "W_BIG_TEMPO_JUMP", "W_ENERGY_CLASH", "W_ARC"):
             self.assertGreater(getattr(po, name), 0.0, name)
+
+
+class TestArcCostHonoursTheChosenShape(unittest.TestCase):
+    """arc_cost 必须真的朝**选定**的形状排。
+
+    以前它把 man-in-a-hole 硬编码在函数体里（valence 谷底固定在 60%），
+    而策划文档把"先选一个形状"列为第一步——那一步当时只有诊断价值，
+    工具并没有兑现它自己写的流程。
+    """
+
+    @staticmethod
+    def _ideal_seq(shape_name):
+        """把某个形状的理想曲线直接造成一串曲目（valence/energy/loudness 都跟着它）。"""
+        vals = core.shape_target(shape_name, 5)
+        return [T(120, key=f"{i + 1}B", energy=v, valence=v,
+                  loud=v * 20 - 20, cid=f"c{i}")
+                for i, v in enumerate(vals)]
+
+    def test_matching_shape_is_cheaper_than_a_mismatched_one(self):
+        seq = self._ideal_seq("cinderella")
+        self.assertLess(po.arc_cost(seq, "cinderella"),
+                        po.arc_cost(seq, "icarus"))
+
+    def test_every_shape_prefers_its_own_curve(self):
+        """每个形状的理想序列，在自己那套目标下都该是最便宜的。
+
+        tempo 那一项与形状无关，所以它在各形状下相同；情绪三项在自己那套目标下
+        距离为 0。于是"自己最便宜"是可以严格断言的，不是近似。
+        """
+        for name in core.SHAPE_ALIASES:
+            seq = self._ideal_seq(name)
+            own = po.arc_cost(seq, name)
+            others = [po.arc_cost(seq, other)
+                      for other in core.SHAPE_ALIASES if other != name]
+            self.assertLessEqual(own, min(others) + 1e-9,
+                                 f"{name} 的理想序列在别的形状下反而更便宜")
+
+    def test_default_shape_is_man_in_a_hole(self):
+        seq = self._ideal_seq("man-in-a-hole")
+        self.assertAlmostEqual(po.arc_cost(seq),
+                               po.arc_cost(seq, core.DEFAULT_SHAPE), places=12)
+
+    def test_default_shape_is_not_all_slow_or_empty(self):
+        """默认值不该是个占位符：它必须是六个之一，而且确实是"落-起"。"""
+        self.assertIn(core.DEFAULT_SHAPE, core.SHAPE_ALIASES)
+        ideal = core.ARCHETYPES[core.resolve_shape(core.DEFAULT_SHAPE)]
+        self.assertLess(min(ideal), ideal[0])      # 中间比开头低
+        self.assertGreater(ideal[-1], ideal[0])    # 结尾比起步高
+
+    def test_unknown_shape_raises(self):
+        with self.assertRaises(ValueError):
+            po.arc_cost(self._ideal_seq("icarus"), "not-a-shape")
+
+    def test_total_cost_threads_the_shape_through(self):
+        seq = self._ideal_seq("cinderella")
+        self.assertAlmostEqual(po.total_cost(seq, "cinderella"),
+                               po.adjacency_cost(seq) + po.arc_cost(seq, "cinderella"),
+                               places=9)
+
+    def test_anneal_accepts_a_shape(self):
+        """退火必须把 shape 一路传下去，否则目标形状在中途被丢掉。"""
+        blocks = _blocks()
+        s1, c1 = po.anneal(blocks, iters=800, seed=11, shape="cinderella")
+        self.assertAlmostEqual(po.total_cost(s1, "cinderella"), c1, places=6)
 
 
 if __name__ == "__main__":

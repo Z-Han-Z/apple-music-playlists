@@ -199,3 +199,65 @@ def classify_shape(vals: list[float]) -> tuple[str, list[float], dict[str, float
     }
     best = min(scores, key=scores.get)
     return best, segs, scores
+
+
+# ---------------------------------------------------------------- 目标形状
+#
+# 上面是"认出你排出来的是什么形状"，这里是"朝着哪个形状排"。
+# 两者共用 ARCHETYPES 这**一份**曲线定义，这是刻意的：
+# 以前"选形状"只停在诊断层，优化器永远朝 man-in-a-hole 走，
+# 而策划文档把"先选一个形状"列为第一步——工具没兑现它自己写的流程。
+
+DEFAULT_SHAPE = "man-in-a-hole"
+
+# 文档与命令行里用的短名 → ARCHETYPES 的键
+SHAPE_ALIASES = {
+    "rags-to-riches": "Rags to riches（持续上升）",
+    "tragedy": "Tragedy（持续下降）",
+    "man-in-a-hole": "Man in a hole（落-起）",
+    "icarus": "Icarus（起-落）",
+    "cinderella": "Cinderella（起-落-起）",
+    "oedipus": "Oedipus（落-起-落）",
+}
+
+
+def resolve_shape(name: str) -> str:
+    """把短名（`cinderella`）或完整键名解析成 ARCHETYPES 的键。"""
+    if name in ARCHETYPES:
+        return name
+    key = SHAPE_ALIASES.get((name or "").strip().lower())
+    if key is None:
+        raise ValueError(f"未知形状 {name!r}。可选：" + "、".join(SHAPE_ALIASES))
+    return key
+
+
+def shape_target(name: str, n: int) -> list[float]:
+    """把 5 点的理想曲线线性插值成 n 个点的目标序列。"""
+    ideal = ARCHETYPES[resolve_shape(name)]
+    if n <= 0:
+        return []
+    if n == 1:
+        return [ideal[0]]
+    out = []
+    last = len(ideal) - 1
+    for i in range(n):
+        pos = i * last / (n - 1)
+        lo = int(pos)
+        hi = min(lo + 1, last)
+        frac = pos - lo
+        out.append(ideal[lo] * (1 - frac) + ideal[hi] * frac)
+    return out
+
+
+def tempo_target(n: int) -> list[float]:
+    """tempo 的目标：倒 U（快的放中段）。
+
+    **刻意不随情感形状变。** 叙事弧描述的是情绪走向（valence / energy /
+    loudness），而"快的放中段"是排序惯例，两者不是一回事。让 tempo 也跟着
+    Cinderella 起落起，等于把两个独立的原则搅成一个。
+    """
+    if n <= 0:
+        return []
+    if n == 1:
+        return [0.5]
+    return [1.0 - abs(i / (n - 1) - 0.5) * 2 for i in range(n)]
