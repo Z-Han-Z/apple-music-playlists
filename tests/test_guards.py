@@ -13,6 +13,7 @@
 import os
 import py_compile
 import re
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -356,6 +357,78 @@ class TestDocsDoNotLie(unittest.TestCase):
                     continue
                 self.assertTrue((here / ref).exists() or (ROOT / ref).exists(),
                                 f"{rel} 提到了不存在的文件：{ref}")
+
+
+def _pyproject_text() -> str:
+    return (ROOT / "pyproject.toml").read_text(encoding="utf-8")
+
+
+def _declared_modules() -> set[str]:
+    """pyproject 的 py-modules 清单。
+
+    刻意用正则而不是 tomllib：CI 覆盖 Python 3.10，而 tomllib 是 3.11+ 才有的。
+    为一个断言引入解析差异不划算。代价是重排这段 TOML 会让测试报错——
+    而那恰好提醒人来同步测试。
+    """
+    m = re.search(r"py-modules\s*=\s*\[(.*?)\]", _pyproject_text(), re.S)
+    assert m, "pyproject.toml 里找不到 py-modules"
+    return set(re.findall(r'"([^"]+)"', m.group(1)))
+
+
+def _tracked_modules() -> set[str]:
+    """仓库根的顶层模块（只算 git 跟踪的、且不在子目录里的）。"""
+    try:
+        out = subprocess.run(["git", "ls-files", "*.py"], cwd=ROOT,
+                             capture_output=True, text=True, check=True).stdout
+        return {Path(line).stem for line in out.split() if "/" not in line}
+    except Exception:
+        # 没有 git（例如从 sdist 里跑测试）时退回工作区，排除已知的本地私有脚本
+        return {p.stem for p in ROOT.glob("*.py")} - {"make_day_playlist"}
+
+
+class TestPackaging(unittest.TestCase):
+    """pyproject.toml 里的东西是手写的，所以会腐烂——尤其是模块清单。
+
+    加一个新模块却忘了写进 `py-modules`：**本地跑一点事都没有**（仓库目录本来
+    就在 sys.path 上），但装出来的包会 ImportError。这类 bug 只在别人机器上出现，
+    是最难查的一种，所以用测试钉住。
+    """
+
+    def test_version_has_a_single_source(self):
+        """版本号只能来自 am_paths.VERSION。手写第二份必然对不上。"""
+        txt = _pyproject_text()
+        self.assertIn('version = {attr = "am_paths.VERSION"}', txt)
+        self.assertIsNone(re.search(r'^version\s*=\s*"', txt, re.M),
+                          "pyproject 里不要手写版本号")
+
+    def test_declared_modules_match_the_repository(self):
+        declared, actual = _declared_modules(), _tracked_modules()
+        self.assertEqual(
+            declared, actual,
+            f"py-modules 与仓库模块不一致。缺：{sorted(actual - declared)}；"
+            f"多：{sorted(declared - actual)}")
+
+    def test_zero_runtime_dependencies(self):
+        """零依赖是这个项目的卖点，别被悄悄改掉。"""
+        self.assertIsNotNone(
+            re.search(r"^dependencies\s*=\s*\[\s*\]", _pyproject_text(), re.M),
+            "运行时依赖必须为空")
+
+    def test_flat_layout_is_declared_explicitly(self):
+        """不显式清空 packages，flat-layout 自动发现可能把 tests/ tools/ 扫进去。"""
+        self.assertIsNotNone(
+            re.search(r"^packages\s*=\s*\[\s*\]", _pyproject_text(), re.M),
+            "pyproject 里要显式写 packages = []")
+
+    def test_console_scripts_resolve_to_real_callables(self):
+        import importlib
+        m = re.search(r"\[project\.scripts\](.*?)(?=\n\[|\Z)", _pyproject_text(), re.S)
+        self.assertIsNotNone(m, "找不到 [project.scripts]")
+        entries = re.findall(r'^\s*([\w-]+)\s*=\s*"([\w.]+):(\w+)"', m.group(1), re.M)
+        self.assertTrue(entries, "console scripts 是空的")
+        for name, mod, fn in entries:
+            obj = getattr(importlib.import_module(mod), fn, None)
+            self.assertTrue(callable(obj), f"{name} 指向 {mod}:{fn}，但它不存在或不可调用")
 
 
 class TestMcpServerConsistency(unittest.TestCase):

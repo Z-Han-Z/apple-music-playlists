@@ -38,6 +38,11 @@ pass. This is the version whose tree contains this changelog.
   Python 3.10 and 3.13.
 - **`AGENTS.md`** — repository conventions for automated contributors, including the
   architectural invariants that keep the core platform-neutral.
+- **`pyproject.toml`** — the project is installable, and the version is read from
+  `am_paths.VERSION` rather than written twice. Two console scripts: `am-playlist` and
+  `am-mcp`. Runtime dependencies stay empty, so the zero-install path still works.
+  Installation is what makes MCP registration one line: the modules land somewhere Python
+  can import them, so a client no longer needs an absolute path to the server script.
 
 ### Changed
 

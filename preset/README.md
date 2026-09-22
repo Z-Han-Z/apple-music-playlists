@@ -97,7 +97,26 @@ python am_playlist.py login          # 见仓库 SETUP.md 的三种方式
 
 ## 只想要 MCP、不想要预设？
 
-`am_mcp_server.py` 是标准 MCP stdio 服务，任何 MCP 客户端都能接：
+`am_mcp_server.py` 是标准 MCP stdio 服务，任何 MCP 客户端都能接。
+
+### 推荐：先装成包，注册只剩一行
+
+装完之后模块进了 site-packages，**不再需要绝对脚本路径，也不依赖 cwd**：
+
+```bash
+pip install "apple-music-playlists @ git+https://github.com/Z-Han-Z/apple-music-playlists.git"
+# 或者已经在仓库里：  pip install -e .
+```
+
+```json
+{ "mcpServers": { "applemusic": {
+    "command": "am-mcp",
+    "env": { "PYTHONIOENCODING": "utf-8" } } } }
+```
+
+`am-mcp` 是打包时声明的 console script（等价于 `python -m am_mcp_server`）。
+
+### 不装包也行：写脚本绝对路径
 
 ```json
 { "mcpServers": { "applemusic": {
@@ -105,3 +124,10 @@ python am_playlist.py login          # 见仓库 SETUP.md 的三种方式
     "args": ["/abs/path/to/am_mcp_server.py"],
     "env": { "PYTHONIOENCODING": "utf-8" } } } }
 ```
+
+> ⚠️ 不装包时 `python -m am_mcp_server` **只在仓库目录里能用**——从别处调用会
+> `No module named am_mcp_server`（实测）。所以这条路必须给脚本绝对路径。
+
+> `PYTHONIOENCODING=utf-8` 不是可选的：服务端用
+> `json.dumps(..., ensure_ascii=False)` 输出，**中文是裸 UTF-8 字节**，
+> Windows 上 stdout 默认 GBK 会直接崩。

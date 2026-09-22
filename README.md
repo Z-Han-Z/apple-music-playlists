@@ -16,6 +16,8 @@ membership needed**. Requires Python 3.10+ and works on Windows / macOS / Linux.
 
 ## Quick start
 
+**Option A — clone and run (nothing to install):**
+
 ```bash
 git clone https://github.com/Z-Han-Z/apple-music-playlists.git
 cd apple-music-playlists
@@ -26,6 +28,33 @@ python am_playlist.py login      # one-time Apple ID sign-in (~6 months validity
 python am_playlist.py create --name "My Playlist" \
     --tracks "Song A - Artist X, Song B - Artist Y"
 ```
+
+There are no dependencies, so this works immediately. It is also the path you want if you intend
+to use the agent skill and the Cordis preset — those are copied out of the repository rather than
+installed.
+
+**Option B — install it:**
+
+```bash
+pip install git+https://github.com/Z-Han-Z/apple-music-playlists.git
+```
+
+That puts two commands on your PATH:
+
+```bash
+am-playlist status      # the CLI
+am-mcp                  # the MCP stdio server
+```
+
+Installing is what makes MCP registration a one-liner: the modules land somewhere Python can
+import them, so the client no longer needs an absolute path to a script.
+
+```json
+{ "mcpServers": { "applemusic": { "command": "am-mcp",
+    "env": { "PYTHONIOENCODING": "utf-8" } } } }
+```
+
+For development, `pip install -e .` from a clone makes edits take effect without reinstalling.
 
 See **[SETUP.md](SETUP.md)** for the credential walkthrough (three ways to get the user token,
 including a zero-dependency one).

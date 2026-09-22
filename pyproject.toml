@@ -1,0 +1,66 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "apple-music-playlists"
+# 版本号只有一个来源：am_paths.VERSION。手写第二份必然对不上。
+dynamic = ["version"]
+description = "Build, analyze, and sequence Apple Music playlists from the CLI or an MCP-capable agent"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+license-files = ["LICENSE"]
+# 零运行时依赖是这个项目的卖点之一，不是巧合——别加东西进来。
+dependencies = []
+keywords = ["apple-music", "playlist", "mcp", "curation", "music", "cli", "sequencing"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: End Users/Desktop",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Multimedia :: Sound/Audio",
+]
+
+[project.urls]
+Homepage = "https://github.com/Z-Han-Z/apple-music-playlists"
+Changelog = "https://github.com/Z-Han-Z/apple-music-playlists/blob/main/CHANGELOG.md"
+
+[project.scripts]
+# 装完之后 MCP 注册可以退化成 {"command": "am-mcp"}，
+# 不再需要两个绝对路径（<PYTHON> + <PROJECT_ROOT>）。
+am-playlist = "am_playlist:main"
+am-mcp = "am_mcp_server:main"
+
+[project.optional-dependencies]
+# 只有在用对应登录方式时才需要（见 SETUP.md）；核心功能零依赖。
+browser-login = ["playwright"]
+windows-cookies = ["cryptography"]
+
+[tool.setuptools]
+# 平铺的顶层模块（不是包）：setuptools 的 py-modules 直接吃得下，
+# 不需要把文件搬进包目录。
+py-modules = [
+    "am_library",
+    "am_mcp_server",
+    "am_meta",
+    "am_paths",
+    "am_playlist",
+    "build_pool",
+    "listening_stats",
+    "playlist_audit",
+    "playlist_core",
+    "playlist_flow",
+    "playlist_optimize",
+    "profile_library",
+]
+# 显式清空，避免 flat-layout 自动发现把 tests/ tools/ 之类扫进去
+packages = []
+
+[tool.setuptools.dynamic]
+version = {attr = "am_paths.VERSION"}
