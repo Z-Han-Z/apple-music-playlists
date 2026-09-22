@@ -98,8 +98,8 @@ python listening_stats.py top --kind songs --year 2026
 }
 ```
 
-服务提供 `create_playlist_from_description` 标准 Prompt 和 11 个工具：状态、搜索、列出/查看歌单、创建、追加、删除、元数据体检、
-听感分析、最近播放和播放次数排行。工具描述为英文/中文，并声明只读与破坏性标记。
+服务提供 `create_playlist_from_description` 标准 Prompt 和 12 个工具：状态、搜索、列出/查看歌单、创建、追加、删除、元数据体检、
+听感分析、**曲序优化**、最近播放和播放次数排行。工具描述为英文/中文，并声明只读与破坏性标记。
 
 Codex、Claude、Cursor、VS Code/Copilot、Gemini CLI、Windsurf、Docker、Cordis/DSH 和 Harness
 配置见 **[docs/client-setup.zh-CN.md](docs/client-setup.zh-CN.md)**。

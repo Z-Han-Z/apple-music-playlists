@@ -3,7 +3,7 @@
 #
 # Why an MCP server instead of "just let the agent call the script": the script
 # is a CLI, so every call would be a shell-quoting problem and every result a
-# parsing problem. The MCP bridge exposes eleven typed tools instead, and its
+# parsing problem. The MCP bridge exposes twelve typed tools instead, and its
 # tool names are namespaced `mcp__applemusic__<name>` by the mcp-client plugin.
 #
 # This file is an AGENT-PLANE composition, mounted ONCE under a standing scope;
@@ -46,10 +46,16 @@
       - `mcp__applemusic__am_add_tracks` / `am_list_playlists` / `am_show_playlist` —— 追加、列出、查看。
       - `mcp__applemusic__am_recently_played` / `am_top_played` —— 查最近播放、查播放次数排行
         （播放次数来自 Apple Music Replay 后端，只在 amp-api 上可用）。
+      - `mcp__applemusic__am_optimize_order` —— **曲序优化**（只读：只返回建议顺序，不改动歌单）。
+        用户说"排一下顺序"、或你自己觉得候选曲序不顺时用它；`arc` 选叙事弧（默认 man-in-a-hole），
+        想保留乐章结构就传 `blocks`（段落顺序不动、段内重排）。**不要自己盯着 BPM 数字手排**——
+        它在同一套相邻规则上做模拟退火，手排比不过。拿到返回的顺序后按原顺序交给
+        `am_create_playlist`；报告末尾已经附了一份可直接复制的曲目列表。
       - 地区默认用配置里记住的账号地区（登录时自动写入），要欧美曲库时传 `storefront: "us"`。
 
       工作流：理解描述并合理补足细节 → `am_status` → 提出有明确开场、中段和收尾的候选曲目 →
-      用 `am_search_songs` 校验有歧义的版本 → `am_create_playlist` 先传 `dry_run: true` → 修正未匹配项 →
+      用 `am_search_songs` 校验有歧义的版本 → **用 `am_optimize_order` 把曲序排好**（分乐章就传 `blocks`）→
+      `am_create_playlist` 先传 `dry_run: true` → 修正未匹配项 →
       正式创建并报告名称、ID、曲目数与遗漏。除非用户另有要求，优先录音室原版、避免重复，
       同一艺人通常不超过两首。
 
@@ -85,7 +91,7 @@
 # ── Apple Music 歌单自动化（MCP）─────────────────────────────────────────────
 
 # One mcp-client instance = one MCP server. It spawns our stdlib-only Python
-# server over stdio and registers its eleven tools as `mcp__applemusic__*`.
+# server over stdio and registers its twelve tools as `mcp__applemusic__*`.
 # `failOnStartupError: false` keeps this preset loadable even if the server
 # cannot start (a bad Python path must not brick the whole agent); the failure
 # then shows up as a tool error instead of a mount failure.

@@ -11,6 +11,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - A standard MCP prompt, `create_playlist_from_description`, that turns a natural-language brief
   into an explicit status → curation → catalog search → dry-run → create workflow.
+- `am_optimize_order` — a **read-only** MCP tool that computes a better track order (simulated
+  annealing over the four adjacency rules and a chosen narrative arc) and writes nothing.
+
+  The gap it closes: `am_analyze_flow` could tell an agent *what* was wrong with a playlist's
+  sequence — two adjacent slow pairs, an Icarus shape — but nothing could tell it how to fix it.
+  The agent had to hand-order from raw BPM numbers, which the curation research says loses to the
+  optimizer. Accepts a free list, explicit blocks (movement order preserved, reordering only
+  within), or an existing playlist, and returns a list ready to hand to `am_create_playlist`.
 
 ### Changed
 

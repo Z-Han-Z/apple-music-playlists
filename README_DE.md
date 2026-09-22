@@ -82,7 +82,7 @@ python playlist_optimize.py list.json -o order.json --arc cinderella
 }
 ```
 
-Der Server stellt 11 Werkzeuge mit englisch/chinesischen Beschreibungen sowie Annotationen für
+Der Server stellt 12 Werkzeuge mit englisch/chinesischen Beschreibungen sowie Annotationen für
 Nur-Lesen, Schreiben und destruktive Aktionen bereit. Anleitungen für Codex, Claude, Cursor,
 VS Code/Copilot, Gemini CLI, Windsurf, Docker, Cordis/DSH und Harness stehen in
 [docs/client-setup.md](docs/client-setup.md).

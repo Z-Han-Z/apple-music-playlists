@@ -81,7 +81,7 @@ python listening_stats.py top --kind songs --year 2026
 }
 ```
 
-11 個の MCP ツールを公開します。ツール説明は英語/中国語の併記で、読み取り専用・書き込み・
+12 個の MCP ツールを公開します。ツール説明は英語/中国語の併記で、読み取り専用・書き込み・
 破壊的操作の annotation も含みます。Codex、Claude、Cursor、VS Code/Copilot、Gemini CLI、
 Windsurf、Docker、Cordis/DSH、Harness の設定は
 [docs/client-setup.md](docs/client-setup.md) を参照してください。

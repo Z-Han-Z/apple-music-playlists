@@ -10,6 +10,9 @@
     python -m unittest discover -s tests -v
 """
 
+import contextlib
+import io
+import json
 import sys
 import unittest
 from collections import Counter
@@ -271,6 +274,78 @@ class TestOptimizerRecordsCoverageReasons(unittest.TestCase):
         txt = po.coverage_report(counts, 3)
         self.assertIn("2/3", txt)
         self.assertIn("⚠️", txt)          # 67% < 90%
+
+
+class TestOrderFromFeatures(unittest.TestCase):
+    """MCP 排序路径的离线测试。
+
+    这条路径不碰网络、不碰文件——`entries` 和 `features` 都是内存里的 dict。
+    它之所以能被完整测到，正是因为 playlist_optimize 保持平台无关
+    （不 import playlist_flow）。而它恰好是新增 MCP 工具的核心。
+    """
+
+    @staticmethod
+    def _feat(cid, name, tempo):
+        return {"_cid": cid, "_name": name, "_artist": "X", "tempo": tempo,
+                "key": 0, "mode": 1, "energy": 0.5, "valence": 0.5, "loudness": -10}
+
+    def _fixture(self):
+        spec = [("1", "Slow A", 90), ("2", "Fast A", 140), ("3", "Slow B", 92),
+                ("4", "Fast B", 138), ("5", "Slow C", 88), ("6", "Fast C", 142)]
+        entries = [{"cid": c, "name": n, "artist": "X", "isrc": f"ISRC{c}"} for c, n, _ in spec]
+        feats = {f"ISRC{c}": self._feat(c, n, t) for c, n, t in spec}
+        return entries, feats
+
+    def test_every_track_survives(self):
+        entries, feats = self._fixture()
+        seq, _ = po.order_from_features(entries, feats)
+        self.assertEqual([t["cid"] for t in seq].__len__(), 6)
+        self.assertEqual({t["cid"] for t in seq}, {"1", "2", "3", "4", "5", "6"})
+
+    def test_never_worse_than_the_input_order(self):
+        entries, feats = self._fixture()
+        seq, _ = po.order_from_features(entries, feats)
+        before = [po._track(e["cid"], e["name"], None, feats[e["isrc"]]) for e in entries]
+        self.assertLessEqual(po.total_cost(seq), po.total_cost(before) + 1e-9)
+
+    def test_report_is_returned_not_printed(self):
+        """MCP 的 tools/call 会把 stdout 重定向掉（协议通道），所以打印等于丢掉。"""
+        entries, feats = self._fixture()
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            _, report = po.order_from_features(entries, feats)
+        self.assertEqual(buf.getvalue(), "", "order_from_features 不该往 stdout 写东西")
+        self.assertIn("优化后的曲序", report)
+
+    def test_report_ends_with_a_create_ready_list(self):
+        """报告里那份列表要能直接交给 am_create_playlist。"""
+        entries, feats = self._fixture()
+        _, report = po.order_from_features(entries, feats)
+        last = [line for line in report.splitlines() if line.startswith("[")][-1]
+        labels = json.loads(last)
+        self.assertEqual(len(labels), 6)
+        self.assertTrue(all(label.endswith(" - X") for label in labels))
+
+    def test_blocks_preserve_group_order(self):
+        """段落顺序是硬约束——`有意思`那一层不能为了顺耳被牺牲。"""
+        entries, feats = self._fixture()
+        for i, e in enumerate(entries):
+            e["block"] = "B1" if i < 3 else "B2"
+        seq, _ = po.order_from_features(entries, feats)
+        self.assertEqual([t["block"] for t in seq], ["B1"] * 3 + ["B2"] * 3)
+
+    def test_missing_isrc_is_labelled_not_dropped(self):
+        entries = [{"cid": "1", "name": "No ISRC", "artist": "X", "isrc": None},
+                   {"cid": "2", "name": "Has ISRC", "artist": "X", "isrc": "ISRC2"}]
+        feats = {"ISRC2": self._feat("2", "Has ISRC", 120)}
+        seq, report = po.order_from_features(entries, feats)
+        self.assertEqual(len(seq), 2, "没有 ISRC 也不该被丢掉")
+        self.assertIn("没有 ISRC", report)
+        self.assertIn("1/2 可用", report)
+
+    def test_empty_input_raises(self):
+        with self.assertRaises(ValueError):
+            po.order_from_features([], {})
 
 
 if __name__ == "__main__":

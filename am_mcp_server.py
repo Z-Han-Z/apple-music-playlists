@@ -24,6 +24,9 @@ import am_playlist as am  # noqa: E402
 import playlist_audit as audit_mod  # noqa: E402
 import playlist_flow as flow_mod  # noqa: E402
 import listening_stats as listening  # noqa: E402
+import playlist_optimize as opt_mod  # noqa: E402
+from am_meta import catalog_meta  # noqa: E402
+from playlist_core import SHAPE_ALIASES  # noqa: E402
 
 PROTOCOL_VERSION = "2025-11-25"
 SUPPORTED_PROTOCOL_VERSIONS = {
@@ -202,6 +205,35 @@ TOOLS = [
         },
     },
     {
+        "name": "am_optimize_order",
+        "description": "为一批曲目**算出更好的顺序**。这是本项目唯一会排序的工具——"
+                       "am_analyze_flow 只诊断（告诉你哪里有 2 处慢歌相邻、形状是 Icarus），"
+                       "不提供修法。这里用模拟退火在四条相邻硬规则（不要两首慢歌相邻 / "
+                       "不要「只慢一点」/ 相邻不该在 tempo 与 key 上同时相似 / 不要 BPM 无理由大跳、"
+                       "能量骤变）与选定叙事弧之间取平衡。**只读**：只返回建议顺序，不动任何歌单；"
+                       "把返回列表按原顺序交给 am_create_playlist 即可。因为需要每首的 BPM/调性，"
+                       "首次会联网抓特征（之后走缓存）。",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "tracks": {"type": "array", "items": {"type": "string"}, "minItems": 2,
+                           "description": "要排序的曲目，每项 '歌名 - 艺人'（配 isrcs=true 时填 ISRC）"},
+                "blocks": {"type": "array", "items": {"type": "array", "items": {"type": "string"}},
+                           "description": "分组排序：每个子数组是一个乐章/段落，"
+                                          "**段落之间的先后顺序保持不动**，只在段落内部重排。"
+                                          "想保留叙事结构时用它（与 tracks 二选一）"},
+                "playlist": {"type": "string", "minLength": 1,
+                             "description": "要重排的现有歌单名或 p.xxxx ID（与 tracks/blocks 二选一）"},
+                "arc": {"type": "string", "enum": list(SHAPE_ALIASES),
+                        "description": "目标叙事弧，默认 man-in-a-hole（先落再起）。"
+                                       "用 cinderella 表示起-落-起，等等"},
+                "isrcs": {"type": "boolean", "description": "tracks/blocks 是否按 ISRC 精确匹配，默认 false"},
+                "refresh": {"type": "boolean", "description": "忽略音频特征缓存重抓，默认 false"},
+            },
+            "additionalProperties": False,
+        },
+    },
+    {
         "name": "am_recently_played",
         "description": "查最近播放。kind=tracks 是最近播放的曲目；played 是最近播放的歌单/专辑；"
                        "stations 是最近听的电台；added 是最近加入音乐库的内容。"
@@ -248,12 +280,14 @@ _ENGLISH_TOOL_DESCRIPTIONS = {
     "am_delete_playlist": "Delete a playlist. Destructive; confirm=true is mandatory.",
     "am_audit_playlist": "Read-only metadata audit: length, artists, genres, eras, duplicates, and interludes.",
     "am_analyze_flow": "Read-only audio-feature and sequencing audit; may fetch and cache remote feature data.",
+    "am_optimize_order": "Read-only: compute a better track order (simulated annealing over the adjacency rules and a chosen narrative arc). Returns the order; writes nothing. May fetch and cache remote feature data.",
     "am_recently_played": "Read recently played or recently added Apple Music content.",
     "am_top_played": "Read Apple Music Replay play-count rankings by song, album, or artist.",
 }
 _READ_ONLY_TOOLS = {
     "am_status", "am_search_songs", "am_list_playlists", "am_show_playlist",
-    "am_audit_playlist", "am_analyze_flow", "am_recently_played", "am_top_played",
+    "am_audit_playlist", "am_analyze_flow", "am_optimize_order",
+    "am_recently_played", "am_top_played",
 }
 for _tool in TOOLS:
     _name = _tool["name"]
@@ -429,6 +463,75 @@ def t_flow(args: dict) -> str:
     return flow_mod.flow_report(args["playlist"], bool(args.get("refresh")))
 
 
+def t_optimize(args: dict) -> str:
+    """算出更好的曲序。**只读**——不改动任何歌单。
+
+    输入三选一：`tracks`（自由重排）/ `blocks`（段落顺序不动，段内重排）/ `playlist`（重排现有歌单）。
+    返回的报告里带一份可直接交给 am_create_playlist 的曲目列表。
+    """
+    cfg = am.load_config()
+    dev = am.get_developer_token(cfg)
+    user = am.require_user(cfg)
+    sf = am.resolve_storefront(None, cfg, dev, user)
+    arc = args.get("arc") or opt_mod.DEFAULT_SHAPE
+    refresh = bool(args.get("refresh"))
+    isrcs = bool(args.get("isrcs"))
+
+    missed: list[str] = []
+    entries: list[dict] = []
+
+    if args.get("playlist"):
+        if args.get("tracks") or args.get("blocks"):
+            return "playlist 与 tracks/blocks 只能给一个。"
+        p = am.find_playlist(args["playlist"], dev, user)
+        if not p:
+            return f"找不到歌单: {args['playlist']}"
+        cids = []
+        for t in am.playlist_tracks(p["id"], dev, user):
+            pp = (t.get("attributes") or {}).get("playParams") or {}
+            cid = pp.get("catalogId") or pp.get("id")
+            if cid:
+                cids.append(str(cid))
+        cm = catalog_meta(cids, dev, sf)
+        entries = [{"cid": c, "name": (cm.get(c) or {}).get("name"),
+                    "artist": (cm.get(c) or {}).get("artistName"),
+                    "isrc": (cm.get(c) or {}).get("isrc")} for c in cids]
+        source = f"现有歌单「{p['attributes'].get('name')}」：{len(entries)} 首"
+    else:
+        groups = args.get("blocks") or ([args["tracks"]] if args.get("tracks") else [])
+        groups = [g for g in groups if g]
+        if not groups:
+            return "请给出 tracks、blocks 或 playlist 之一。"
+        multi = len(groups) > 1
+        for gi, group in enumerate(groups, 1):
+            ids, gone = am.resolve_tracks(list(group), dev, sf, isrcs=isrcs)
+            missed += gone
+            cm = catalog_meta(ids, dev, sf)
+            for c in ids:
+                m = cm.get(c) or {}
+                entries.append({"cid": c, "name": m.get("name"), "artist": m.get("artistName"),
+                                "isrc": m.get("isrc"), "block": f"B{gi}" if multi else None})
+        source = (f"给定 {len(groups)} 组共 {sum(len(g) for g in groups)} 项："
+                  f"{len(entries)} 首匹配成功")
+
+    if not entries:
+        return f"{source}，但没有解析出任何可排序的曲目。未匹配：{missed or '（无）'}"
+
+    # 只有拿到 ISRC 才查得到音频特征；没有的那些会被标记出来而不是静默丢掉。
+    feature_input = [(e["cid"], e.get("name") or e["cid"], e.get("artist") or "", e.get("isrc"))
+                     for e in entries if e.get("isrc")]
+    features = flow_mod.fetch_features("mcp-order", feature_input, refresh)
+
+    _, report = opt_mod.order_from_features(entries, features, arc=arc)
+
+    lines = [source]
+    if missed:
+        lines.append(f"未匹配、已排除（{len(missed)}）：{', '.join(missed)}")
+    lines.append("")
+    lines.append(report)
+    return "\n".join(lines)
+
+
 def t_recent(args: dict) -> str:
     return listening.recent_report(args.get("kind", "tracks"), int(args.get("limit", 30)))
 
@@ -450,6 +553,7 @@ HANDLERS = {
     "am_delete_playlist": t_delete,
     "am_audit_playlist": t_audit,
     "am_analyze_flow": t_flow,
+    "am_optimize_order": t_optimize,
     "am_recently_played": t_recent,
     "am_top_played": t_top,
 }

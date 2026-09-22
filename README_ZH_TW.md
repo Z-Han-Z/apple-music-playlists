@@ -78,7 +78,7 @@ python playlist_optimize.py list.json -o order.json --arc cinderella
 }
 ```
 
-共 11 個 MCP 工具，說明同時包含英文與中文，並標示只讀、寫入和破壞性操作。
+共 12 個 MCP 工具，說明同時包含英文與中文，並標示只讀、寫入和破壞性操作。
 Codex、Claude、Cursor、VS Code/Copilot、Gemini CLI、Windsurf、Docker、Cordis/DSH 與 Harness
 的完整設定請見 [docs/client-setup.zh-CN.md](docs/client-setup.zh-CN.md)。
 

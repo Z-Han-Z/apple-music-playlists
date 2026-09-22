@@ -80,7 +80,7 @@ including a zero-dependency one).
 | File | Purpose |
 |---|---|
 | `am_playlist.py` | Core: token management, catalog search, create / edit / delete playlists, track resolution |
-| `am_mcp_server.py` | Primary MCP stdio service: one description-to-playlist prompt plus **11 tools** |
+| `am_mcp_server.py` | Primary MCP stdio service: one description-to-playlist prompt plus **12 tools** |
 | `playlist_audit.py` | **Metadata audit**: length, artist concentration, genres, eras, durations, duplicates, interludes |
 | `playlist_flow.py` | **Audio-feature audit**: BPM / key / loudness / energy / valence, adjacency checks, arc shape |
 | `playlist_optimize.py` | Simulated-annealing **track ordering** against the measured rules |
@@ -115,7 +115,15 @@ the grounded Apple Music execution layer:
 
 `am_status` · `am_search_songs` · `am_list_playlists` · `am_show_playlist` ·
 `am_create_playlist` · `am_add_tracks` · `am_delete_playlist` ·
-`am_audit_playlist` · `am_analyze_flow` · `am_recently_played` · `am_top_played`
+`am_audit_playlist` · `am_analyze_flow` · `am_optimize_order` ·
+`am_recently_played` · `am_top_played`
+
+`am_analyze_flow` **diagnoses** a playlist; `am_optimize_order` **fixes the order**. The latter
+runs the same simulated annealing the CLI uses, over the same four adjacency rules and the same
+six narrative shapes, and returns a better sequence without touching anything. Exposing it is the
+point: otherwise an agent can tell you that your playlist has two adjacent slow pairs but has no
+way to repair them, and falls back to hand-ordering from raw BPM numbers — which the research in
+[`docs/`](docs/) says loses to the optimizer.
 
 Mount it in a Cordis agent preset with the template in [`preset/`](preset/), or wire it into
 any other MCP client with:

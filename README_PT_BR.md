@@ -80,7 +80,7 @@ python playlist_optimize.py list.json -o order.json --arc cinderella
 }
 ```
 
-O servidor oferece 11 ferramentas, descrições em inglês/chinês e annotations de leitura, escrita e
+O servidor oferece 12 ferramentas, descrições em inglês/chinês e annotations de leitura, escrita e
 operação destrutiva. A configuração para Codex, Claude, Cursor, VS Code/Copilot, Gemini CLI,
 Windsurf, Docker, Cordis/DSH e Harness está em [docs/client-setup.md](docs/client-setup.md).
 

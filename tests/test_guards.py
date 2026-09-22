@@ -431,6 +431,52 @@ class TestPackaging(unittest.TestCase):
             self.assertTrue(callable(obj), f"{name} 指向 {mod}:{fn}，但它不存在或不可调用")
 
 
+class TestOptimizeToolWiring(unittest.TestCase):
+    """新排序工具的接线检查。
+
+    这个工具存在的理由：`am_analyze_flow` 只**诊断**（告诉你哪里有 2 处慢歌相邻），
+    没有任何工具能**修**。于是 agent 只能盯着 BPM 数字手排——而文档自己说那比退火差。
+    """
+
+    @staticmethod
+    def _tool():
+        import am_mcp_server as srv
+        return next(t for t in srv.TOOLS if t["name"] == "am_optimize_order")
+
+    def test_registered_with_a_handler(self):
+        import am_mcp_server as srv
+        self.assertIn("am_optimize_order", srv.HANDLERS)
+
+    def test_declared_read_only(self):
+        annotations = self._tool()["annotations"]
+        self.assertTrue(annotations["readOnlyHint"],
+                        "排序工具只返回建议，不改动任何歌单")
+        self.assertFalse(annotations["destructiveHint"])
+
+    def test_arc_enum_has_a_single_source(self):
+        """schema 的 arc 取值必须就是 playlist_core 的形状表。
+
+        另抄一份必然漂移——而这个项目已经因为"同一件事写两遍"吃过好几次亏。
+        """
+        from playlist_core import SHAPE_ALIASES
+        enum = self._tool()["inputSchema"]["properties"]["arc"]["enum"]
+        self.assertEqual(set(enum), set(SHAPE_ALIASES))
+
+    def test_input_is_three_way_exclusive_by_handler(self):
+        """JSON Schema 表达不了"三选一"，所以 schema 不该写 required，由 handler 拦。"""
+        schema = self._tool()["inputSchema"]
+        self.assertNotIn("required", schema)
+        for key in ("tracks", "blocks", "playlist"):
+            self.assertIn(key, schema["properties"])
+
+    def test_analyze_and_optimize_are_both_exposed(self):
+        """诊断和修法要同时存在，否则"agent-first"就是残的。"""
+        import am_mcp_server as srv
+        names = {t["name"] for t in srv.TOOLS}
+        self.assertIn("am_analyze_flow", names)
+        self.assertIn("am_optimize_order", names)
+
+
 class TestMcpServerConsistency(unittest.TestCase):
     """声明了工具却没接上 handler（或反过来）是这类服务器的经典 bug。"""
 

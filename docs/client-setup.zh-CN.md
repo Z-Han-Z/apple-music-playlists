@@ -131,7 +131,7 @@ Windsurf 把通用 `mcpServers` 对象放到 `~/.codeium/windsurf/mcp_config.jso
 
 ### Cordis / DSH Agent Harness
 
-[`preset/`](../preset/) 内有可直接复制的预设：挂载全部 11 个工具、加载配套 skill，并为较慢的
+[`preset/`](../preset/) 内有可直接复制的预设：挂载全部 12 个工具、加载配套 skill，并为较慢的
 音频特征分析设置两分钟超时。安装步骤见 [`preset/README.md`](../preset/README.md)。
 
 ### Harness Platform

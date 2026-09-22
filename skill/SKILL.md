@@ -35,11 +35,11 @@ UI 时遵循同一流程：
 |---|---|
 | 建歌单 / 加歌 / 查曲目 | MCP 工具（`am_*`）或 `am_playlist.py` |
 | "这张歌单怎么样" | `am_audit_playlist`（元数据层）+ `am_analyze_flow`（听感层） |
-| "帮我排一下顺序" | `playlist_optimize.py`（见 §三） |
+| "帮我排一下顺序" | `am_optimize_order`（MCP，见 §三）；离线/脚本化才用 `playlist_optimize.py` |
 | "我库里有什么" / 挑候选曲池 | `am_playlist.py library` + `build_pool.py`（见 §五） |
 | 排查 API 报错 | 先看 §四 |
 
-**MCP 工具（11 个）**
+**MCP 工具（12 个）**
 
 ```
 am_status            先查这个：token 是否有效、是否已登录
@@ -51,6 +51,7 @@ am_add_tracks        向已有歌单追加
 am_delete_playlist   删除（必须 confirm=true）
 am_audit_playlist    元数据层体检
 am_analyze_flow      听感体检（BPM/调性/响度/能量/情绪 + 相邻衔接 + 弧线形状）
+am_optimize_order    排序：算出更好的曲序（可指定叙事弧；blocks 保留段落顺序）。只读
 am_recently_played   最近播放（曲目 / 歌单 / 电台 / 最近入库）
 am_top_played        播放次数排行（songs / albums / artists × 年份或 all-time）
 ```
@@ -99,6 +100,11 @@ python -m unittest discover -s tests         # 测试（全部离线）
 ---
 
 ## 三、排序：怎么排出一个「好听又有意思」的顺序
+
+**MCP 里有 `am_optimize_order`**（只读：返回建议曲序，不改动歌单）。它跑的就是下面这套规则与
+形状，参数 `arc` 选叙事弧、`blocks` 保留乐章顺序、`tracks` 自由重排。**优先用它**，不要自己
+盯着 BPM 数字手排——退火是在同一套 cost 上求最小，手排做不到，实测差距很大。
+`playlist_optimize.py` 是同一算法的离线/脚本化入口，两者共用 `playlist_core`，不会分叉。
 
 完整依据见仓库 `docs/how-to-build-a-good-playlist.md`（含 PLOS ONE 2025 的实证数据表）。
 

@@ -114,6 +114,35 @@ W_ENERGY_CLASH = WEIGHTS["energy_clash"]
 W_ARC = 12.0
 
 
+def _track(cid, name, block, feat, *, isrc=None, stage_hint=None):
+    """把一首曲子规整成优化器认识的 dict。**唯一实现。**
+
+    文件路径（`load_tracks`）和内存路径（`order_from_features`）都走这里。
+    以前只有文件路径，MCP 想复用就得把 bpm/key/energy 的换算再抄一遍——
+    那正是这个项目反复踩的"同一件事写两遍"。
+    """
+    if not feat or "tempo" not in feat:
+        # 记下**为什么**没特征。优化器只看得见特征缓存，所以它能分清
+        # "源没收录"和"压根没抓过"；"没有 ISRC"只有调用方知道，用 stage_hint 传进来。
+        stage = stage_hint or ("source-miss" if (feat or {}).get("_miss")
+                               else "not-in-cache" if not feat
+                               else "no-features")
+        return {"cid": cid, "block": block, "name": (feat or {}).get("_name") or name or cid,
+                "artist": (feat or {}).get("_artist") or "", "f": None, "stage": stage}
+    return {
+        "cid": cid, "block": block,
+        "name": feat.get("_name") or name or cid,
+        "artist": feat.get("_artist") or "",
+        "f": feat,
+        "stage": "ok",
+        "bpm": fold_tempo(feat.get("tempo", 0)),
+        "key": camelot(feat.get("key", 0), feat.get("mode", 0)),
+        "energy": feat.get("energy", 0.0),
+        "valence": feat.get("valence", 0.0),
+        "loud": feat.get("loudness", -20.0),
+    }
+
+
 def load_tracks(spec_file, features_file=None):
     cache = resolve_feature_cache(features_file)
     if cache is None:
@@ -127,34 +156,73 @@ def load_tracks(spec_file, features_file=None):
             by_cid[str(v["_cid"])] = v
 
     spec = parse_spec(json.loads(Path(spec_file).read_text(encoding="utf-8")))
-    tracks = []
-    for blk in spec:
-        for cid in blk["tracks"]:
-            cid = str(cid)
-            f = by_cid.get(cid)
-            if not f or "tempo" not in f:
-                # 记下**为什么**没特征。优化器只看得见特征缓存，所以它能分清
-                # "源没收录"和"压根没抓过"，但说不出"没有 ISRC"——那是上游的事。
-                # 关键是不再压成一个笼统的 None：覆盖率报告要据此给出可行动的分解。
-                stage = ("source-miss" if (f or {}).get("_miss")
-                         else "not-in-cache" if not f
-                         else "no-features")
-                tracks.append({"cid": cid, "block": blk["id"],
-                               "name": (f or {}).get("_name", cid), "f": None,
-                               "stage": stage})
-                continue
-            tracks.append({
-                "cid": cid, "block": blk["id"],
-                "name": f.get("_name", cid),
-                "f": f,
-                "stage": "ok",
-                "bpm": fold_tempo(f.get("tempo", 0)),
-                "key": camelot(f.get("key", 0), f.get("mode", 0)),
-                "energy": f.get("energy", 0.0),
-                "valence": f.get("valence", 0.0),
-                "loud": f.get("loudness", -20.0),
-            })
+    tracks = [_track(str(cid), None, blk["id"], by_cid.get(str(cid)))
+              for blk in spec for cid in blk["tracks"]]
     return spec, tracks
+
+
+def order_from_features(entries, features, *, arc=DEFAULT_SHAPE):
+    """内存里排序：`entries` = [{cid, name, artist, isrc, block?}]，`features` = {isrc: 特征}。
+
+    返回 `(ordered_tracks, report_text)`。
+
+    **不 import playlist_flow、不碰文件**——取特征是调用方（MCP 层）的事。
+    算法层因此保持平台无关，也完全可离线测试。
+
+    分组：按 `block` **首次出现的顺序**分组，组内重排、组间顺序不动（这是硬约束）。
+    不带 block 就是一整块自由重排。
+
+    报告是**返回的字符串**，不是 print：MCP 的 tools/call 会把 stdout 重定向掉
+    （协议通道不能用），所以打印等于丢掉。
+    """
+    if not entries:
+        raise ValueError("没有可排序的曲目")
+
+    grouped: dict = {}
+    seen_blocks: list = []
+    for e in entries:
+        key = e.get("block")
+        if key not in grouped:
+            grouped[key] = []
+            seen_blocks.append(key)
+        isrc = e.get("isrc")
+        grouped[key].append(_track(
+            str(e["cid"]), e.get("name"), key,
+            features.get(isrc) if isrc else None,
+            isrc=isrc, stage_hint=None if isrc else "no-isrc"))
+    blocks = [grouped[k] for k in seen_blocks]
+
+    before = [t for b in blocks for t in b]
+    seq, cost = anneal(blocks, shape=arc)
+
+    counts = Counter(t.get("stage", "ok") for t in seq)
+    lines = [
+        f"目标形状：{resolve_shape(arc)}",
+        coverage_report(counts, len(seq)),
+        f"原始顺序 cost = {total_cost(before, arc):.2f} "
+        f"(相邻 {adjacency_cost(before):.2f} + 弧线 {arc_cost(before, arc):.2f})",
+        f"优化后   cost = {cost:.2f} "
+        f"(相邻 {adjacency_cost(seq):.2f} + 弧线 {arc_cost(seq, arc):.2f})",
+        "",
+        "优化后的曲序：",
+    ]
+    multi_block = len(blocks) > 1
+    prev = object()
+    for i, t in enumerate(seq, 1):
+        if multi_block and t["block"] != prev:
+            prev = t["block"]
+            lines.append(f"  ── {t['block']} ──")
+        if t["f"]:
+            lines.append(f"{i:>4}. {str(t['name'])[:38]:<40} {t['bpm']:6.1f}BPM "
+                         f"{t['key']:>4} E={t['energy']:.2f} V={t['valence']:.2f}")
+        else:
+            lines.append(f"{i:>4}. {str(t['name'])[:38]:<40} （无特征，位置未被评估）")
+
+    ordered_labels = [f"{t['name']} - {t['artist']}" if t.get("artist") else t["name"]
+                      for t in seq]
+    lines += ["", "可直接按此顺序交给 am_create_playlist 的曲目列表：",
+              json.dumps(ordered_labels, ensure_ascii=False)]
+    return seq, "\n".join(lines)
 
 
 def adjacency_cost(seq):
