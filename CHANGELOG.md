@@ -19,6 +19,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   The agent had to hand-order from raw BPM numbers, which the curation research says loses to the
   optimizer. Accepts a free list, explicit blocks (movement order preserved, reordering only
   within), or an existing playlist, and returns a list ready to hand to `am_create_playlist`.
+- `am_library` now keeps `hasLyrics` from the catalog response it was already fetching, and the
+  library report shows lyrics coverage next to ISRC coverage. Zero extra requests — the field was
+  arriving and being discarded. Measured on a real library: 65.1% of songs have lyrics, and the
+  gap is concentrated in instrumental genres (soundtrack 11%, jazz 11%, electronic 32%) rather
+  than spread evenly.
 
 ### Changed
 

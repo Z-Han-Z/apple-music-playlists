@@ -127,6 +127,9 @@ def fetch_library_songs(dev: str, user: str, sf: str, *, limit: int | None = Non
             it["isrc"] = m.get("isrc")
             it["year"] = (m.get("releaseDate") or "")[:4] or None
             it["genre"] = m.get("genreNames") or []
+            # hasLyrics 本来就在这次响应里，只是没人存。存下来之后，
+            # "这个库有多少首能被歌词信号覆盖"就变成零额外请求的可测量事实。
+            it["has_lyrics"] = bool(m.get("hasLyrics"))
             it["name"] = m.get("name") or it["name"]
             it["artist"] = m.get("artistName") or it["artist"]
     return items
@@ -169,6 +172,10 @@ def library_report(items: list[dict], top: int = 15) -> str:
     with_isrc = sum(1 for it in items if it.get("isrc"))
     lines.append(f"  有 ISRC（可用于查音频特征）：{with_isrc} 首 "
                  f"= {with_isrc / len(items) * 100:.0f}%")
+    if any("has_lyrics" in it for it in items):
+        with_lyr = sum(1 for it in items if it.get("has_lyrics"))
+        lines.append(f"  有歌词（Apple 提供 TTML）：{with_lyr} 首 "
+                     f"= {with_lyr / len(items) * 100:.0f}%")
     years = Counter(it.get("year") for it in items if it.get("year"))
     if years:
         span = sorted(years)
