@@ -9,8 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.1.0] - 2026-09-22
 
-First tagged release. Everything below is relative to the untagged `1.0.0` state
-(commit `709123c`).
+Everything below is relative to `v1.0.0` (commit `709123c`), the state before the hardening
+pass. This is the version whose tree contains this changelog.
 
 ### Added
 
@@ -113,17 +113,50 @@ First tagged release. Everything below is relative to the untagged `1.0.0` state
 - A stale `refs/library-songs.json` from the earlier schema (no `isrc` field) is now
   rejected by a schema check and refetched. It is safe to delete.
 
-## [1.0.0] - 2026-09-21
+## [1.0.0] - 2026-09-22
 
-Initial state, retroactively tagged. There was no `VERSION` constant at the time and the
-MCP server reported `1.0.0`.
+The first state the project itself called `1.0.0` — the MCP server reported that version —
+and the first state that was general-purpose rather than personal. Tagged retrospectively.
 
-- Create, edit and delete Apple Music playlists from the CLI or from an MCP server
-  (11 tools).
+- Create, edit and delete Apple Music playlists from the CLI or from an MCP server.
 - Metadata audit, audio-feature audit, and simulated-annealing track ordering.
 - Listening history: recently played, and per-track / album / artist play counts.
-- Taste profile derived from play counts.
+- Taste profile derived from play counts, plus a candidate-pool builder.
+- Library-specific personal scripts removed, so the repository is a general-purpose tool.
+
+## [0.3.0] - 2026-09-22
+
+- Added `profile_library.py` — a taste profile built from play counts (BPM / energy /
+  valence spread, mood quadrants).
+- Added `build_pool.py` — build a candidate pool out of your own library.
+- Fixed: arc classification split the curve into 3 segments, which mislabelled a
+  rise-fall-rise playlist as `Icarus`. It now uses 5 segments, and all six narrative
+  archetypes classify as themselves.
+- Fixed: `status` now actually answers whether the tokens have expired, instead of only
+  reporting that they exist.
+
+## [0.2.0] - 2026-09-21
+
+- Added `listening_stats.py` — recently played, and per-track / album / artist play counts,
+  read from the Apple Music Replay backend (the only endpoint that exposes play counts).
+- Added the corresponding MCP tools.
+- Fixed: the storefront is resolved from config rather than defaulting to a hardcoded region.
+
+## [0.1.0] - 2026-09-21
+
+First working toolkit.
+
+- `am_playlist.py` — token handling, catalog search, playlist create / edit / delete, and
+  track resolution.
+- `am_mcp_server.py` — an MCP stdio server over the same capabilities.
+- `playlist_audit.py` (metadata), `playlist_flow.py` (audio features), and
+  `playlist_optimize.py` (simulated-annealing ordering).
+- `docs/` — the curation research the sequencing rules are derived from.
+- `skill/` and `preset/` — an agent skill, and a Cordis preset that mounts the MCP server.
 
 [Unreleased]: https://github.com/Z-Han-Z/apple-music-playlists/compare/v1.1.0...HEAD
 [1.1.0]: https://github.com/Z-Han-Z/apple-music-playlists/compare/v1.0.0...v1.1.0
-[1.0.0]: https://github.com/Z-Han-Z/apple-music-playlists/releases/tag/v1.0.0
+[1.0.0]: https://github.com/Z-Han-Z/apple-music-playlists/compare/v0.3.0...v1.0.0
+[0.3.0]: https://github.com/Z-Han-Z/apple-music-playlists/compare/v0.2.0...v0.3.0
+[0.2.0]: https://github.com/Z-Han-Z/apple-music-playlists/compare/v0.1.0...v0.2.0
+[0.1.0]: https://github.com/Z-Han-Z/apple-music-playlists/releases/tag/v0.1.0
