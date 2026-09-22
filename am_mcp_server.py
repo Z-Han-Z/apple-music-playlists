@@ -38,12 +38,15 @@ SUPPORTED_PROTOCOL_VERSIONS = {
 SERVER_INFO = {"name": "apple-music-playlists", "version": am.VERSION}
 SERVER_INSTRUCTIONS = (
     "Turn natural-language playlist descriptions into Apple Music playlists: interpret the "
-    "brief, call am_status, propose suitable tracks, verify them with am_search_songs, then call "
-    "am_create_playlist with dry_run=true before the final write. The host client's LLM does the "
-    "curation; this server validates tracks against Apple Music and performs account operations. "
+    "brief, call am_status, propose a generous candidate pool, ground it with "
+    "am_resolve_candidates, and let the host LLM compare candidates directly against the user's "
+    "words. Do not invent scalar theme scores. Then call am_create_playlist with dry_run=true "
+    "before the final write. The host client's LLM does the curation; this server validates tracks "
+    "against Apple Music and performs account operations. "
     "am_delete_playlist is destructive and requires confirm=true. Only playlists created by this "
     "API client can be modified. / 根据用户的自然语言描述策划 Apple Music 歌单：先理解需求并调用 "
-    "am_status，由客户端模型提出候选曲目，用 am_search_songs 校验，再以 dry_run=true 调用 "
+    "am_status，由客户端模型提出充足的候选曲目，用 am_resolve_candidates 批量校验后直接比较"
+    "候选与用户文字的契合度，不要虚构主题分数；再以 dry_run=true 调用 "
     "am_create_playlist 预演后正式创建。删除必须 confirm=true；只有本 API 客户端创建的歌单可修改。"
 )
 
@@ -54,7 +57,8 @@ PROMPTS = [
         "title": "Create a playlist from a description / 根据描述创建歌单",
         "description": (
             "Curate, validate, preview, and create an Apple Music playlist from a natural-language "
-            "brief. The MCP host's model chooses candidates; Apple Music catalog search verifies them. / "
+            "brief. The MCP host's model chooses and compares candidates; Apple Music catalog "
+            "grounding verifies them. / "
             "根据自然语言需求策划、校验、预演并创建 Apple Music 歌单。"
         ),
         "arguments": [
@@ -105,6 +109,28 @@ TOOLS = [
                 "limit": {"type": "integer", "minimum": 1, "maximum": 100, "description": "返回条数，默认 5"},
             },
             "required": ["term"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "am_resolve_candidates",
+        "description": "批量校验 LLM 提出的候选曲目，并返回 Apple Music 的真实曲名、艺人、专辑、"
+                       "发行日期、流派、时长、歌词可用性、版本标记和 catalog ID。还会指出重复录音与"
+                       "艺人集中度，但**不替模型做主题评分或选曲**。模型应直接根据用户描述与这些"
+                       "真实信息比较候选，保留理由充分的曲目。只读，不修改音乐库。",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "tracks": {
+                    "type": "array",
+                    "items": {"type": "string", "minLength": 1},
+                    "minItems": 1,
+                    "maxItems": 60,
+                    "description": "候选曲目，每项形如 '歌名 - 艺人'。建议先给目标数量的 1.5–2 倍。",
+                },
+                "storefront": {"type": "string", "description": "可选地区代码；默认使用账号地区"},
+            },
+            "required": ["tracks"],
             "additionalProperties": False,
         },
     },
@@ -273,6 +299,7 @@ TOOLS = [
 _ENGLISH_TOOL_DESCRIPTIONS = {
     "am_status": "Check developer-token validity and Apple Music login status. Run before writes.",
     "am_search_songs": "Search the Apple Music catalog and return stable catalog IDs.",
+    "am_resolve_candidates": "Ground an LLM-curated candidate pool in Apple Music metadata; flag duplicates and version markers without scoring theme fit.",
     "am_list_playlists": "List every playlist in the current user's library, including IDs.",
     "am_show_playlist": "Show the tracks in a playlist selected by name or ID.",
     "am_create_playlist": "Create a playlist from 'Title - Artist' strings or ISRCs; supports dry-run matching.",
@@ -285,7 +312,7 @@ _ENGLISH_TOOL_DESCRIPTIONS = {
     "am_top_played": "Read Apple Music Replay play-count rankings by song, album, or artist.",
 }
 _READ_ONLY_TOOLS = {
-    "am_status", "am_search_songs", "am_list_playlists", "am_show_playlist",
+    "am_status", "am_search_songs", "am_resolve_candidates", "am_list_playlists", "am_show_playlist",
     "am_audit_playlist", "am_analyze_flow", "am_optimize_order",
     "am_recently_played", "am_top_played",
 }
@@ -341,6 +368,85 @@ def t_search(args: dict) -> str:
             a = item.get("attributes", {})
             lines.append(f"{item['id']}\t{a.get('name')} — {a.get('artistName') or a.get('curatorName','')}")
     return "\n".join(lines) or "无结果"
+
+
+def t_resolve_candidates(args: dict) -> str:
+    """把模型提出的候选批量落到真实 catalog 元数据上，不做语义评分。"""
+    cfg = am.load_config()
+    dev = am.get_developer_token(cfg)
+    sf = am.resolve_storefront(args.get("storefront"), cfg, dev, am.get_user_token(cfg))
+    queries = [item.strip() for item in args["tracks"]]
+
+    matched: list[tuple[int, str, str]] = []
+    candidates_by_index: dict[int, dict] = {}
+    for index, query in enumerate(queries):
+        ids, gone = am.resolve_tracks([query], dev, sf, quiet=True)
+        if gone or not ids:
+            candidates_by_index[index] = {
+                "input_index": index, "input": query, "status": "unmatched",
+            }
+        else:
+            matched.append((index, query, ids[0]))
+
+    metadata = catalog_meta([catalog_id for _, _, catalog_id in matched], dev, sf)
+    first_input_by_id: dict[str, int] = {}
+    artist_recordings: dict[str, set[str]] = {}
+    duplicate_count = 0
+    for index, query, catalog_id in matched:
+        item = metadata.get(catalog_id) or {}
+        artist = item.get("artistName") or ""
+        if artist:
+            artist_recordings.setdefault(artist, set()).add(catalog_id)
+        duplicate_of = first_input_by_id.get(catalog_id)
+        if duplicate_of is None:
+            first_input_by_id[catalog_id] = index
+        else:
+            duplicate_count += 1
+        duration_ms = item.get("durationInMillis")
+        row = {
+            "input_index": index,
+            "input": query,
+            "status": "resolved",
+            "catalog_id": catalog_id,
+            "name": item.get("name"),
+            "artist": artist or None,
+            "album": item.get("albumName"),
+            "release_date": item.get("releaseDate"),
+            "genres": item.get("genreNames") or [],
+            "duration_seconds": round(duration_ms / 1000, 1) if duration_ms else None,
+            "content_rating": item.get("contentRating"),
+            "has_lyrics": item.get("hasLyrics") if "hasLyrics" in item else None,
+            "isrc": item.get("isrc"),
+            "version_markers": am.version_noise_hits(item.get("name") or ""),
+        }
+        if duplicate_of is not None:
+            row["duplicate_of_input_index"] = duplicate_of
+        candidates_by_index[index] = row
+
+    concentrated = [
+        {"artist": artist, "count": len(recordings)}
+        for artist, recordings in sorted(
+            artist_recordings.items(), key=lambda pair: (-len(pair[1]), pair[0]))
+        if len(recordings) > 2
+    ]
+    candidates = [candidates_by_index[index] for index in range(len(queries))]
+    result = {
+        "storefront": sf,
+        "summary": {
+            "input_count": len(queries),
+            "resolved_count": len(matched),
+            "unmatched_count": len(queries) - len(matched),
+            "duplicate_recordings": duplicate_count,
+            "artists_over_two_tracks": concentrated,
+        },
+        "candidates": candidates,
+        "selection_note": (
+            "Use the user's original words to compare these grounded candidates directly. "
+            "Treat has_lyrics=false as unknown, not proof of an instrumental. Prefer explicit "
+            "reasons and playlist roles over scalar theme-fit scores."
+        ),
+    }
+    return json.dumps(result, ensure_ascii=False, indent=2)
 
 
 def t_list(_args: dict) -> str:
@@ -546,6 +652,7 @@ def t_top(args: dict) -> str:
 HANDLERS = {
     "am_status": t_status,
     "am_search_songs": t_search,
+    "am_resolve_candidates": t_resolve_candidates,
     "am_list_playlists": t_list,
     "am_show_playlist": t_show,
     "am_create_playlist": t_create,
@@ -587,11 +694,13 @@ Response language: {language}
 Use the Apple Music MCP tools to complete the task, not merely to suggest a list:
 1. Interpret the brief. Make reasonable assumptions instead of asking many questions; ask only if a missing choice would materially change the result.
 2. Call am_status before any write. If the user asks for personalization, use am_recently_played or am_top_played as supporting taste signals.
-3. Curate a coherent candidate set. Unless the brief says otherwise, prefer original studio versions, avoid duplicates, keep artist variety (normally no more than two tracks per artist), and shape a deliberate opening, middle, and ending.
-4. Verify ambiguous or uncertain candidates with am_search_songs. Apple catalog search is the source of truth for availability; do not invent catalog IDs.
-5. Call am_create_playlist with dry_run=true using "Title - Artist" strings. Review misses and suspicious matches, revise queries or candidates, and dry-run again when needed.
-6. Once the preview is sound, create the playlist with dry_run=false. If the user explicitly asked only for a plan or preview, stop before this write.
-7. Report the playlist name, ID, track count, unmatched tracks, and any assumptions briefly.
+3. Curate a candidate pool about 1.5–2 times the requested size. Use your direct understanding of the user's words, musical context, and relationships between songs. Do not turn theme fit into arbitrary 0–1 scores.
+4. Call am_resolve_candidates on that pool. Apple catalog data is the source of truth for availability and versions; do not invent catalog IDs. Treat has_lyrics=false as unknown, never as proof that a track is instrumental.
+5. Compare candidates directly within the role they could play: opening, development, peak, release, or landing. Prefer explicit natural-language reasons (essential / strong / bridge / optional / reject) over point scores. Unless the brief says otherwise, prefer original studio versions, avoid duplicates, and normally keep no more than two tracks per artist.
+6. Select the final set and arrange those narrative roles into ordered blocks. am_optimize_order is optional and may refine transitions inside blocks; it must not decide which songs fit the theme.
+7. Call am_create_playlist with dry_run=true using "Title - Artist" strings. Review misses and suspicious matches, revise candidates, and dry-run again when needed.
+8. Once the preview is sound, create the playlist with dry_run=false. If the user explicitly asked only for a plan or preview, stop before this write.
+9. Report the playlist name, ID, track count, unmatched tracks, and the most important curation choices briefly.
 
 The language model in the MCP client performs the curation. This MCP server does not call or require a separate LLM provider."""
 
@@ -651,10 +760,15 @@ def _validate_tool_arguments(name: str, arguments) -> str | None:
         if isinstance(value, list):
             if len(value) < schema.get("minItems", 0):
                 return f"argument '{key}' must not be empty"
+            if "maxItems" in schema and len(value) > schema["maxItems"]:
+                return f"argument '{key}' must contain at most {schema['maxItems']} items"
             item_type = schema.get("items", {}).get("type")
             item_checker = expected_types.get(item_type)
             if item_checker and any(not item_checker(item) for item in value):
                 return f"every item in argument '{key}' must be {item_type}"
+            item_min_length = schema.get("items", {}).get("minLength", 0)
+            if item_type == "string" and any(len(item.strip()) < item_min_length for item in value):
+                return f"every item in argument '{key}' must not be empty"
     return None
 
 

@@ -81,7 +81,9 @@ python listening_stats.py top --kind songs --year 2026
 }
 ```
 
-11개의 MCP 도구를 제공합니다. 도구 설명은 영어/중국어로 제공되고 읽기 전용, 쓰기, 파괴적 작업
+13개의 MCP 도구를 제공합니다. `am_resolve_candidates`는 LLM이 제안한 후보 풀을 Apple Music의
+실제 메타데이터와 대조하지만 주제 적합도를 채점하지 않습니다. 모델이 사용자의 문장에 비추어 후보를
+직접 비교하고, 순서 최적화는 선곡 후 선택적인 구간 내 연결 보조로만 사용합니다. 도구 설명은 영어/중국어로 제공되고 읽기 전용, 쓰기, 파괴적 작업
 annotation을 포함합니다. Codex, Claude, Cursor, VS Code/Copilot, Gemini CLI, Windsurf, Docker,
 Cordis/DSH 및 Harness 설정은 [docs/client-setup.md](docs/client-setup.md)를 참고하세요.
 

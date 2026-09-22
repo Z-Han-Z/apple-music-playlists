@@ -46,7 +46,7 @@ Then describe the result, not the implementation:
 
 Clients with MCP Prompt support can select `create_playlist_from_description`. In every other
 client, send the same request in chat: the server instructions and typed tools expose the same
-status → search → dry-run → create workflow.
+status → candidate pool → catalog grounding → direct comparison → dry-run → create workflow.
 
 **From a clone (nothing to install):**
 
@@ -80,7 +80,7 @@ including a zero-dependency one).
 | File | Purpose |
 |---|---|
 | `am_playlist.py` | Core: token management, catalog search, create / edit / delete playlists, track resolution |
-| `am_mcp_server.py` | Primary MCP stdio service: one description-to-playlist prompt plus **12 tools** |
+| `am_mcp_server.py` | Primary MCP stdio service: one description-to-playlist prompt plus **13 tools** |
 | `playlist_audit.py` | **Metadata audit**: length, artist concentration, genres, eras, durations, duplicates, interludes |
 | `playlist_flow.py` | **Audio-feature audit**: BPM / key / loudness / energy / valence, adjacency checks, arc shape |
 | `playlist_optimize.py` | Simulated-annealing **track ordering** against the measured rules |
@@ -113,17 +113,16 @@ The standard prompt `create_playlist_from_description` asks for a natural-langua
 optional name, track count, and response language. Curation stays in the host model; the tools are
 the grounded Apple Music execution layer:
 
-`am_status` · `am_search_songs` · `am_list_playlists` · `am_show_playlist` ·
+`am_status` · `am_search_songs` · `am_resolve_candidates` · `am_list_playlists` · `am_show_playlist` ·
 `am_create_playlist` · `am_add_tracks` · `am_delete_playlist` ·
 `am_audit_playlist` · `am_analyze_flow` · `am_optimize_order` ·
 `am_recently_played` · `am_top_played`
 
-`am_analyze_flow` **diagnoses** a playlist; `am_optimize_order` **fixes the order**. The latter
-runs the same simulated annealing the CLI uses, over the same four adjacency rules and the same
-six narrative shapes, and returns a better sequence without touching anything. Exposing it is the
-point: otherwise an agent can tell you that your playlist has two adjacent slow pairs but has no
-way to repair them, and falls back to hand-ordering from raw BPM numbers — which the research in
-[`docs/`](docs/) says loses to the optimizer.
+`am_resolve_candidates` grounds a generous LLM-proposed pool in real catalog metadata, flags
+duplicates and suspicious versions, and deliberately does not score theme fit. The host model
+compares candidates directly with the user's words and explains their playlist roles.
+`am_analyze_flow` diagnoses transitions; `am_optimize_order` can optionally refine ordering inside
+already chosen narrative blocks. It never decides which songs belong in the playlist.
 
 Mount it in a Cordis agent preset with the template in [`preset/`](preset/), or wire it into
 any other MCP client with:
@@ -298,6 +297,7 @@ More in [`docs/apple-music-api-notes.md`](docs/apple-music-api-notes.md) and
 | [`docs/apple-music-api-notes.md`](docs/apple-music-api-notes.md) | Token model, endpoint contracts, measured API behaviour, eval of 7 automation approaches |
 | [`docs/how-to-build-a-good-playlist.md`](docs/how-to-build-a-good-playlist.md) | Curation methodology: adjacency physics, arc data, six narrative shapes, the ISO principle |
 | [`docs/playlist-curation-survey.md`](docs/playlist-curation-survey.md) | Survey of published curation guidance (platform rules, DJ methods, academic findings) |
+| [`docs/evaluation-signals.md`](docs/evaluation-signals.md) | LLM-native curation: direct candidate comparison, catalog grounding, readable constraints, and why scalar theme scores stay out of the critical path |
 | [`docs/platform-adapters.md`](docs/platform-adapters.md) | The platform-adapter boundary: what is platform-neutral, what an adapter must provide, and what breaks on a service that exposes no ISRC |
 | [`skill/`](skill/) | Agent skill: workflow + the accumulated gotcha list |
 | [`CHANGELOG.md`](CHANGELOG.md) | Release history, including behaviour changes between versions |

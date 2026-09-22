@@ -127,7 +127,7 @@ class TestSingleSourceOfTruth(unittest.TestCase):
         src = (ROOT / "playlist_core.py").read_text(encoding="utf-8")
         mods = {m.group(1).split(".")[0]
                 for m in re.finditer(r"^\s*(?:from|import)\s+([\w.]+)", src, re.M)}
-        self.assertEqual(mods - {"__future__", "statistics"}, set(),
+        self.assertEqual(mods - {"__future__", "re", "statistics"}, set(),
                          f"playlist_core 依赖了不该依赖的东西：{mods}")
 
 
@@ -256,6 +256,28 @@ class TestCoverageReport(unittest.TestCase):
 
     def test_missing_keys_are_treated_as_zero(self):
         self.assertIn("50/100", core.coverage_report({"ok": 50}, 100))
+
+
+class TestMarkerHits(unittest.TestCase):
+    """通用标记词匹配：拉丁词整词、CJK 子串。"""
+
+    def test_latin_words_match_whole_only(self):
+        words = ("live", "instrumental")
+        self.assertEqual(core.marker_hits("Alive", words, ()), [])
+        self.assertEqual(core.marker_hits("Olive Tree", words, ()), [])
+        self.assertEqual(core.marker_hits("Delivery", words, ()), [])
+
+    def test_latin_markers_hit(self):
+        self.assertEqual(core.marker_hits("Song (Live)", ("live",), ()), ["live"])
+        self.assertEqual(core.marker_hits("Song Instrumental", ("instrumental",), ()),
+                         ["instrumental"])
+
+    def test_cjk_markers_match_as_substring(self):
+        self.assertEqual(core.marker_hits("某曲 现场版", (), ("现场",)), ["现场"])
+
+    def test_empty_input(self):
+        self.assertEqual(core.marker_hits("", ("live",), ("现场",)), [])
+        self.assertEqual(core.marker_hits(None, ("live",), ("现场",)), [])
 
 
 if __name__ == "__main__":

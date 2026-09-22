@@ -14,9 +14,11 @@ UI 时遵循同一流程：
 
 1. 理解描述，只在缺失信息会实质改变结果时提问；否则做合理假设。
 2. 调用 `am_status`；需要个性化时再参考 `am_recently_played` / `am_top_played`。
-3. 策划有开场、中段和收尾的候选曲目，默认 25 首、优先录音室原版、避免重复，同一艺人通常不超过两首。
-4. 用 `am_search_songs` 校验不确定或有版本歧义的候选，不臆造 catalog ID。
-5. 调用 `am_create_playlist(dry_run=true)`，处理遗漏或可疑匹配后，再正式创建并简要报告结果。
+3. 先策划目标数量 1.5–2 倍的候选池；用自然语言记录必须项、偏好、排除项与叙事角色，不生成任意的 0–1 主题分。
+4. 用 `am_resolve_candidates` 一次校验候选池；`am_search_songs` 只用于单曲歧义或探索性搜索。不臆造 catalog ID，也不把 `has_lyrics=false` 当作纯音乐证据。
+5. 直接对照用户的原话比较候选，用 `essential / strong / bridge / optional / reject` 和开场、发展、高潮、释放、落地等角色说明取舍。
+6. 先定最终曲目和叙事分段；`am_optimize_order` 只可选地优化段内衔接，不负责判断主题契合度。
+7. 调用 `am_create_playlist(dry_run=true)`，处理遗漏或可疑匹配后，再正式创建并简要报告结果。
 
 若用户明确只要建议或预览，则停在写入之前。CLI 主要用于登录、诊断、脚本、体检和高级维护。
 本项目不含固定艺人清单或主题，内容来自用户描述和 Agent 策划。
@@ -39,11 +41,12 @@ UI 时遵循同一流程：
 | "我库里有什么" / 挑候选曲池 | `am_playlist.py library` + `build_pool.py`（见 §五） |
 | 排查 API 报错 | 先看 §四 |
 
-**MCP 工具（12 个）**
+**MCP 工具（13 个）**
 
 ```
 am_status            先查这个：token 是否有效、是否已登录
 am_search_songs      catalog 搜索，返回 song id
+am_resolve_candidates 批量校验候选池，返回真实元数据/重复/版本标记，不做主题评分
 am_list_playlists    列出音乐库歌单
 am_show_playlist     看某歌单的曲目
 am_create_playlist   主入口：建歌单 + 一次性写入曲目
@@ -102,8 +105,8 @@ python -m unittest discover -s tests         # 测试（全部离线）
 ## 三、排序：怎么排出一个「好听又有意思」的顺序
 
 **MCP 里有 `am_optimize_order`**（只读：返回建议曲序，不改动歌单）。它跑的就是下面这套规则与
-形状，参数 `arc` 选叙事弧、`blocks` 保留乐章顺序、`tracks` 自由重排。**优先用它**，不要自己
-盯着 BPM 数字手排——退火是在同一套 cost 上求最小，手排做不到，实测差距很大。
+形状，参数 `arc` 选叙事弧、`blocks` 保留乐章顺序、`tracks` 自由重排。它是候选已由 LLM
+选定后的**可选衔接器**：适合在不改叙事分段的前提下减少明显的 BPM/能量突变，不能用它替代 LLM 判断主题、语义和文化语境。
 `playlist_optimize.py` 是同一算法的离线/脚本化入口，两者共用 `playlist_core`，不会分叉。
 
 完整依据见仓库 `docs/how-to-build-a-good-playlist.md`（含 PLOS ONE 2025 的实证数据表）。

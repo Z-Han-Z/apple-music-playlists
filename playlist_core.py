@@ -24,6 +24,7 @@ playlist_core.py — 与音乐平台**无关**的乐理与相邻规则。
 
 from __future__ import annotations
 
+import re
 import statistics
 
 # ---------------------------------------------------------------- 调性 / 速度
@@ -348,3 +349,18 @@ def coverage_report(counts: dict[str, int], total: int,
             f"剩下 {lost} 首的位置实际上没有被评估过——"
             f"报告里的 cost 只描述前一部分。")
     return "\n".join(lines)
+
+
+# ---------------------------------------------------------------- 通用标记词匹配
+# 拉丁词必须按整词匹配，CJK 才能按子串匹配；否则 Alive / Olive / Deliver
+# 都会因为包含 "live" 而被误判为现场版。具体词表由调用方维护。
+
+def marker_hits(text: str, latin: tuple, cjk: tuple) -> list[str]:
+    """在文本里找标记词。拉丁词按**整词**匹配，CJK 按子串匹配。"""
+    low = (text or "").lower()
+    hits = [w for w in cjk if w in low]
+    if latin:
+        pattern = r"\b(?:" + "|".join(
+            re.escape(w) for w in sorted(latin, key=len, reverse=True)) + r")\b"
+        hits += [m.group(0).lower() for m in re.finditer(pattern, low, re.I)]
+    return hits

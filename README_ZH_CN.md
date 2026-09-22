@@ -37,7 +37,8 @@ am-playlist login
 > 创建一张 25 首的雨夜开车歌单，以华语独立和梦幻流行为主，不要现场版，结尾平静一些。
 
 支持 MCP Prompt 的客户端可选择 `create_playlist_from_description`；不显示 Prompt 的客户端
-直接发送同样的自然语言即可，服务端指引和工具会完成“状态 → 搜索 → 预演 → 创建”。
+直接发送同样的自然语言即可，服务端指引和工具会完成
+“状态 → 候选池 → 曲库校验 → 直接比较 → 预演 → 创建”。
 
 也可以直接克隆（无需安装依赖）：
 
@@ -98,8 +99,11 @@ python listening_stats.py top --kind songs --year 2026
 }
 ```
 
-服务提供 `create_playlist_from_description` 标准 Prompt 和 12 个工具：状态、搜索、列出/查看歌单、创建、追加、删除、元数据体检、
-听感分析、**曲序优化**、最近播放和播放次数排行。工具描述为英文/中文，并声明只读与破坏性标记。
+服务提供 `create_playlist_from_description` 标准 Prompt 和 13 个工具：状态、搜索、
+`am_resolve_candidates` 候选池校验、列出/查看歌单、创建、追加、删除、元数据体检、
+听感分析、曲序优化、最近播放和播放次数排行。候选校验只返回 Apple Music 真实元数据、
+重复与版本标记，不代替 LLM 评分主题；LLM 应直接对照用户的文字比较候选并说明理由。
+曲序优化只是可选的段内衔接工具，不决定哪些歌应入选。
 
 Codex、Claude、Cursor、VS Code/Copilot、Gemini CLI、Windsurf、Docker、Cordis/DSH 和 Harness
 配置见 **[docs/client-setup.zh-CN.md](docs/client-setup.zh-CN.md)**。

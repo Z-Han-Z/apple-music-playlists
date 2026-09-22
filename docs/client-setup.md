@@ -13,9 +13,10 @@ The intended interaction is a natural-language request such as:
 > Make a 20-track Sunday-morning playlist: warm soul, folk, and quiet jazz; mostly 1970s to
 > present; no live recordings; gently increase the energy and end softly.
 
-The LLM in the MCP client turns that brief into candidates. The stdio server then grounds the work
-in Apple Music through `am_status`, `am_search_songs`, and a dry run of `am_create_playlist` before
-the final write. It does not call a separate model provider and needs no LLM API key of its own.
+The LLM in the MCP client turns that brief into a generous candidate pool, then compares the
+candidates directly with the user's words. The stdio server grounds the pool through `am_status`
+and `am_resolve_candidates`, followed by a dry run of `am_create_playlist` before the final write.
+It does not call a separate model provider and needs no LLM API key of its own.
 
 Clients that expose MCP Prompts can select `create_playlist_from_description` and fill in the
 brief, optional name, track count, and response language. A client without Prompt UI support loses
@@ -164,7 +165,7 @@ normal `initialize` → `notifications/initialized` → `tools/list` sequence.
 
 ### Cordis / DSH agent harness
 
-The ready-to-copy preset in [`preset/`](../preset/) mounts the stdio server, exposes all 12 tools,
+The ready-to-copy preset in [`preset/`](../preset/) mounts the stdio server, exposes all 13 tools,
 loads the companion skill, and sets a two-minute tool timeout for slower feature analysis. Follow
 [`preset/README.md`](../preset/README.md).
 

@@ -10,7 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - A standard MCP prompt, `create_playlist_from_description`, that turns a natural-language brief
-  into an explicit status → curation → catalog search → dry-run → create workflow.
+  into an explicit status → candidate pool → catalog grounding → direct comparison →
+  dry-run → create workflow.
 - `am_optimize_order` — a **read-only** MCP tool that computes a better track order (simulated
   annealing over the four adjacency rules and a chosen narrative arc) and writes nothing.
 
@@ -19,6 +20,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   The agent had to hand-order from raw BPM numbers, which the curation research says loses to the
   optimizer. Accepts a free list, explicit blocks (movement order preserved, reordering only
   within), or an existing playlist, and returns a list ready to hand to `am_create_playlist`.
+- `am_library` now keeps `hasLyrics` from the catalog response it was already fetching, and the
+  library report shows lyrics coverage next to ISRC coverage. This costs no extra request; the
+  field was already arriving and being discarded. A false value is treated as missing evidence,
+  never as proof that a track is instrumental.
+- `am_resolve_candidates` — a read-only MCP grounding tool for LLM-generated candidate pools. It
+  preserves input order and returns real Apple Music metadata, catalog IDs, explicit version
+  markers, duplicate recordings, and artist-concentration warnings without assigning theme-fit
+  scores or making aesthetic decisions for the model.
 
 ### Changed
 
@@ -26,6 +35,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   user's description while this server validates candidates against Apple Music and performs the
   account operations. No separate LLM provider or API key is embedded in the server.
 - Kept the CLI as the authentication, diagnostics, scripting, and advanced-maintenance interface.
+- Replaced the experimental LLM-number-to-optimizer bridge with an LLM-native curation workflow:
+  generate a generous pool, ground it in Apple Music, compare candidates in natural language,
+  assign narrative roles, and use deterministic sequencing only as an optional final pass.
 
 ## [1.2.0] - 2026-09-22
 
