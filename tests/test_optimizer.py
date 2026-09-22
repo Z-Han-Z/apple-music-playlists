@@ -1,0 +1,175 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+排序器（playlist_optimize.py）的单元测试。**全部离线**。
+
+这里逐条隔离验证四项"硬性相邻规则"的惩罚项。隔离很重要：
+如果两条规则同时触发而测试只断言总数，改动其中一条会被另一条掩盖。
+
+跑：
+    python -m unittest discover -s tests -v
+"""
+
+import sys
+import unittest
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+import playlist_optimize as po  # noqa: E402
+
+
+def T(bpm, key="8B", energy=0.5, valence=0.5, loud=-10.0,
+      cid="x", block="A", has_feat=True):
+    """造一个优化器认识的曲目 dict。
+
+    has_feat=False 用来模拟"这首歌没抓到音频特征"——此时 cost 函数必须跳过它。
+    """
+    return {"cid": cid, "block": block, "name": cid,
+            "bpm": bpm, "key": key, "energy": energy, "valence": valence, "loud": loud,
+            "f": {"tempo": bpm} if has_feat else None}
+
+
+class TestAdjacencyCostIsolated(unittest.TestCase):
+    """每条规则单独触发，断言恰好等于它自己的权重。"""
+
+    def test_clean_pair_costs_nothing(self):
+        # 120→125BPM（幅度 4% 但调性不兼容）、能量相同、都不是慢歌
+        self.assertEqual(po.adjacency_cost([T(120, "8B"), T(125, "3A")]), 0.0)
+
+    def test_two_slow_only(self):
+        # 两首都 <100、同 BPM、调性不兼容 → 只触发"两首慢歌"
+        self.assertEqual(po.adjacency_cost([T(95, "8B"), T(95, "3A")]), po.W_TWO_SLOW)
+
+    def test_small_drop_only(self):
+        # 100→95 降 5%：起点不算慢歌（100 不小于 100）、调性不兼容 → 只触发"只慢一点"
+        self.assertEqual(po.adjacency_cost([T(100, "8B"), T(95, "3A")]), po.W_SMALL_DROP)
+
+    def test_both_similar_only(self):
+        # 同 BPM 且 Camelot 兼容 → 只触发"节奏与调性同时相似"
+        self.assertEqual(po.adjacency_cost([T(120, "8B"), T(120, "8A")]), po.W_BOTH_SIMILAR)
+
+    def test_big_tempo_jump_only(self):
+        # 80→130 是 +62.5%，超过 40% 阈值；80 不算慢歌（130 不 <100）
+        self.assertEqual(po.adjacency_cost([T(80, "8B"), T(130, "3A")]), po.W_BIG_TEMPO_JUMP)
+
+    def test_energy_clash_only(self):
+        # 能量 0.9→0.3 骤变且调性不兼容 → 突兀
+        self.assertEqual(
+            po.adjacency_cost([T(120, "8B", energy=0.9), T(120, "3A", energy=0.3)]),
+            po.W_ENERGY_CLASH)
+
+
+class TestAdjacencyCostEdgeCases(unittest.TestCase):
+    def test_missing_features_are_skipped(self):
+        # 任一首没有特征，整个衔接就不参与惩罚（不能凭空猜）
+        self.assertEqual(po.adjacency_cost([T(95, "8B", has_feat=False), T(95, "8B")]), 0.0)
+        self.assertEqual(po.adjacency_cost([T(95, "8B"), T(95, "8B", has_feat=False)]), 0.0)
+
+    def test_short_sequences(self):
+        self.assertEqual(po.adjacency_cost([]), 0.0)
+        self.assertEqual(po.adjacency_cost([T(95, "8B")]), 0.0)
+
+    def test_penalties_accumulate(self):
+        """两首歌同时踩多条规则时，惩罚应该相加而不是只算一条。"""
+        pair = [T(95, "8B", energy=0.9), T(95, "8A", energy=0.3)]
+        # 两首慢歌 + 同 BPM 且调性兼容 → 至少这两项之和
+        self.assertGreaterEqual(po.adjacency_cost(pair), po.W_TWO_SLOW + po.W_BOTH_SIMILAR)
+
+
+class TestArcCost(unittest.TestCase):
+    def test_needs_at_least_five_featured_tracks(self):
+        self.assertEqual(po.arc_cost([T(120) for _ in range(4)]), 0.0)
+        self.assertEqual(po.arc_cost([]), 0.0)
+
+    def test_non_negative(self):
+        seq = [T(120, valence=v) for v in (0.1, 0.5, 0.9, 0.4, 0.2)]
+        self.assertGreaterEqual(po.arc_cost(seq), 0.0)
+
+    def test_valence_valley_late_beats_valley_centred(self):
+        """valence 的目标是"先落再起"（谷底在 60% 处），倒 U 应该明显更贵。"""
+        hole = [0.9, 0.4, 0.2, 0.5, 1.0]
+        inverted = [0.2, 0.5, 0.9, 0.5, 0.2]
+        a = po.arc_cost([T(120, valence=v) for v in hole])
+        b = po.arc_cost([T(120, valence=v) for v in inverted])
+        self.assertLess(a, b)
+
+    def test_uniform_features_are_tolerated(self):
+        """所有歌特征完全相同时，无法构成任何弧线，cost 应为确定值而非崩溃/除零。"""
+        seq = [T(120, valence=0.5) for _ in range(6)]
+        self.assertIsInstance(po.arc_cost(seq), float)
+
+
+def _blocks():
+    """两个各 8 首的块，特征刻意做得容易被重排。"""
+    a = [T(95 + i, key="8B" if i % 2 else "3A", cid=f"A{i}", block="A") for i in range(8)]
+    b = [T(120 + i, key="5A" if i % 2 else "9B", cid=f"B{i}", block="B") for i in range(8)]
+    return [a, b]
+
+
+class TestAnneal(unittest.TestCase):
+    def test_deterministic_for_same_seed(self):
+        """固定 seed 必须完全可复现——否则报告里的 cost 数字没有意义。"""
+        s1, c1 = po.anneal(_blocks(), iters=3000, seed=42)
+        s2, c2 = po.anneal(_blocks(), iters=3000, seed=42)
+        self.assertEqual(c1, c2)
+        self.assertEqual([t["cid"] for t in s1], [t["cid"] for t in s2])
+
+    def test_block_order_is_preserved(self):
+        """硬约束：主题分块顺序不能为了顺耳被打乱，只能组内重排。"""
+        seq, _ = po.anneal(_blocks(), iters=3000, seed=7)
+        self.assertEqual([t["block"] for t in seq], ["A"] * 8 + ["B"] * 8)
+        self.assertEqual({t["cid"] for t in seq if t["block"] == "A"},
+                         {f"A{i}" for i in range(8)})
+        self.assertEqual({t["cid"] for t in seq if t["block"] == "B"},
+                         {f"B{i}" for i in range(8)})
+
+    def test_never_worse_than_input_order(self):
+        blocks = _blocks()
+        start = po.total_cost([t for b in blocks for t in b])
+        _, best = po.anneal(blocks, iters=3000, seed=7)
+        self.assertLessEqual(best, start + 1e-9)
+
+    def test_reported_cost_matches_recomputed(self):
+        seq, best = po.anneal(_blocks(), iters=500, seed=3)
+        self.assertAlmostEqual(po.total_cost(seq), best, places=6)
+
+    def test_all_tracks_survive(self):
+        seq, _ = po.anneal(_blocks(), iters=1000, seed=5)
+        self.assertEqual(len(seq), 16)
+        self.assertEqual(len({t["cid"] for t in seq}), 16)
+
+
+class TestParseSpec(unittest.TestCase):
+    def test_blocks(self):
+        spec = po.parse_spec({"blocks": [{"id": "A", "title": "起", "tracks": ["1", "2"]}]})
+        self.assertEqual(spec, [{"id": "A", "title": "起", "tracks": ["1", "2"]}])
+
+    def test_flat_is_wrapped_into_one_block(self):
+        spec = po.parse_spec({"tracks": ["1", "2"]})
+        self.assertEqual(len(spec), 1)
+        self.assertEqual(spec[0]["tracks"], ["1", "2"])
+
+    def test_missing_id_is_generated(self):
+        self.assertEqual(po.parse_spec({"blocks": [{"tracks": ["1"]}]})[0]["id"], "B1")
+
+    def test_empty_raises_value_error(self):
+        for bad in ({}, {"blocks": []}, {"tracks": []}):
+            with self.assertRaises(ValueError):
+                po.parse_spec(bad)
+
+
+class TestTotalCost(unittest.TestCase):
+    def test_is_sum_of_parts(self):
+        seq = [T(95 + i, cid=f"c{i}", valence=(i % 5) / 4) for i in range(10)]
+        self.assertAlmostEqual(
+            po.total_cost(seq), po.adjacency_cost(seq) + po.arc_cost(seq), places=9)
+
+    def test_weights_are_positive(self):
+        for name in ("W_TWO_SLOW", "W_SMALL_DROP", "W_BOTH_SIMILAR",
+                     "W_BIG_TEMPO_JUMP", "W_ENERGY_CLASH", "W_ARC"):
+            self.assertGreater(getattr(po, name), 0.0, name)
+
+
+if __name__ == "__main__":
+    unittest.main(verbosity=2)

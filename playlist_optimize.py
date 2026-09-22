@@ -6,7 +6,7 @@ playlist_optimize.py — 用模拟退火算出一个「好听」的曲序。
 输入是一份**曲目清单**（可分组），输出是重排后的 catalog id 列表，
 可以直接喂给 `am_playlist.py create --json` 建歌单。
 
-约束（依据见 docs/怎么做一个好听又有意思的歌单.md）：
+约束（依据见 docs/how-to-build-a-good-playlist.md）：
   硬性（相邻）  不要两首慢歌相邻
                 不要"只慢一点"（降幅 0–12%，会让慢歌显得拖）
                 相邻不该在 tempo 和 key 上「同时」相似

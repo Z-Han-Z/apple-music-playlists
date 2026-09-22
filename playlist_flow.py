@@ -15,7 +15,7 @@ playlist_flow.py — 给歌单做「好听度」体检（BPM / 调性 / 响度 /
 albumName/isrc/artwork...）。而 Spotify 的 audio-features 已于 2024-11-27 对新应用关闭。
 ReccoBeats 是当前可用的免费替代，**且直接支持用 ISRC 查询**——ISRC 正好是 Apple 会给的字段。
 
-体检依据（见 调研-怎么做一个好听又有意思的歌单.md）：
+体检依据（见 docs/how-to-build-a-good-playlist.md）：
   §2.1 不要两首慢歌相邻；不要"只慢一点"（会让慢歌显得拖）
   §2.3 相邻两首不该在 tempo 和 key 上「同时」相似
   §2.4/§3.1 响度前重后轻；valence/arousal/loudness 呈 U 型，tempo 呈倒 U 型
@@ -37,7 +37,9 @@ import urllib.request
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import am_paths as ap  # noqa: E402
 import am_playlist as am  # noqa: E402
+from am_meta import catalog_meta  # noqa: E402
 
 if sys.stdout.encoding and sys.stdout.encoding.lower() not in ("utf-8", "utf8"):
     try:
@@ -46,7 +48,9 @@ if sys.stdout.encoding and sys.stdout.encoding.lower() not in ("utf-8", "utf8"):
         pass
 
 RB = "https://api.reccobeats.com"
-CACHE_DIR = Path(__file__).resolve().parent / "refs"
+# 缓存写进**用户目录**，不写进仓库。refs/ 曾经是缓存目录，现在只作只读回退
+# （见 am_paths.read_dirs）——否则 clone 下来就在仓库里留一堆个人中间产物。
+CACHE_DIR = am.cache_dir()
 
 # Spotify 的 key 是 0-11 的半音序号；mode 0=小调 1=大调
 PITCH = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
@@ -103,19 +107,35 @@ def rb_get(path: str, retries: int = 3) -> dict | None:
     return None
 
 
+def feature_cache_path(pid: str) -> Path:
+    """新缓存一律写这里（用户目录）。"""
+    return CACHE_DIR / f"features-{pid.replace('.', '_')}.json"
+
+
+def load_feature_cache(pid: str) -> dict:
+    """读特征缓存：先用户目录，再回退到旧版的仓库内 refs/。
+
+    回退是为了不浪费已经抓好的特征——重抓一轮是几十次网络请求。
+    """
+    name = feature_cache_path(pid).name
+    for d in ap.read_dirs():
+        p = d / name
+        if p.exists():
+            try:
+                return json.loads(p.read_text(encoding="utf-8"))
+            except Exception:
+                continue
+    return {}
+
+
 def fetch_features(pid: str, tracks: list[tuple[str, str, str, str]], refresh: bool) -> dict:
     """tracks: [(catalog_id, name, artist, isrc)] → {isrc: features}
 
     每条特征里会带上 `_cid`（catalog id），这样下游（比如 playlist_optimize.py）
     可以直接按 catalog id 索引，不需要使用者另外手工维护一张 id→ISRC 映射表。
     """
-    cache_file = CACHE_DIR / f"features-{pid.replace('.', '_')}.json"
-    cache = {}
-    if cache_file.exists() and not refresh:
-        try:
-            cache = json.loads(cache_file.read_text(encoding="utf-8"))
-        except Exception:
-            cache = {}
+    cache_file = feature_cache_path(pid)
+    cache = {} if refresh else load_feature_cache(pid)
 
     todo = [t for t in tracks if t[3] and t[3] not in cache]
     print(f"特征缓存: 已有 {len(cache)} 条，待抓 {len(todo)} 条")
@@ -140,7 +160,7 @@ def fetch_features(pid: str, tracks: list[tuple[str, str, str, str]], refresh: b
               f"E={f.get('energy',0):.2f} V={f.get('valence',0):.2f}")
         time.sleep(0.3)
 
-    CACHE_DIR.mkdir(exist_ok=True)
+    CACHE_DIR.mkdir(parents=True, exist_ok=True)
     cache_file.write_text(json.dumps(cache, ensure_ascii=False, indent=1), encoding="utf-8")
     return cache
 
@@ -288,6 +308,7 @@ def run(target: str, refresh: bool = False) -> int:
     cfg = am.load_config()
     dev = am.get_developer_token(cfg)
     user = am.require_user(cfg)
+    sf = am.resolve_storefront(None, cfg, dev, user)
 
     p = am.find_playlist(target, dev, user)
     if not p:
@@ -307,12 +328,9 @@ def run(target: str, refresh: bool = False) -> int:
             cat_ids.append(str(cid))
             dur[str(cid)] = a.get("durationInMillis", 0)
 
-    meta = {}
-    for i in range(0, len(cat_ids), 100):
-        st, body = am.api("GET", "/catalog/cn/songs", dev=dev,
-                          query={"ids": ",".join(cat_ids[i:i + 100])})
-        for s in json.loads(body).get("data", []):
-            meta[s["id"]] = s["attributes"]
+    # 曾经这里写死 "/catalog/cn/songs"：非 cn 账号会静默拿回空元数据，
+    # 于是整个体检降级成"有效曲目太少，无法分析"。地区必须解析出来。
+    meta = catalog_meta(cat_ids, dev, sf)
 
     tracks = [(c,
                meta.get(c, {}).get("name") or f"id:{c}",

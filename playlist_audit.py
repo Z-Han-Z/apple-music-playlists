@@ -5,7 +5,7 @@ playlist_audit.py — 按调研到的策展原则给歌单做体检。
 
 只检查「用 Apple Music 元数据**能**检查的」规则。BPM/调性/能量那类
 （dj.studio 的能量曲线、Mixed In Key 的 Camelot）Apple 不提供字段，
-本工具**不会假装能查**（见 调研-怎么做一张好歌单.md §8）。
+本工具**不会假装能查**（这些字段 Apple 确实不提供，见 docs/how-to-build-a-good-playlist.md §9.1）。
 
 依据：
   - Apple 官方策展规范：15–50 首、单一主题、开头放爆款
@@ -27,27 +27,13 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import am_playlist as am  # noqa: E402
+from am_meta import catalog_meta  # noqa: E402
 
 if sys.stdout.encoding and sys.stdout.encoding.lower() not in ("utf-8", "utf8"):
     try:
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     except Exception:
         pass
-
-
-def catalog_meta(ids: list[str], dev: str, sf: str = "cn") -> dict:
-    """批量取 catalog 元数据（每批 100 个 id）。"""
-    out = {}
-    for i in range(0, len(ids), 100):
-        chunk = ids[i:i + 100]
-        try:
-            st, body = am.api("GET", f"/catalog/{sf}/songs", dev=dev,
-                              query={"ids": ",".join(chunk)})
-            for s in json.loads(body).get("data", []):
-                out[s["id"]] = s["attributes"]
-        except am.ApiError as e:
-            print(f"  ! 元数据批次失败 {e.status}", file=sys.stderr)
-    return out
 
 
 def mmss(ms: int) -> str:
@@ -59,6 +45,7 @@ def audit(name: str) -> int:
     cfg = am.load_config()
     dev = am.get_developer_token(cfg)
     user = am.require_user(cfg)
+    sf = am.resolve_storefront(None, cfg, dev, user)
 
     p = am.find_playlist(name, dev, user)
     if not p:
@@ -80,7 +67,7 @@ def audit(name: str) -> int:
         if cid:
             cat_ids.append(str(cid))
 
-    meta = catalog_meta(cat_ids, dev) if cat_ids else {}
+    meta = catalog_meta(cat_ids, dev, sf) if cat_ids else {}
 
     print(f"\n{'='*72}\n歌单体检：{title}\n id={pid}   曲目数={len(lib)}\n{'='*72}")
 
@@ -175,7 +162,7 @@ def audit(name: str) -> int:
     print(f"     疑似间奏(<2:00)：{('⚠️ ' + ', '.join(f'{x}({mmss(y)})' for x, y in inter)) if inter else '✅ 无'}")
 
     print(f"\n{'='*72}")
-    print("体检完毕。标 ⚠️/❌ 的项见 调研-怎么做一张好歌单.md §9 的修改建议。")
+    print("体检完毕。标 ⚠️/❌ 的项见 docs/playlist-curation-survey.md §10 的可执行清单。")
     print(f"{'='*72}\n")
     return 0
 

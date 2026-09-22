@@ -27,6 +27,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import am_playlist as am  # noqa: E402
 import playlist_flow as pf  # noqa: E402
+from am_meta import catalog_meta  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent
 REF = ROOT / "refs"
@@ -54,16 +55,6 @@ def replay_top(period: str, dev: str, user: str, want: int) -> list[dict]:
         if not j.get("next"):
             break
     return out[:want]
-
-
-def catalog_meta(ids: list[str], dev: str, sf: str) -> dict:
-    meta = {}
-    for i in range(0, len(ids), 100):
-        st, body = am.api("GET", f"/catalog/{sf}/songs", dev=dev,
-                          query={"ids": ",".join(ids[i:i + 100])})
-        for s in json.loads(body).get("data", []):
-            meta[s["id"]] = s["attributes"]
-    return meta
 
 
 def main() -> int:

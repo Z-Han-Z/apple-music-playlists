@@ -26,7 +26,7 @@ import playlist_flow as flow_mod  # noqa: E402
 import listening_stats as listening  # noqa: E402
 
 PROTOCOL_VERSION = "2024-11-05"
-SERVER_INFO = {"name": "apple-music-playlists", "version": "1.0.0"}
+SERVER_INFO = {"name": "apple-music-playlists", "version": am.VERSION}
 
 TOOLS = [
     {

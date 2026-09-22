@@ -50,6 +50,9 @@ import urllib.request
 import zlib
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from am_paths import VERSION, cache_dir, config_dir  # noqa: E402
+
 # Windows 控制台默认 GBK，强制 UTF-8 以免中文乱码
 if os.name == "nt":
     for _s in (sys.stdout, sys.stderr):
@@ -70,14 +73,8 @@ JWT_RE = re.compile(r"eyJ[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-
 SCRIPT_RE = re.compile(r'src="(/assets/[^"]+\.js)"')
 
 
-def config_dir() -> Path:
-    if os.name == "nt":
-        base = Path(os.environ.get("APPDATA", Path.home() / "AppData" / "Roaming"))
-    else:
-        base = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config"))
-    return base / "am-playlist"
-
-
+# config_dir() / cache_dir() / VERSION 的唯一实现在 am_paths.py ——
+# 那是个平台无关模块，playlist_optimize.py 那类纯算法代码可以只依赖它。
 CONFIG_PATH = config_dir() / "config.json"
 
 
@@ -197,12 +194,6 @@ def resolve_storefront(explicit: str | None, cfg: dict, dev: str,
         except Exception:
             pass
     return "us"
-    if not body or not body.strip():
-        return None
-    try:
-        return json.loads(body)
-    except json.JSONDecodeError:
-        return None
 
 
 def api(method: str, path: str, *, dev: str, user: str | None = None,
@@ -503,12 +494,38 @@ def cmd_status(args) -> int:
     return 0
 
 
-# 查询里没提到、却出现在曲名里的"版本后缀"——出现就扣分，避免匹配到现场版/伴奏版
-VERSION_NOISE = (
-    "live", "remaster", "remastered", "demo", "acoustic", "instrumental", "karaoke",
-    "cover", "version", "edit", "mix", "reprise", "deluxe", "bonus", "mono", "stereo",
-    "现场", "演唱会", "伴奏", "翻唱", "重制", "纯音乐",
+# 查询里没提到、却出现在曲名里的"版本后缀"——出现就扣分，避免匹配到现场版/伴奏版。
+#
+# ⚠️ 必须区分两种语言，不能一律子串匹配：
+#   · 拉丁词要**按整词**匹配。子串匹配会误伤一大片——"Alive" / "Olive" /
+#     "Deliver" 全都含 "live"，会被当成现场版扣 1.2 分，把好结果挤下去。
+#   · CJK 没有词边界，只能继续子串匹配。
+# 另外 "mix" 不能单独按整词列出，否则 "Remix" 反而不再算版本后缀；
+# 这类合成词要显式进表（remix / re-mix）。
+VERSION_NOISE_WORDS = (
+    "remastered", "instrumental", "acoustic", "karaoke", "remaster", "reprise",
+    "deluxe", "stereo", "version", "remix", "re-mix", "bonus", "cover", "live",
+    "demo", "edit", "mono",
 )
+VERSION_NOISE_CJK = ("现场", "演唱会", "伴奏", "翻唱", "重制", "纯音乐")
+
+# 保留这个名字：文档里用它指代"版本后缀扣分"这件事
+VERSION_NOISE = VERSION_NOISE_WORDS + VERSION_NOISE_CJK
+
+_NOISE_RE = re.compile(
+    r"\b(?:" + "|".join(re.escape(w) for w in VERSION_NOISE_WORDS) + r")\b", re.I)
+
+
+def version_noise_hits(title: str) -> list[str]:
+    """曲名里命中了哪些"版本后缀"，返回小写词表。
+
+    调用方拿它跟查询词比对，决定要不要扣分——所以这里只负责"命中什么"，
+    不负责"该不该扣"。
+    """
+    low = (title or "").lower()
+    hits = [w for w in VERSION_NOISE_CJK if w in low]
+    hits += [m.group(0).lower() for m in _NOISE_RE.finditer(low)]
+    return hits
 
 
 def best_song_match(query: str, songs: list[dict]) -> dict | None:
@@ -523,7 +540,9 @@ def best_song_match(query: str, songs: list[dict]) -> dict | None:
     else:
         want_t, want_a = query, ""
     nt, na = norm(want_t), norm(want_a)
-    q_low = query.lower()
+    # 查询自己提到的版本词不算"没被要求"。这里也要用同一套整词判定——
+    # 否则查询 "Alive" 会因为自身含 "live" 而豁免所有现场版罚分。
+    q_hits = set(version_noise_hits(want_t))
 
     scored = []
     for s in songs:
@@ -542,9 +561,8 @@ def best_song_match(query: str, songs: list[dict]) -> dict | None:
             elif na in ar or ar in na:
                 score += 1.5
         # 曲名里带查询没要求的版本后缀 → 扣分（"Live" 之类）
-        low_t = raw_t.lower()
-        for w in VERSION_NOISE:
-            if w in low_t and w not in q_low:
+        for w in version_noise_hits(raw_t):
+            if w not in q_hits:
                 score -= 1.2
                 break
         scored.append((score, s))
@@ -713,7 +731,12 @@ def cmd_login(args) -> int:
 def cmd_search(args) -> int:
     cfg = load_config()
     dev = get_developer_token(cfg, verbose=args.verbose)
-    st, body = api("GET", f"/catalog/{args.storefront}/search", dev=dev,
+    # 必须解析地区。这个子命令的 --storefront 曾经默认写死 "us"，
+    # 于是 resolve_storefront 的 explicit 分支永远先命中，配置里记住的
+    # 账号地区完全没生效——而 MCP 的 am_search_songs 是解析过的，
+    # 于是同一个查询在 CLI 和 MCP 里会得到不同地区的结果。
+    sf = resolve_storefront(args.storefront, cfg, dev, get_user_token(cfg))
+    st, body = api("GET", f"/catalog/{sf}/search", dev=dev,
                    query={"term": args.term, "types": args.types, "limit": args.limit})
     data = json.loads(body).get("results", {})
     for kind, payload in data.items():
@@ -995,7 +1018,8 @@ def main() -> int:
     p = sub.add_parser("search", help="搜索 catalog")
     p.add_argument("term"); p.add_argument("--types", default="songs")
     p.add_argument("--limit", type=int, default=5)
-    p.add_argument("--storefront", default="us")
+    p.add_argument("--storefront", default=None,
+                   help="地区码；不给则用配置里记住的，再兜底 us")
     p.set_defaults(fn=cmd_search)
 
     p = sub.add_parser("list", help="列出我的歌单")
