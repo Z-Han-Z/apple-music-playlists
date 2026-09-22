@@ -4,23 +4,51 @@ English | [简体中文](README_ZH_CN.md) | [繁體中文](README_ZH_TW.md) |
 [日本語](README_JP.md) | [한국어](README_KR.md) | [Español](README_ES.md) |
 [Português do Brasil](README_PT_BR.md) | [Deutsch](README_DE.md) | [Français](README_FR.md)
 
-**Build, analyze, and sequence Apple Music playlists from the command line or an MCP-capable agent.**
+**Describe the playlist you want. Your MCP agent curates it, verifies every track in Apple Music,
+previews the match, and creates it for you.**
 
 Pure Python standard library — no `pip install` required to run, and **no Apple Developer Program
 membership needed**. Requires Python 3.10+ and works on Windows / macOS / Linux.
 
-> This is a **general-purpose** playlist toolkit. It ships no artist lists, no themes, and no
-> curated content — you bring the tracks.
+The primary interface is the local `am-mcp` stdio server. The language model already running in
+your MCP client interprets the brief and chooses candidates; this project searches the Apple Music
+catalog, resolves exact tracks, and performs account operations. There is no bundled model, LLM
+API key, artist list, or fixed theme. The CLI remains available for login, diagnostics, scripting,
+audits, and advanced sequencing.
 
 ```
-  create  →  audit  →  fetch audio features  →  optimize order  →  rebuild
+  describe  →  curate  →  catalog-check  →  dry-run  →  create
 ```
 
 ---
 
 ## Quick start
 
-**Option A — clone and run (nothing to install):**
+**Recommended — install the MCP stdio service:**
+
+```bash
+pip install git+https://github.com/Z-Han-Z/apple-music-playlists.git
+am-playlist status
+am-playlist login       # one-time Apple ID sign-in
+```
+
+Register `am-mcp` in the client. The common configuration shape is:
+
+```json
+{ "mcpServers": { "applemusic": { "command": "am-mcp",
+    "env": { "PYTHONIOENCODING": "utf-8" } } } }
+```
+
+Then describe the result, not the implementation:
+
+> Create a 25-track late-night driving playlist: atmospheric alternative R&B and electronic,
+> mostly from the last ten years, no live versions, with a calm landing.
+
+Clients with MCP Prompt support can select `create_playlist_from_description`. In every other
+client, send the same request in chat: the server instructions and typed tools expose the same
+status → search → dry-run → create workflow.
+
+**From a clone (nothing to install):**
 
 ```bash
 git clone https://github.com/Z-Han-Z/apple-music-playlists.git
@@ -29,34 +57,15 @@ cd apple-music-playlists
 python am_playlist.py status     # auto-fetches the developer token
 python am_playlist.py login      # one-time Apple ID sign-in (~6 months validity)
 
-python am_playlist.py create --name "My Playlist" \
-    --tracks "Song A - Artist X, Song B - Artist Y"
+python am_mcp_server.py             # register this absolute script path in the MCP client
 ```
 
-There are no dependencies, so this works immediately. It is also the path you want if you intend
-to use the agent skill and the Cordis preset — those are copied out of the repository rather than
-installed.
-
-**Option B — install it:**
-
-```bash
-pip install git+https://github.com/Z-Han-Z/apple-music-playlists.git
-```
-
-That puts two commands on your PATH:
+Installation also puts the CLI and MCP commands on your PATH:
 
 ```bash
 am-playlist status      # the CLI
 am-playlist login       # one-time Apple ID sign-in
 am-mcp                  # the MCP stdio server
-```
-
-Installing is what makes MCP registration a one-liner: the modules land somewhere Python can
-import them, so the client no longer needs an absolute path to a script.
-
-```json
-{ "mcpServers": { "applemusic": { "command": "am-mcp",
-    "env": { "PYTHONIOENCODING": "utf-8" } } } }
 ```
 
 For development, `pip install -e .` from a clone makes edits take effect without reinstalling.
@@ -71,7 +80,7 @@ including a zero-dependency one).
 | File | Purpose |
 |---|---|
 | `am_playlist.py` | Core: token management, catalog search, create / edit / delete playlists, track resolution |
-| `am_mcp_server.py` | MCP (stdio) server exposing **11 tools** to any MCP client |
+| `am_mcp_server.py` | Primary MCP stdio service: one description-to-playlist prompt plus **11 tools** |
 | `playlist_audit.py` | **Metadata audit**: length, artist concentration, genres, eras, durations, duplicates, interludes |
 | `playlist_flow.py` | **Audio-feature audit**: BPM / key / loudness / energy / valence, adjacency checks, arc shape |
 | `playlist_optimize.py` | Simulated-annealing **track ordering** against the measured rules |
@@ -99,6 +108,10 @@ ids, report = playlist_optimize.optimize("stack.json")   # -> (list[str], str)
 ```
 
 ### MCP tools
+
+The standard prompt `create_playlist_from_description` asks for a natural-language brief and
+optional name, track count, and response language. Curation stays in the host model; the tools are
+the grounded Apple Music execution layer:
 
 `am_status` · `am_search_songs` · `am_list_playlists` · `am_show_playlist` ·
 `am_create_playlist` · `am_add_tracks` · `am_delete_playlist` ·

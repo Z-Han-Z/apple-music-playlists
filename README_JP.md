@@ -4,7 +4,12 @@
 日本語 | [한국어](README_KR.md) | [Español](README_ES.md) |
 [Português do Brasil](README_PT_BR.md) | [Deutsch](README_DE.md) | [Français](README_FR.md)
 
-**コマンドラインまたは MCP 対応エージェントから、Apple Music のプレイリストを作成・診断・並べ替えます。**
+**聴きたいプレイリストを説明するだけで、MCP エージェントが選曲し、Apple Music で検証・プレビューして作成します。**
+
+中心となるインターフェースはローカルの `am-mcp` stdio サービスです。MCP クライアント側の
+モデルが自然言語の要望を解釈し、本サービスがカタログ検索、正確な照合、アカウント操作を
+担当します。別の LLM や API キーは不要です。Prompt 対応クライアントでは
+`create_playlist_from_description` を選択でき、それ以外では要望をそのままチャットに入力できます。
 
 Python 3.10 以上、Windows / macOS / Linux 対応。実行時依存は標準ライブラリのみです。
 既定では Apple の Web プレーヤーに含まれる公開 developer token を取得するため、

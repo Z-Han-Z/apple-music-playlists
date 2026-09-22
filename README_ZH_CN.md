@@ -4,34 +4,49 @@
 [日本語](README_JP.md) | [한국어](README_KR.md) | [Español](README_ES.md) |
 [Português do Brasil](README_PT_BR.md) | [Deutsch](README_DE.md) | [Français](README_FR.md)
 
-**从命令行或支持 MCP 的 Agent 创建、体检和重排 Apple Music 歌单。**
+**描述你想听的歌单；MCP Agent 负责策划，逐首在 Apple Music 校验，预演后直接创建。**
 
 Python 3.10+，运行时只用标准库，支持 Windows / macOS / Linux。默认使用
-Apple 网页播放器的公开 developer token，不需要 Apple Developer Program。本项目不内置
-艺人清单、主题或成品歌单，曲目由你提供。
+Apple 网页播放器的公开 developer token，不需要 Apple Developer Program。主入口是本地
+`am-mcp` stdio 服务：客户端里已有的模型理解描述并挑选候选曲目，本服务负责 Apple Music
+检索、精确匹配与账号操作，不内置模型或要求另一份 LLM API key。CLI 保留用于登录、诊断、
+脚本化、体检和高级曲序优化。
 
 ```text
-创建 → 元数据体检 → 抓取音频特征 → 优化曲序 → 重建
+描述 → 策划 → 曲库校验 → dry-run → 创建
 ```
 
 ## 快速开始
 
-直接克隆（无需安装依赖）：
+推荐先安装并登录：
+
+```bash
+pip install "apple-music-playlists @ git+https://github.com/Z-Han-Z/apple-music-playlists.git@v1.2.0"
+am-playlist status
+am-playlist login
+```
+
+在 MCP 客户端注册 `am-mcp`：
+
+```json
+{"mcpServers":{"applemusic":{"command":"am-mcp","env":{"PYTHONIOENCODING":"utf-8"}}}}
+```
+
+然后直接描述结果，例如：
+
+> 创建一张 25 首的雨夜开车歌单，以华语独立和梦幻流行为主，不要现场版，结尾平静一些。
+
+支持 MCP Prompt 的客户端可选择 `create_playlist_from_description`；不显示 Prompt 的客户端
+直接发送同样的自然语言即可，服务端指引和工具会完成“状态 → 搜索 → 预演 → 创建”。
+
+也可以直接克隆（无需安装依赖）：
 
 ```bash
 git clone https://github.com/Z-Han-Z/apple-music-playlists.git
 cd apple-music-playlists
 python am_playlist.py status
 python am_playlist.py login
-python am_playlist.py create --name "我的歌单" --tracks "歌名 A - 艺人 X, 歌名 B - 艺人 Y"
-```
-
-或安装为命令：
-
-```bash
-pip install "apple-music-playlists @ git+https://github.com/Z-Han-Z/apple-music-playlists.git@v1.2.0"
-am-playlist status
-am-playlist login
+python am_mcp_server.py
 ```
 
 安装后可用 `am-playlist` CLI 和 `am-mcp` MCP stdio 服务。开发时在克隆目录执行
@@ -83,7 +98,7 @@ python listening_stats.py top --kind songs --year 2026
 }
 ```
 
-服务提供 11 个工具：状态、搜索、列出/查看歌单、创建、追加、删除、元数据体检、
+服务提供 `create_playlist_from_description` 标准 Prompt 和 11 个工具：状态、搜索、列出/查看歌单、创建、追加、删除、元数据体检、
 听感分析、最近播放和播放次数排行。工具描述为英文/中文，并声明只读与破坏性标记。
 
 Codex、Claude、Cursor、VS Code/Copilot、Gemini CLI、Windsurf、Docker、Cordis/DSH 和 Harness

@@ -32,7 +32,9 @@
 
       ## Apple Music 歌单自动化
 
-      你可以直接操作用户的 Apple Music 账号，工具由 `mcp__applemusic__*` 提供：
+      你可以根据用户的自然语言描述直接策划并创建 Apple Music 歌单，工具由
+      `mcp__applemusic__*` 提供。模型负责理解场景、情绪、年代、流派、排除项和曲序，
+      Apple Music MCP 服务负责搜索校验与账号写入；不要要求用户先提供完整歌曲数组。
 
       - `mcp__applemusic__am_status` —— 先查这个：确认 developer token 有效、且已保存 music-user-token。
         若返回"未登录"，不要反复重试：直接告诉用户，在终端跑一次
@@ -45,6 +47,11 @@
       - `mcp__applemusic__am_recently_played` / `am_top_played` —— 查最近播放、查播放次数排行
         （播放次数来自 Apple Music Replay 后端，只在 amp-api 上可用）。
       - 地区默认用配置里记住的账号地区（登录时自动写入），要欧美曲库时传 `storefront: "us"`。
+
+      工作流：理解描述并合理补足细节 → `am_status` → 提出有明确开场、中段和收尾的候选曲目 →
+      用 `am_search_songs` 校验有歧义的版本 → `am_create_playlist` 先传 `dry_run: true` → 修正未匹配项 →
+      正式创建并报告名称、ID、曲目数与遗漏。除非用户另有要求，优先录音室原版、避免重复，
+      同一艺人通常不超过两首。
 
       规则：**写操作前先 am_status**；**批量建单前先 dry_run 预览**；只有本工具创建的歌单才能被本工具写入
       （Apple 的限制），遇到 403 就这么向用户解释，而不是反复重试。用户说"帮我建个歌单"时，

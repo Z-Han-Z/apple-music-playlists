@@ -34,12 +34,53 @@ SUPPORTED_PROTOCOL_VERSIONS = {
 }
 SERVER_INFO = {"name": "apple-music-playlists", "version": am.VERSION}
 SERVER_INSTRUCTIONS = (
-    "Apple Music playlist tools. Call am_status before writes and use dry_run before "
-    "large creates/additions. am_delete_playlist is destructive and requires confirm=true. "
-    "Only playlists created by this API client can be modified. / "
-    "Apple Music 歌单工具：写入前先调用 am_status，大批量创建或追加前先 dry_run；"
-    "删除具有破坏性，必须显式传 confirm=true；只有本 API 客户端创建的歌单可修改。"
+    "Turn natural-language playlist descriptions into Apple Music playlists: interpret the "
+    "brief, call am_status, propose suitable tracks, verify them with am_search_songs, then call "
+    "am_create_playlist with dry_run=true before the final write. The host client's LLM does the "
+    "curation; this server validates tracks against Apple Music and performs account operations. "
+    "am_delete_playlist is destructive and requires confirm=true. Only playlists created by this "
+    "API client can be modified. / 根据用户的自然语言描述策划 Apple Music 歌单：先理解需求并调用 "
+    "am_status，由客户端模型提出候选曲目，用 am_search_songs 校验，再以 dry_run=true 调用 "
+    "am_create_playlist 预演后正式创建。删除必须 confirm=true；只有本 API 客户端创建的歌单可修改。"
 )
+
+PLAYLIST_PROMPT_NAME = "create_playlist_from_description"
+PROMPTS = [
+    {
+        "name": PLAYLIST_PROMPT_NAME,
+        "title": "Create a playlist from a description / 根据描述创建歌单",
+        "description": (
+            "Curate, validate, preview, and create an Apple Music playlist from a natural-language "
+            "brief. The MCP host's model chooses candidates; Apple Music catalog search verifies them. / "
+            "根据自然语言需求策划、校验、预演并创建 Apple Music 歌单。"
+        ),
+        "arguments": [
+            {
+                "name": "description",
+                "description": (
+                    "The playlist brief: mood, scene, genres, artists, era, language, exclusions, "
+                    "and any sequencing preferences. / 歌单需求描述。"
+                ),
+                "required": True,
+            },
+            {
+                "name": "name",
+                "description": "Optional playlist name; otherwise propose one. / 可选歌单名称。",
+                "required": False,
+            },
+            {
+                "name": "track_count",
+                "description": "Desired track count as text; defaults to 25. / 期望曲目数，默认 25。",
+                "required": False,
+            },
+            {
+                "name": "language",
+                "description": "Language for the plan and final report. / 计划与结果所用语言。",
+                "required": False,
+            },
+        ],
+    }
+]
 
 TOOLS = [
     {
@@ -426,6 +467,48 @@ def _invalid_arguments(rid, message: str) -> dict:
             "error": {"code": -32602, "message": message}}
 
 
+def _render_playlist_prompt(arguments: dict) -> str:
+    description = arguments["description"].strip()
+    name = arguments.get("name", "").strip() or "Propose a concise name that fits the brief"
+    track_count = arguments.get("track_count", "").strip() or "25"
+    language = arguments.get("language", "").strip() or "the user's language"
+    return f"""Create an Apple Music playlist from this brief:
+
+{description}
+
+Requested name: {name}
+Requested size: {track_count} tracks
+Response language: {language}
+
+Use the Apple Music MCP tools to complete the task, not merely to suggest a list:
+1. Interpret the brief. Make reasonable assumptions instead of asking many questions; ask only if a missing choice would materially change the result.
+2. Call am_status before any write. If the user asks for personalization, use am_recently_played or am_top_played as supporting taste signals.
+3. Curate a coherent candidate set. Unless the brief says otherwise, prefer original studio versions, avoid duplicates, keep artist variety (normally no more than two tracks per artist), and shape a deliberate opening, middle, and ending.
+4. Verify ambiguous or uncertain candidates with am_search_songs. Apple catalog search is the source of truth for availability; do not invent catalog IDs.
+5. Call am_create_playlist with dry_run=true using "Title - Artist" strings. Review misses and suspicious matches, revise queries or candidates, and dry-run again when needed.
+6. Once the preview is sound, create the playlist with dry_run=false. If the user explicitly asked only for a plan or preview, stop before this write.
+7. Report the playlist name, ID, track count, unmatched tracks, and any assumptions briefly.
+
+The language model in the MCP client performs the curation. This MCP server does not call or require a separate LLM provider."""
+
+
+def _validate_prompt_arguments(arguments) -> str | None:
+    if not isinstance(arguments, dict):
+        return "prompt arguments must be a JSON object"
+    allowed = {item["name"] for item in PROMPTS[0]["arguments"]}
+    unknown = sorted(set(arguments) - allowed)
+    if unknown:
+        return f"unknown prompt argument(s): {', '.join(unknown)}"
+    if "description" not in arguments:
+        return "missing required prompt argument: description"
+    for key, value in arguments.items():
+        if not isinstance(value, str):
+            return f"prompt argument '{key}' must be string"
+    if not arguments["description"].strip():
+        return "prompt argument 'description' must not be empty"
+    return None
+
+
 def _validate_tool_arguments(name: str, arguments) -> str | None:
     if not isinstance(arguments, dict):
         return "tool arguments must be a JSON object"
@@ -489,7 +572,10 @@ def handle(req: dict):
         selected = want if want in SUPPORTED_PROTOCOL_VERSIONS else PROTOCOL_VERSION
         return {"jsonrpc": "2.0", "id": rid, "result": {
             "protocolVersion": selected,
-            "capabilities": {"tools": {"listChanged": False}},
+            "capabilities": {
+                "tools": {"listChanged": False},
+                "prompts": {"listChanged": False},
+            },
             "serverInfo": SERVER_INFO,
             "instructions": SERVER_INSTRUCTIONS,
         }}
@@ -499,6 +585,23 @@ def handle(req: dict):
         return {"jsonrpc": "2.0", "id": rid, "result": {}}
     if method == "tools/list":
         return {"jsonrpc": "2.0", "id": rid, "result": {"tools": TOOLS}}
+    if method == "prompts/list":
+        return {"jsonrpc": "2.0", "id": rid, "result": {"prompts": PROMPTS}}
+    if method == "prompts/get":
+        name = params.get("name")
+        if name != PLAYLIST_PROMPT_NAME:
+            return _invalid_arguments(rid, f"unknown prompt: {name}")
+        arguments = params.get("arguments", {})
+        error = _validate_prompt_arguments(arguments)
+        if error:
+            return _invalid_arguments(rid, error)
+        return {"jsonrpc": "2.0", "id": rid, "result": {
+            "description": PROMPTS[0]["description"],
+            "messages": [{
+                "role": "user",
+                "content": {"type": "text", "text": _render_playlist_prompt(arguments)},
+            }],
+        }}
     if method == "tools/call":
         name = params.get("name")
         fn = HANDLERS.get(name)

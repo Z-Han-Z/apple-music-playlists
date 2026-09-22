@@ -6,6 +6,26 @@ The supported transport is local MCP over standard input/output. Install the pro
 point the client at `am-mcp`. The server writes protocol messages only to stdout, uses UTF-8, has
 no runtime dependencies, and exposes explicit read-only/destructive tool annotations.
 
+## Description-to-playlist workflow
+
+The intended interaction is a natural-language request such as:
+
+> Make a 20-track Sunday-morning playlist: warm soul, folk, and quiet jazz; mostly 1970s to
+> present; no live recordings; gently increase the energy and end softly.
+
+The LLM in the MCP client turns that brief into candidates. The stdio server then grounds the work
+in Apple Music through `am_status`, `am_search_songs`, and a dry run of `am_create_playlist` before
+the final write. It does not call a separate model provider and needs no LLM API key of its own.
+
+Clients that expose MCP Prompts can select `create_playlist_from_description` and fill in the
+brief, optional name, track count, and response language. A client without Prompt UI support loses
+nothing essential: send the request in ordinary chat, because the same workflow is also present in
+the server instructions and tool descriptions.
+
+The CLI is the companion interface for authentication, diagnostics, automation scripts, audits,
+and manual maintenance; users should not have to assemble a `"Title - Artist"` array for the normal
+MCP flow.
+
 ## 1. Install and authenticate
 
 ```bash

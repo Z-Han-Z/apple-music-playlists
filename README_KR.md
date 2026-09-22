@@ -4,7 +4,12 @@
 [日本語](README_JP.md) | 한국어 | [Español](README_ES.md) |
 [Português do Brasil](README_PT_BR.md) | [Deutsch](README_DE.md) | [Français](README_FR.md)
 
-**명령줄 또는 MCP 호환 에이전트에서 Apple Music 플레이리스트를 만들고, 진단하고, 곡 순서를 최적화합니다.**
+**원하는 플레이리스트를 설명하면 MCP 에이전트가 선곡하고 Apple Music에서 검증·미리보기 후 생성합니다.**
+
+기본 인터페이스는 로컬 `am-mcp` stdio 서비스입니다. MCP 클라이언트의 모델이 자연어 요청을
+해석하고, 이 서비스가 카탈로그 검색, 정확한 곡 매칭 및 계정 작업을 담당합니다. 별도의 LLM이나
+API 키가 필요하지 않습니다. Prompt 지원 클라이언트에서는 `create_playlist_from_description`을
+선택할 수 있고, 그 외 클라이언트에서는 같은 설명을 채팅으로 보내면 됩니다.
 
 Python 3.10 이상과 Windows / macOS / Linux를 지원합니다. 런타임에는 Python 표준 라이브러리만
 사용합니다. 기본 설정은 Apple 웹 플레이어의 공개 developer token을 자동으로 가져오므로

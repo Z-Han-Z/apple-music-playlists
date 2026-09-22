@@ -4,7 +4,11 @@
 [日本語](README_JP.md) | [한국어](README_KR.md) | [Español](README_ES.md) |
 [Português do Brasil](README_PT_BR.md) | [Deutsch](README_DE.md) | [Français](README_FR.md)
 
-**從命令列或支援 MCP 的 Agent 建立、檢查並重排 Apple Music 歌單。**
+**描述想聽的歌單；MCP Agent 負責策劃、在 Apple Music 逐首驗證、預演並建立。**
+
+主要入口是本機 `am-mcp` stdio 服務。MCP 客戶端既有的模型理解自然語言描述並挑選候選曲目；
+本服務負責目錄搜尋、精確配對和帳號操作，不內建模型，也不需要另一組 LLM API key。
+支援 Prompt 的客戶端可選 `create_playlist_from_description`，其他客戶端直接輸入描述即可。
 
 需要 Python 3.10+，執行時只使用標準庫，支援 Windows / macOS / Linux。預設可自動取得
 Apple 網頁播放器的公開 developer token，不必加入 Apple Developer Program。本專案不附帶
