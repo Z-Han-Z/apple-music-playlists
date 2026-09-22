@@ -433,29 +433,73 @@ def harvest_from_windows_app() -> str | None:
 # ---------------------------------------------------------------- 功能
 
 def cmd_status(args) -> int:
+    """报告两个令牌的状态。
+
+    developer token 是 JWT，能解出确切的过期时间；music-user-token 是不透明字符串，
+    **没有可解析的过期时间**，只能实调验证——所以这里会真的打几个接口。
+    """
     cfg = load_config()
-    print(f"配置文件: {CONFIG_PATH}")
-    print(f"存在: {CONFIG_PATH.exists()}")
+    now = int(time.time())
+
+    def ts(x):
+        return time.strftime("%Y-%m-%d %H:%M", time.gmtime(x)) + " UTC"
+
+    print(f"配置文件 : {CONFIG_PATH}")
+    print(f"现在     : {ts(now)}")
+
+    print("\n── developer token（网页播放器内嵌的公开 token）")
     tok = cfg.get("developer_token")
-    if tok:
+    if not tok:
+        print("   未保存 —— 运行任意命令会自动抓取")
+    else:
         try:
             c = jwt_claims(tok)
-            left = c["exp"] - time.time()
-            print(f"developer token: {'有效' if left > 0 else '已过期'} "
-                  f"(iss={c.get('iss')}, 剩余 {left/86400:.1f} 天)")
+            left = c.get("exp", 0) - now
+            print(f"   iss    : {c.get('iss')}")
+            print(f"   iat    : {ts(c['iat'])}")
+            print(f"   exp    : {ts(c['exp'])}")
+            print(f"   剩余   : {left/86400:.2f} 天")
+            print(f"   状态   : {'✅ 有效' if left > 0 else '❌ 已过期'}")
+            if 0 < left < 86400:
+                print("   ⚠️ 不足 1 天；下次运行会自动重抓，无需手动处理")
         except Exception:
-            print("developer token: 解析失败")
+            print("   ❌ 无法解析 —— 删掉配置里的 developer_token 可触发重抓")
+
+    print("\n── music-user-token（你的账号登录态）")
+    user = get_user_token(cfg)
+    if not user:
+        print("   未保存 —— 运行 python am_playlist.py login")
     else:
-        print("developer token: 无（运行任意命令会自动抓取）")
-    u = get_user_token(cfg)
-    src = "环境变量" if os.environ.get("APPLE_MUSIC_USER_TOKEN") else "配置文件"
-    print(f"music-user-token: {'已保存（来自' + src + '）' if u else '无 —— 请先运行 login'}")
-    if tok and u:
-        try:
-            st, body = api("GET", "/me/storefront", dev=tok, user=u)
-            print(f"在线校验: OK (HTTP {st}) {body[:120]}")
-        except ApiError as e:
-            print(f"在线校验: 失败 → {e.status} {e.body[:200]}")
+        src = ("环境变量 APPLE_MUSIC_USER_TOKEN"
+               if os.environ.get("APPLE_MUSIC_USER_TOKEN") else "配置文件")
+        saved = cfg.get("music_user_token_saved_at")
+        print(f"   来源   : {src}")
+        print(f"   长度   : {len(user)} 字符")
+        if saved:
+            print(f"   保存于 : {ts(saved)}（{(now - saved)/86400:.1f} 天前）")
+        print("   注意   : 不透明字符串，**没有可解析的过期时间**（官方只说约 6 个月），")
+        print("            唯一可靠的判断方式是实调 ↓")
+
+    if tok and user:
+        print("\n── 在线校验（实调，可靠依据）")
+        checks = [
+            ("读账号信息", API_ROOT, "/me/storefront", None),
+            ("读音乐库", API_ROOT, "/me/library/playlists", {"limit": 1}),
+            ("读最近播放", API_ROOT, "/me/recent/played/tracks", {"limit": 1}),
+            ("播放次数", AMP_ROOT, "/me/music-summaries/search", {"period": "year,all-time"}),
+        ]
+        passed = 0
+        for label, root, path, q in checks:
+            try:
+                st, _ = api("GET", path, dev=tok, user=user, root=root, query=q)
+                print(f"   ✅ {label:<10} HTTP {st}")
+                passed += 1
+            except ApiError as e:
+                hint = {401: "developer token 无效",
+                        403: "music-user-token 失效 → 重新 login"}.get(e.status, "")
+                print(f"   ❌ {label:<10} HTTP {e.status}  {hint}")
+        print(f"   {passed}/{len(checks)} 通过 → "
+              + ("两个令牌都可用" if passed == len(checks) else "见上面的提示"))
     return 0
 
 
