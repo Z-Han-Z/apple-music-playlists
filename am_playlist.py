@@ -52,6 +52,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from am_paths import VERSION, cache_dir, config_dir, enable_utf8_stdout  # noqa: E402
+from playlist_core import marker_hits  # noqa: E402
 
 # Windows 控制台默认 GBK，强制 UTF-8 以免中文乱码（唯一实现在 am_paths）
 enable_utf8_stdout()
@@ -572,20 +573,14 @@ VERSION_NOISE_CJK = ("现场", "演唱会", "伴奏", "翻唱", "重制", "纯�
 # 保留这个名字：文档里用它指代"版本后缀扣分"这件事
 VERSION_NOISE = VERSION_NOISE_WORDS + VERSION_NOISE_CJK
 
-_NOISE_RE = re.compile(
-    r"\b(?:" + "|".join(re.escape(w) for w in VERSION_NOISE_WORDS) + r")\b", re.I)
-
 
 def version_noise_hits(title: str) -> list[str]:
     """曲名里命中了哪些"版本后缀"，返回小写词表。
 
-    调用方拿它跟查询词比对，决定要不要扣分——所以这里只负责"命中什么"，
-    不负责"该不该扣"。
+    匹配机制来自 `playlist_core.marker_hits`（拉丁词整词、CJK 子串）——和器乐标记
+    共用同一套机制，但**词表是分开的**：`Live` 是版本后缀，不是器乐标记。
     """
-    low = (title or "").lower()
-    hits = [w for w in VERSION_NOISE_CJK if w in low]
-    hits += [m.group(0).lower() for m in _NOISE_RE.finditer(low)]
-    return hits
+    return marker_hits(title, VERSION_NOISE_WORDS, VERSION_NOISE_CJK)
 
 
 def best_song_match(query: str, songs: list[dict]) -> dict | None:

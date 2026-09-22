@@ -127,7 +127,7 @@ class TestSingleSourceOfTruth(unittest.TestCase):
         src = (ROOT / "playlist_core.py").read_text(encoding="utf-8")
         mods = {m.group(1).split(".")[0]
                 for m in re.finditer(r"^\s*(?:from|import)\s+([\w.]+)", src, re.M)}
-        self.assertEqual(mods - {"__future__", "statistics"}, set(),
+        self.assertEqual(mods - {"__future__", "re", "statistics"}, set(),
                          f"playlist_core 依赖了不该依赖的东西：{mods}")
 
 
@@ -256,6 +256,91 @@ class TestCoverageReport(unittest.TestCase):
 
     def test_missing_keys_are_treated_as_zero(self):
         self.assertIn("50/100", core.coverage_report({"ok": 50}, 100))
+
+
+class TestMarkerHits(unittest.TestCase):
+    """标记词匹配：拉丁词整词、CJK 子串。机制被两处共用，词表各自独立。"""
+
+    def test_latin_words_match_whole_only(self):
+        self.assertEqual(core.instrumental_hits("Instinct"), [])
+        self.assertEqual(core.instrumental_hits("Olive Tree"), [])
+        self.assertEqual(core.instrumental_hits("Delivery"), [])
+
+    def test_latin_markers_hit(self):
+        for title in ("Song (Instrumental)", "Off Vocal", "OffVocal", "Off-Vocal",
+                      "Karaoke Version", "Backing Track"):
+            self.assertTrue(core.instrumental_hits(title), f"{title!r} 没被识别")
+
+    def test_cjk_markers_match_as_substring(self):
+        self.assertTrue(core.instrumental_hits("某曲 伴奏"))
+        self.assertTrue(core.instrumental_hits("纯音乐集"))
+        self.assertTrue(core.instrumental_hits("カラオケ"))
+
+    def test_empty_input(self):
+        self.assertEqual(core.instrumental_hits(""), [])
+        self.assertEqual(core.instrumental_hits(None), [])
+
+    def test_marker_vocabulary_is_not_empty(self):
+        self.assertTrue(core.INSTRUMENTAL_WORDS)
+        self.assertTrue(core.INSTRUMENTAL_CJK)
+
+
+class TestClassifyVocality(unittest.TestCase):
+    """人声/器乐判定：给"排除纯音乐、伴奏"用。
+
+    三种信号可信度差得很远，所以不压成一个布尔——不确定就返回 unknown，
+    而不是假装知道。
+    """
+
+    def test_title_marker_is_decisive(self):
+        self.assertEqual(core.classify_vocality("Song (Instrumental)"),
+                         core.INSTRUMENTAL_MARKED)
+        self.assertEqual(core.classify_vocality("某曲 伴奏"), core.INSTRUMENTAL_MARKED)
+
+    def test_title_marker_outranks_everything(self):
+        """标题写着伴奏，就算歌词源返回了东西也仍然算标记命中——先命中先返回。"""
+        self.assertEqual(
+            core.classify_vocality("Song (Karaoke)", lyrics_found=True),
+            core.INSTRUMENTAL_MARKED)
+
+    def test_lyrics_found_proves_vocal(self):
+        self.assertEqual(core.classify_vocality("Normal", lyrics_found=True), core.VOCAL)
+
+    def test_checked_and_absent_means_likely_instrumental(self):
+        self.assertEqual(core.classify_vocality("Normal", lyrics_found=False),
+                         core.INSTRUMENTAL_UNMARKED)
+
+    def test_short_track_is_an_interlude(self):
+        self.assertEqual(core.classify_vocality("Intro", duration_ms=45_000),
+                         core.INTERLUDE)
+
+    def test_interlude_wins_over_no_lyrics(self):
+        self.assertEqual(
+            core.classify_vocality("Intro", lyrics_found=False, duration_ms=45_000),
+            core.INTERLUDE)
+
+    def test_apple_flag_alone_is_not_a_verdict(self):
+        """Apple 的歌词覆盖只有 65%，缺口集中在原声/爵士——那可能真是器乐，
+        也可能是没收录。单独出现时不该冒充结论。"""
+        self.assertEqual(core.classify_vocality("Normal", has_apple_lyrics=False),
+                         core.UNKNOWN)
+
+    def test_nothing_known_is_unknown(self):
+        self.assertEqual(core.classify_vocality("Normal"), core.UNKNOWN)
+
+    def test_every_class_has_a_label(self):
+        for key in (core.VOCAL, core.INSTRUMENTAL_MARKED, core.INSTRUMENTAL_UNMARKED,
+                    core.INTERLUDE, core.UNKNOWN):
+            self.assertIn(key, core.VOCALITY_LABELS)
+
+    def test_report_counts_the_excludable(self):
+        txt = core.vocality_report(
+            {core.VOCAL: 40, core.INSTRUMENTAL_MARKED: 3, core.INTERLUDE: 2}, 45)
+        self.assertIn("40", txt)
+        self.assertIn("可排除上面 5 首", txt)
+
+    def test_report_handles_empty(self):
+        self.assertIn("没有曲目", core.vocality_report({}, 0))
 
 
 if __name__ == "__main__":
