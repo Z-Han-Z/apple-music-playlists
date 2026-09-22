@@ -38,7 +38,8 @@ UI 时遵循同一流程：
 | 建歌单 / 加歌 / 查曲目 | MCP 工具（`am_*`）或 `am_playlist.py` |
 | "这张歌单怎么样" | `am_audit_playlist`（元数据层）+ `am_analyze_flow`（听感层） |
 | "帮我排一下顺序" | `am_optimize_order`（MCP，见 §三）；离线/脚本化才用 `playlist_optimize.py` |
-| "我库里有什么" / 挑候选曲池 | `am_playlist.py library` + `build_pool.py`（见 §五） |
+| "我库里有什么" | `am_playlist.py library` |
+| "按我最近和以前爱听的歌来做" | `am_recently_played` + `am_top_played`；离线汇总可用 `build_pool.py` |
 | 排查 API 报错 | 先看 §四 |
 
 **MCP 工具（13 个）**
@@ -79,7 +80,8 @@ python am_playlist.py add --playlist "X" --tracks "..."
 python am_playlist.py delete "X" --yes
 python am_playlist.py library                # 导出整个音乐库（含 ISRC）
 
-python build_pool.py --tag my-pool --cap 130 # 从自己库里挑候选池 + 抓特征
+python build_pool.py --tag old-and-new --years 2026 2023 2021
+# 合并最近播放与多个 Replay 年份，只生成事实证据；最终取舍仍由 LLM 完成
 python playlist_audit.py     "歌单名"              # 元数据层体检
 python playlist_flow.py      "歌单名" [--refresh]  # 听感层体检（联网抓特征）
 python playlist_optimize.py  清单.json [-o 输出.json] [--features 缓存.json] [--arc 形状]

@@ -18,8 +18,8 @@ am_meta.py               ← Apple：catalog 元数据
 am_library.py            ← Apple：音乐库导出
 playlist_audit.py        ← Apple：元数据体检
 listening_stats.py       ← Apple：播放历史
-profile_library.py       ← Apple：口味画像
-build_pool.py            ← Apple：候选池
+profile_library.py       ← Apple：播放样本的描述性画像
+build_pool.py            ← Apple：跨时期收听证据归一化
 ```
 
 `tests/test_rules.py::TestSingleSourceOfTruth` 和
@@ -35,12 +35,12 @@ build_pool.py            ← Apple：候选池
 |---|---|---|
 | `track_ref(id) -> TrackRef` | 核心 | 见下方"可移植身份" |
 | `search(query) -> [TrackRef]` | 建歌单 | 需要版本后缀打分（`best_song_match`） |
-| `catalog_meta(ids)` | 体检、画像、候选池 | 至少要能给出 ISRC / 年 / 流派 |
-| `library_songs()` | 候选池 | 分页；"材料够杂"的原料 |
+| `catalog_meta(ids)` | 体检、画像、收听证据 | 至少要能给出 ISRC / 年 / 流派 |
+| `library_songs()` | 完整音乐库导出 | 分页；它不是自动扩展候选的理由 |
 | `playlist_list()` / `playlist_show(id)` | 体检 | |
 | `playlist_create(name, ids)` | 建歌单 | **必须一次性带上曲目**（见 Apple 的 iCloud 传播延迟） |
 | `playlist_add(id, ids)` / `playlist_delete(id)` | 维护 | |
-| `recently_played()` / `top_played(period, kind)` | 画像、候选池 | 播放次数是最强的"你实际在听什么"信号 |
+| `recently_played()` / `top_played(period, kind)` | 画像、收听证据 | 保留时间与次数，让 LLM 结合用户描述解释，不直接产出主题分 |
 | `auth_status()` / `login()` | 全部 | 各平台形态完全不同，不强行统一 |
 
 ## 最硬的一个约束：可移植身份
@@ -52,7 +52,7 @@ Apple 曲目 ──► ISRC ──► reccobeats ──► tempo/key/energy/vale
 ```
 
 Apple 会给 ISRC，但**只有 88%**（实测 1581 首里 1395 首）。剩下的 12% 曾经是被
-**静默丢掉**的——它们进不了候选池、进不了体检表，而且不报错。
+**静默丢掉**的——它们进不了音频特征分析、进不了体检表，而且不报错。
 （这一点已经改了：现在按原因报告，见本节末尾。）
 
 这不是小问题：它就是接下一个平台时最先崩的地方。
@@ -67,7 +67,7 @@ Apple 会给 ISRC，但**只有 88%**（实测 1581 首里 1395 首）。剩下�
 
 **这一条已经落地了。** 覆盖率现在按**原因**分解
 （`playlist_core.COVERAGE_STAGES` / `classify_coverage()` / `coverage_report()`），
-体检、优化器、候选池三条路都会打印它，低于 90% 时明确警告"cost 只描述了能测量的那部分
+体检和优化器都会打印它，低于 90% 时明确警告"cost 只描述了能测量的那部分
 曲目"。实测某账号的音乐库：1581 首里 **186 首没有 ISRC（11.8%）**——这部分是硬损失。
 
 接新平台时要做的，是**照着 `COVERAGE_STAGES` 把新平台的失败原因填进去**，

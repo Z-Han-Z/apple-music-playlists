@@ -198,7 +198,8 @@ class TestBuildPoolIsDistributable(unittest.TestCase):
       2. 读 refs/library-songs.json —— 而**仓库里没有任何代码生成过这个文件**，
          它还被 gitignore 了。于是对新克隆的人来说必然 FileNotFoundError。
 
-    现在它必须是：可 import、有 main()、用 argparse、不依赖仓库内 refs/。
+    现在它必须是：可 import、有 main()、用 argparse、不依赖仓库内 refs/；同时只做
+    收听历史证据归一化，不再以偏爱艺人或“补杂”算法替 LLM 选曲。
     """
 
     def setUp(self):
@@ -221,14 +222,55 @@ class TestBuildPoolIsDistributable(unittest.TestCase):
             self.assertNotIn('"refs"', line,
                              f"build_pool 不该再用仓库内的 refs/：{line.strip()}")
 
-    def test_uses_the_shared_library_accessor(self):
-        """缓存文件名必须由 am_library 决定，不能在这里再拼一次。"""
-        self.assertIn("import am_library", self.src)
+    def test_is_evidence_collector_not_semantic_selector(self):
+        self.assertIn("import listening_stats", self.src)
         for line in self.src.splitlines():
             if line.lstrip().startswith("#"):
                 continue
             self.assertNotIn("library-songs.json", line,
                              f"缓存文件名不该在 build_pool 里硬编码：{line.strip()}")
+            self.assertNotIn("top_artists", line,
+                             f"证据池不应按偏爱艺人扩展候选：{line.strip()}")
+            self.assertNotIn('"filler"', line,
+                             f"证据池不应以补杂算法替 LLM 选曲：{line.strip()}")
+
+
+class TestHistoryEvidenceMerge(unittest.TestCase):
+    def test_replay_parser_keeps_missing_dates_missing(self):
+        import listening_stats
+
+        rows = listening_stats.parse_summaries([
+            {"id": "eWVhci0yMDI2LXNvbmctMQ", "attributes": {"playCount": 3},
+             "relationships": {"song": {"data": [{"id": "1"}]}}},
+        ], "songs")
+        self.assertEqual(rows[0]["firstPlayed"], "")
+        self.assertEqual(rows[0]["lastPlayed"], "")
+
+    def test_merges_recent_and_multiple_replay_periods_without_scoring(self):
+        import build_pool
+
+        recent = [
+            {"id": "1", "attributes": {"name": "Now", "artistName": "A"}},
+            {"id": "2", "attributes": {"name": "Again", "artistName": "B"}},
+        ]
+        periods = {
+            "year-2026": [{"id": "1", "playCount": 12,
+                            "firstPlayed": "2026-01-02", "lastPlayed": "2026-08-01"}],
+            "year-2022": [{"id": "1", "playCount": 40,
+                            "firstPlayed": "2022-02-03", "lastPlayed": "2022-12-20"},
+                           {"id": "3", "name": "Then", "artist": "C", "playCount": 22,
+                            "firstPlayed": "2022-03-01", "lastPlayed": "2022-09-09"}],
+        }
+
+        rows = build_pool.merge_history_evidence(recent, periods)
+        self.assertEqual([r["cid"] for r in rows], ["1", "2", "3"])
+        first = rows[0]
+        self.assertEqual(first["evidence"]["recent_rank"], 1)
+        self.assertEqual(first["evidence"]["periods"]["year-2022"]["play_count"], 40)
+        self.assertEqual(first["evidence"]["first_played"], "2022-02-03")
+        self.assertEqual(first["evidence"]["last_played"], "2026-08-01")
+        self.assertNotIn("score", first)
+        self.assertNotIn("bucket", first)
 
 
 class TestCliEntryPoints(unittest.TestCase):

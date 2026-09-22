@@ -272,7 +272,7 @@ def tempo_target(n: int) -> list[float]:
 #
 # 以前这件事散落在几处 `continue` 里，而且被压成一个笼统的 miss：
 #   · playlist_flow   `if not f or f.get("_miss") or "tempo" not in f: continue`
-#   · build_pool      "N 首查不到音频特征，已被排除"
+#   · 旧 build_pool   "N 首查不到音频特征，已被排除"（现已改为不依赖特征的证据池）
 #   · profile_library 反而做对了，它分了 "no-isrc" 和 "reccobeats" 两种
 # 只有 profile_library 做对，恰恰说明这不是能力问题，而是定义没有归属。
 #

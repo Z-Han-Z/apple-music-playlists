@@ -5,12 +5,9 @@ am_library.py — 读取并缓存**用户自己的音乐库**。
 
 为什么需要这个模块
 ------------------
-`build_pool.py` 一直依赖 `refs/library-songs.json`，但**仓库里没有任何代码
-生成过这个文件**（而且 refs/ 被 gitignore 了）。也就是说那个脚本对任何新
-克隆的人都是必然的 FileNotFoundError —— 它不是"没写好"，是缺了一整环。
-
-顺带说，"库里有什么"本身就是通用能力：它是"材料要够杂、气质要统一"这条
-策展原则的原料。没有它，选曲只能从外部搜索来，做不出"从你自己的收藏里选"。
+“库里有什么”本身就是独立能力：它支持完整导出、查重、覆盖率检查，以及由 LLM
+按用户描述从自己的收藏中策划。早期 `build_pool.py` 曾直接依赖一份不存在的
+`refs/library-songs.json`；集中到这里后，分页、缓存与元数据补全有了唯一实现。
 
 缓存与网络
 ----------
@@ -151,7 +148,7 @@ def ensure_library_songs(dev: str, user: str, sf: str, *, refresh: bool = False,
     items = fetch_library_songs(dev, user, sf, limit=limit, quiet=quiet)
     if limit is not None:
         # 部分拉取**不能**写缓存：否则一份残缺的库会覆盖完整缓存，
-        # 之后 build_pool 会以为你的库只有这么多歌，而且它不会报错。
+        # 之后的完整库导出会误把部分结果当成全部，而且不会报错。
         if not quiet:
             print(f"（--limit {limit} 是部分拉取，按约定不写缓存）", file=sys.stderr)
         return items
@@ -164,7 +161,7 @@ def ensure_library_songs(dev: str, user: str, sf: str, *, refresh: bool = False,
 
 
 def library_report(items: list[dict], top: int = 15) -> str:
-    """给一个可读的库概览，便于快速判断"素材够不够杂"。"""
+    """给一个可读的事实概览，不替调用方判断选曲方向。"""
     from collections import Counter
     if not items:
         return "音乐库是空的（或没能读到）。"

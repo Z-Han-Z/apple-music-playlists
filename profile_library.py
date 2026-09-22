@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-profile_library.py — 给你最常听的歌做「声音画像」
+profile_library.py — 描述最常播放样本的「声音画像」
 
-思路：不看流派标签，直接抓音频特征，找出一批歌**共同的声音特征**，
-再据此命名一个主题。这比"按流派抓歌"更能反映真实听感。
+它报告样本的中位数、范围和相对分布，供人或 LLM 理解收听证据；不替用户定义
+“品味”，也不据此决定歌单主题。高/低象限始终是相对本次样本中位数而言。
 
 数据来源：
   · 播放次数 → /me/music-summaries/<period>/view/top-songs
@@ -27,6 +27,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import am_paths as ap  # noqa: E402
 import am_playlist as am  # noqa: E402
+import listening_stats as stats  # noqa: E402
 import playlist_flow as pf  # noqa: E402
 from am_meta import catalog_meta  # noqa: E402
 
@@ -55,27 +56,11 @@ def load_profile(year: int) -> list[dict] | None:
 
 
 def replay_top(period: str, dev: str, user: str, want: int) -> list[dict]:
-    """取播放次数排行，返回 [{cid, plays}]。一次最多 50 条/页。"""
-    out, off = [], 0
-    while len(out) < want:
-        st, body = am.api("GET", f"/me/music-summaries/{period}/view/top-songs",
-                          dev=dev, user=user, root=am.AMP_ROOT,
-                          query={"limit": 50, "offset": off})
-        j = json.loads(body)
-        page = j.get("data", [])
-        if not page:
-            break
-        for x in page:
-            a = x.get("attributes", {})
-            rel = ((x.get("relationships") or {}).get("song") or {}).get("data") or []
-            if rel:
-                out.append({"cid": rel[0].get("id"), "plays": a.get("playCount"),
-                            "first": str(a.get("firstPlayed"))[:10],
-                            "last": str(a.get("lastPlayed"))[:10]})
-        off += len(page)
-        if not j.get("next"):
-            break
-    return out[:want]
+    """取播放次数排行；认证、分页与 Replay 解析由 listening_stats 统一实现。"""
+    items = stats.fetch_top("songs", period, dev, user, want)
+    return [{"cid": row.get("id"), "plays": row.get("playCount"),
+             "first": row.get("firstPlayed"), "last": row.get("lastPlayed")}
+            for row in stats.parse_summaries(items, "songs") if row.get("id")]
 
 
 def main() -> int:
@@ -163,7 +148,7 @@ def report(prof: list[dict]) -> int:
 
     # 情绪四象限
     if ok:
-        print("\n── 情绪四象限（valence × energy，各以中位为界）")
+        print("\n── 样本内相对四象限（valence × energy，各以本次样本中位数为界）")
         vm = statistics.median([p["valence"] for p in ok])
         em = statistics.median([p["energy"] for p in ok])
         q = Counter()

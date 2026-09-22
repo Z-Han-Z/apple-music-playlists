@@ -47,6 +47,13 @@ ap.enable_utf8_stdout()
 # music-summaries 走 web 主机更稳
 ROOT = am.AMP_ROOT
 
+RECENT_ENDPOINTS = {
+    "tracks": ("/me/recent/played/tracks", ROOT),
+    "played": ("/me/recent/played", ROOT),
+    "stations": ("/me/recent/radio-stations", ROOT),
+    "added": ("/me/library/recently-added", ROOT),
+}
+
 
 def b64(s: str) -> str:
     """music-summaries 的 id 是 base64 编码的可读串，如 year-2026-song-1657318884。"""
@@ -65,22 +72,33 @@ def _rel(it: dict, name: str) -> dict:
     return d or {}
 
 
-def summarize(items: list[dict], kind: str, sf: str, dev: str) -> list[dict]:
-    """把 song/album/artist-period-summaries 解析成 {name, artist, playCount, ...}。"""
-    ids, parsed = [], []
+def _date(value) -> str:
+    """Normalize Replay timestamps without turning missing values into the string 'None'."""
+    return str(value)[:10] if value else ""
+
+
+def parse_summaries(items: list[dict], kind: str) -> list[dict]:
+    """Purely parse Replay resources, retaining dates/counts without catalog requests."""
+    parsed = []
     for it in items:
         a = it.get("attributes", {})
         res = _rel(it, kind) or _rel(it, kind.rstrip("s"))
         rid = res.get("id")
-        if rid:
-            ids.append(rid)
         parsed.append({
             "id": rid,
             "playCount": a.get("playCount"),
-            "firstPlayed": str(a.get("firstPlayed"))[:10],
-            "lastPlayed": str(a.get("lastPlayed"))[:10],
-            "_fallback": b64(it.get("id", "")),
+            "firstPlayed": _date(a.get("firstPlayed")),
+            "lastPlayed": _date(a.get("lastPlayed")),
+            "name": b64(it.get("id", "")),
+            "artist": "",
         })
+    return parsed
+
+
+def summarize(items: list[dict], kind: str, sf: str, dev: str) -> list[dict]:
+    """把 song/album/artist-period-summaries 解析成 {name, artist, playCount, ...}。"""
+    parsed = parse_summaries(items, kind)
+    ids = [p["id"] for p in parsed if p.get("id")]
 
     meta = {}
     for i in range(0, len(ids), 100):
@@ -94,7 +112,7 @@ def summarize(items: list[dict], kind: str, sf: str, dev: str) -> list[dict]:
 
     for p in parsed:
         a = meta.get(p["id"], {})
-        p["name"] = a.get("name") or p["_fallback"]
+        p["name"] = a.get("name") or p["name"]
         p["artist"] = a.get("artistName") or a.get("albumArtistName") or ""
     return parsed
 
@@ -121,6 +139,16 @@ def fetch_top(kind: str, period: str, dev: str, user: str, want: int) -> list[di
     return out[:want]
 
 
+def fetch_recent(kind: str, dev: str, user: str, want: int) -> list[dict]:
+    """Return recent-play resources without turning their order into a taste score."""
+    if kind not in RECENT_ENDPOINTS:
+        raise ValueError(f"unsupported recent kind: {kind}")
+    path, root = RECENT_ENDPOINTS[kind]
+    _, body = am.api("GET", path, dev=dev, user=user, root=root,
+                     query={"limit": min(100, max(1, want))})
+    return json.loads(body).get("data", [])[:want]
+
+
 def cmd_periods(args) -> int:
     cfg = am.load_config()
     dev = am.get_developer_token(cfg)
@@ -139,16 +167,7 @@ def cmd_recent(args) -> int:
     dev = am.get_developer_token(cfg)
     user = am.require_user(cfg)
     what = args.kind
-    paths = {
-        "tracks": ("/me/recent/played/tracks", ROOT),
-        "played": ("/me/recent/played", ROOT),
-        "stations": ("/me/recent/radio-stations", ROOT),
-        "added": ("/me/library/recently-added", ROOT),
-    }
-    path, root = paths[what]
-    _, body = am.api("GET", path, dev=dev, user=user, root=root,
-                     query={"limit": min(100, args.limit)})
-    data = json.loads(body).get("data", [])
+    data = fetch_recent(what, dev, user, args.limit)
     print(f"=== 最近{'播放的曲目' if what=='tracks' else {'played':'播放','stations':'电台','added':'加入音乐库'}[what]}"
           f"（{len(data)} 条，接口不提供播放次数）===")
     for i, t in enumerate(data, 1):
