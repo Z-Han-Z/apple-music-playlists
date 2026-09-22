@@ -194,6 +194,7 @@ More in [`docs/apple-music-api-notes.md`](docs/apple-music-api-notes.md) and
 | [`docs/apple-music-api-notes.md`](docs/apple-music-api-notes.md) | Token model, endpoint contracts, measured API behaviour, eval of 7 automation approaches |
 | [`docs/how-to-build-a-good-playlist.md`](docs/how-to-build-a-good-playlist.md) | Curation methodology: adjacency physics, arc data, six narrative shapes, the ISO principle |
 | [`docs/playlist-curation-survey.md`](docs/playlist-curation-survey.md) | Survey of published curation guidance (platform rules, DJ methods, academic findings) |
+| [`docs/platform-adapters.md`](docs/platform-adapters.md) | The platform-adapter boundary: what is platform-neutral, what an adapter must provide, and what breaks on a service that exposes no ISRC |
 | [`skill/`](skill/) | Agent skill: workflow + the accumulated gotcha list |
 | [`preset/`](preset/) | Cordis agent preset template that mounts the MCP server |
 
