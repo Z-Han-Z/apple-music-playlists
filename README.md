@@ -105,6 +105,74 @@ including a zero-dependency one).
 
 ---
 
+## A real curation demo: *A Machine Dreams It Is Human*
+
+This is deliberately harder than “make me a workout playlist.” The brief asks music to carry a
+plot, and some of its constraints cannot be expressed as tempo or mood sliders:
+
+> Build a 12-track, three-act story in which a machine wakes in a city, mistakes attention for
+> intimacy, asks to be touched, becomes vulnerable, and sees dawn. Cross electronic music and art
+> pop from the late 1970s to the present; use one track per artist, studio recordings only, and let
+> the voices become progressively more human. The ending must feel quiet and earned, not merely
+> low-energy.
+
+The run below used the public US Apple Music catalog on 2026-09-23. It did not read or write a
+private library.
+
+```text
+22 LLM-proposed candidates
+└─ 22 catalog matches returned exact title, artist, album, date, ISRC, and version metadata
+   ├─ rejected: “Open Eye Signal (Mixed)” — resolved to a 2025 DJ Mix, not the studio cut
+   ├─ rejected: “Deeper Understanding (2018 Remaster)” — not the requested original recording
+   └─ 12 final selections
+
+Final create dry-run:       12/12 matched; no write performed
+Audio-feature coverage:     12/12 usable (100%)
+Flow cost, narrative locks: 44.14 → 41.14
+```
+
+| Act | Grounded order | What the sequence is doing |
+|---|---|---|
+| **I — Boot** | The Robots — Kraftwerk<br>Technopolis — Yellow Magic Orchestra<br>Kid A — Radiohead | A body, then a city, then an unstable first-person voice. |
+| **II — Desire** | Oblivion — Grimes<br>Digital Witness — St. Vincent<br>Is It Cold In The Water? — SOPHIE<br>Touch — Daft Punk & Paul Williams<br>All Is Full of Love — Björk | Public attention becomes bodily risk, transformation, a request for contact, and finally an answer. |
+| **III — Re-entry** | Cellophane — FKA twigs<br>Retrograde — James Blake<br>Long Road Home — Oneohtrix Point Never<br>An Ending (Ascent) — Brian Eno | The synthetic shell fails; retreat becomes return, and the story lands at dawn. |
+
+The interesting failure happened during ordering. With only the three acts locked, the numerical
+optimizer cut the measured cost from `48.28` to `14.88` — but put **Retrograde** after the dawn and
+made **All Is Full of Love** answer a request that had not happened yet. That is cheaper and worse.
+The host model therefore added semantic beat boundaries (`request → answer`, `return → dawn`) and
+let `am_optimize_order` make only local changes inside those boundaries. Selection and story stayed
+linguistic; BPM, key, energy, and valence remained supporting evidence.
+
+<details>
+<summary>Final dry-run input</summary>
+
+```json
+[
+  "The Robots - Kraftwerk",
+  "Technopolis - Yellow Magic Orchestra",
+  "Kid A - Radiohead",
+  "Oblivion - Grimes",
+  "Digital Witness - St. Vincent",
+  "Is It Cold In The Water? - SOPHIE",
+  "Touch - Daft Punk",
+  "All Is Full of Love - Björk",
+  "Cellophane - FKA twigs",
+  "Retrograde - James Blake",
+  "Long Road Home - Oneohtrix Point Never",
+  "An Ending (Ascent) - Brian Eno"
+]
+```
+
+</details>
+
+This is the normal MCP workflow: the host model interprets the brief and proposes more candidates
+than it needs; `am_resolve_candidates` grounds them; the model chooses and assigns narrative roles;
+`am_optimize_order` optionally checks local flow without crossing semantic boundaries; and
+`am_create_playlist(dry_run=true)` verifies the exact final recordings before the write.
+
+---
+
 ## What's in the box
 
 | File | Purpose |

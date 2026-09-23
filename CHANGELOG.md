@@ -19,6 +19,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   pinned, and registry metadata is never published before its PyPI package exists.
 - Added complete community-health files, issue forms, a pull-request template, a shared social
   preview, Glama discovery metadata, and richer MCP tool titles/descriptions.
+- Added a fully executed README curation demo built from a difficult three-act brief, including
+  candidate/version rejection, 100% audio-feature coverage, narrative locks, and the final 12/12
+  catalog dry run.
 
 ### Changed
 
