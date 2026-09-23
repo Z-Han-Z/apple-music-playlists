@@ -8,6 +8,7 @@
 [![Container](https://github.com/Z-Han-Z/apple-music-playlists/actions/workflows/container.yml/badge.svg)](https://github.com/Z-Han-Z/apple-music-playlists/actions/workflows/container.yml)
 [![Release](https://img.shields.io/github/v/release/Z-Han-Z/apple-music-playlists)](https://github.com/Z-Han-Z/apple-music-playlists/releases/latest)
 [![PyPI](https://img.shields.io/pypi/v/apple-music-playlists)](https://pypi.org/project/apple-music-playlists/)
+[![MCP Registry](https://img.shields.io/badge/MCP_Registry-listed-5A67D8)](https://registry.modelcontextprotocol.io/v0.1/servers?search=io.github.Z-Han-Z%2Fapple-music-playlists)
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Glama quality score](https://glama.ai/mcp/servers/Z-Han-Z/apple-music-playlists/badges/score.svg)](https://glama.ai/mcp/servers/Z-Han-Z/apple-music-playlists)
