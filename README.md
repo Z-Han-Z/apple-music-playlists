@@ -132,11 +132,14 @@ Audio-feature coverage:     12/12 usable (100%)
 Flow cost, narrative locks: 44.14 → 41.14
 ```
 
+Each title below opens the exact US catalog recording returned by the resolver, so the sequence can
+be auditioned rather than taken on trust.
+
 | Act | Grounded order | What the sequence is doing |
 |---|---|---|
-| **I — Boot** | The Robots — Kraftwerk<br>Technopolis — Yellow Magic Orchestra<br>Kid A — Radiohead | A body, then a city, then an unstable first-person voice. |
-| **II — Desire** | Oblivion — Grimes<br>Digital Witness — St. Vincent<br>Is It Cold In The Water? — SOPHIE<br>Touch — Daft Punk & Paul Williams<br>All Is Full of Love — Björk | Public attention becomes bodily risk, transformation, a request for contact, and finally an answer. |
-| **III — Re-entry** | Cellophane — FKA twigs<br>Retrograde — James Blake<br>Long Road Home — Oneohtrix Point Never<br>An Ending (Ascent) — Brian Eno | The synthetic shell fails; retreat becomes return, and the story lands at dawn. |
+| **I — Boot** | [The Robots](https://music.apple.com/us/album/the-robots/726157248?i=726157329) — Kraftwerk<br>[Technopolis](https://music.apple.com/us/album/technopolis/1291843638?i=1291843640) — Yellow Magic Orchestra<br>[Kid A](https://music.apple.com/us/album/kid-a/1097862870?i=1097863120) — Radiohead | A body, then a city, then an unstable first-person voice. |
+| **II — Desire** | [Oblivion](https://music.apple.com/us/album/oblivion/499874506?i=499875050) — Grimes<br>[Digital Witness](https://music.apple.com/us/album/digital-witness/1440942954?i=1440943307) — St. Vincent<br>[Is It Cold In The Water?](https://music.apple.com/us/album/is-it-cold-in-the-water/1709023350?i=1709023358) — SOPHIE<br>[Touch](https://music.apple.com/us/album/touch/617154241?i=617154364) — Daft Punk & Paul Williams<br>[All Is Full of Love](https://music.apple.com/us/album/all-is-full-of-love/20833577?i=20833608) — Björk | Public attention becomes bodily risk, transformation, a request for contact, and finally an answer. |
+| **III — Re-entry** | [Cellophane](https://music.apple.com/us/album/cellophane/1458754719?i=1458754722) — FKA twigs<br>[Retrograde](https://music.apple.com/us/album/retrograde/1440871055?i=1440871816) — James Blake<br>[Long Road Home](https://music.apple.com/us/album/long-road-home/1589489446?i=1589489449) — Oneohtrix Point Never<br>[An Ending (Ascent)](https://music.apple.com/us/album/an-ending-ascent/714861155?i=714861225) — Brian Eno | The synthetic shell fails; retreat becomes return, and the story lands at dawn. |
 
 The interesting failure happened during ordering. With only the three acts locked, the numerical
 optimizer cut the measured cost from `48.28` to `14.88` — but put **Retrograde** after the dawn and

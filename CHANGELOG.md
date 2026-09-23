@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `am_resolve_candidates` now returns each grounded recording's Apple Music URL so users can
+  audition and verify the exact catalog version before a playlist is written.
+
 ## [1.4.0] - 2026-09-23
 
 ### Added

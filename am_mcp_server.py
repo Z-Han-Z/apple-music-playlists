@@ -299,7 +299,7 @@ TOOLS = [
 _ENGLISH_TOOL_DESCRIPTIONS = {
     "am_status": "Check developer-token validity and Apple Music login status. Use before any library write; this check changes nothing.",
     "am_search_songs": "Search the Apple Music catalog for a small exploratory lookup and return stable catalog IDs. For an LLM-proposed playlist-sized pool, use am_resolve_candidates instead.",
-    "am_resolve_candidates": "Ground an LLM-curated candidate pool in Apple Music metadata before final selection or creation. It flags unresolved tracks, duplicate recordings, artist concentration, and version markers; it never scores theme fit or writes to the library.",
+    "am_resolve_candidates": "Ground an LLM-curated candidate pool in Apple Music metadata before final selection or creation. It returns exact catalog metadata and Apple Music links, flags unresolved tracks, duplicate recordings, artist concentration, and version markers, and never scores theme fit or writes to the library.",
     "am_list_playlists": "List every playlist in the current user's library, including IDs. Use am_show_playlist when the tracks of one playlist are needed.",
     "am_show_playlist": "Show the tracks in one playlist selected by name or ID. Use am_list_playlists first when the exact playlist is unknown.",
     "am_create_playlist": "Create a new playlist from 'Title - Artist' strings or ISRCs. Use dry_run=true to verify catalog matching without writing; use am_add_tracks for an existing playlist.",
@@ -428,6 +428,7 @@ def t_resolve_candidates(args: dict) -> str:
             "input": query,
             "status": "resolved",
             "catalog_id": catalog_id,
+            "apple_music_url": item.get("url"),
             "name": item.get("name"),
             "artist": artist or None,
             "album": item.get("albumName"),

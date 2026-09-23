@@ -202,6 +202,7 @@ class TestMcpCompatibility(unittest.TestCase):
                 "durationInMillis": 201234,
                 "hasLyrics": False,
                 "isrc": "USAAA2400001",
+                "url": "https://music.apple.com/us/song/midnight-road/101",
             },
             "202": {
                 "name": "City Glow (Live)",
@@ -244,6 +245,9 @@ class TestMcpCompatibility(unittest.TestCase):
                          [0, 1, 2, 3, 4])
         self.assertEqual(payload["candidates"][1]["duplicate_of_input_index"], 0)
         self.assertEqual(payload["candidates"][2]["status"], "unmatched")
+        self.assertEqual(payload["candidates"][0]["apple_music_url"],
+                         "https://music.apple.com/us/song/midnight-road/101")
+        self.assertIsNone(payload["candidates"][3]["apple_music_url"])
         self.assertFalse(payload["candidates"][0]["has_lyrics"])
         self.assertIsNone(payload["candidates"][4]["has_lyrics"])
         self.assertIn("live", payload["candidates"][3]["version_markers"])
