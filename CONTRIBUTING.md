@@ -3,6 +3,16 @@
 Thanks for helping improve the Apple Music MCP Playlist Toolkit. Bug reports, client setup fixes,
 storefront-specific findings, documentation translations, and focused code changes are welcome.
 
+By participating, you agree to follow the [Code of Conduct](CODE_OF_CONDUCT.md). For setup help,
+support routes, security reports, and private conduct reports, see [SUPPORT.md](SUPPORT.md).
+
+## Choose the right channel
+
+- Use the setup or usage question form when you need help applying existing behavior.
+- Use the bug form for a reproducible failure and the feature form for a new outcome.
+- Use GitHub private reporting for vulnerabilities, credential exposure, or conduct concerns.
+- Keep account data and personal listening history out of public issues and pull requests.
+
 ## Before opening a pull request
 
 1. Create a focused branch from `main`.
@@ -37,3 +47,10 @@ offline evidence that proves the change. Do not include tokens, cookies, `.p8` k
 history, personal song selections, cache files, or generated playlists.
 
 For security issues, follow [SECURITY.md](SECURITY.md) instead of filing a public bug report.
+
+## Review expectations
+
+Maintainers may ask for a smaller scope, an offline regression test, or documentation changes
+before merging. Reviews evaluate behavior and evidence, not the author or the tool used to prepare
+the contribution. Be candid about limitations, generated code, untested environments, and any
+remaining risk so reviewers can reproduce the result.

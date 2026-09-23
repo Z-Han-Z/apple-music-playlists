@@ -1,0 +1,38 @@
+name: Setup or usage question
+description: Ask for help with MCP clients, the CLI, containers, credentials, or playlist workflows
+title: "[Question]: "
+labels: ["question"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please check `SUPPORT.md`, the setup guide, and existing issues first.
+        Never paste Apple Music tokens, cookies, `.p8` keys, account identifiers, or listening history.
+  - type: textarea
+    id: goal
+    attributes:
+      label: What are you trying to do?
+      description: Describe the desired outcome and the client, CLI command, or container workflow involved.
+    validations:
+      required: true
+  - type: textarea
+    id: attempted
+    attributes:
+      label: What have you tried?
+      description: Include redacted configuration or commands and the exact error or unexpected result.
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: OS, Python version, project version, MCP client, container runtime, and storefront if relevant
+    validations:
+      required: true
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Privacy check
+      options:
+        - label: I removed credentials, cookies, private keys, account identifiers, and personal listening data.
+          required: true

@@ -13,3 +13,4 @@
 - [ ] `git diff --check`
 - [ ] No credentials, listening history, personal song selections, or generated playlists included
 - [ ] CLI, MCP schema, documentation, and skill remain consistent where applicable
+- [ ] I have read and will follow `CODE_OF_CONDUCT.md`

@@ -1,5 +1,8 @@
 blank_issues_enabled: false
 contact_links:
+  - name: Setup and client documentation
+    url: https://github.com/Z-Han-Z/apple-music-playlists/blob/main/docs/client-setup.md
+    about: Check MCP client, Docker, Cordis/DSH, and generic harness setup before opening an issue.
   - name: Private security report
     url: https://github.com/Z-Han-Z/apple-music-playlists/security/advisories/new
-    about: Report credential exposure or another vulnerability privately.
+    about: Report credential exposure, another vulnerability, or a private conduct concern.
