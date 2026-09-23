@@ -1,5 +1,7 @@
 # Apple-Music-Playlist-Toolkit
 
+![Apple Music MCP — natürlichsprachige Playlists, geprüft im Apple-Music-Katalog](.github/assets/social-preview.jpg)
+
 [English](README.md) | [简体中文](README_ZH_CN.md) | [繁體中文](README_ZH_TW.md) |
 [日本語](README_JP.md) | [한국어](README_KR.md) | [Español](README_ES.md) |
 [Português do Brasil](README_PT_BR.md) | Deutsch | [Français](README_FR.md)

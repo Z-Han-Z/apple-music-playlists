@@ -346,6 +346,15 @@ class TestStableReleaseAssets(unittest.TestCase):
                 if target != name:
                     self.assertIn(target, text, f"{name} does not link to {target}")
 
+    def test_every_locale_uses_the_shared_social_preview(self):
+        preview = self.ROOT / ".github" / "assets" / "social-preview.jpg"
+        self.assertTrue(preview.is_file())
+        self.assertLess(preview.stat().st_size, 1_000_000)
+        for name in self.LOCALES:
+            text = (self.ROOT / name).read_text(encoding="utf-8")
+            self.assertIn(".github/assets/social-preview.jpg", text,
+                          f"{name} does not show the shared project banner")
+
     def test_container_runs_as_non_root_and_excludes_secrets(self):
         dockerfile = (self.ROOT / "Dockerfile").read_text(encoding="utf-8")
         ignore = (self.ROOT / ".dockerignore").read_text(encoding="utf-8")

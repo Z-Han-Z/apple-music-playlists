@@ -1,5 +1,7 @@
 # Apple Music プレイリスト・ツールキット
 
+![Apple Music MCP — Apple Music カタログで検証する自然言語プレイリスト](.github/assets/social-preview.jpg)
+
 [English](README.md) | [简体中文](README_ZH_CN.md) | [繁體中文](README_ZH_TW.md) |
 日本語 | [한국어](README_KR.md) | [Español](README_ES.md) |
 [Português do Brasil](README_PT_BR.md) | [Deutsch](README_DE.md) | [Français](README_FR.md)

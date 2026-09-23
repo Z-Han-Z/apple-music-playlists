@@ -1,5 +1,7 @@
 # Apple Music 歌单工具箱
 
+![Apple Music MCP——基于 Apple Music 曲库校验的自然语言歌单](.github/assets/social-preview.jpg)
+
 [English](README.md) | 简体中文 | [繁體中文](README_ZH_TW.md) |
 [日本語](README_JP.md) | [한국어](README_KR.md) | [Español](README_ES.md) |
 [Português do Brasil](README_PT_BR.md) | [Deutsch](README_DE.md) | [Français](README_FR.md)
