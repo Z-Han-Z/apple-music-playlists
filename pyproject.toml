@@ -35,6 +35,7 @@ Homepage = "https://github.com/Z-Han-Z/apple-music-playlists"
 Documentation = "https://github.com/Z-Han-Z/apple-music-playlists/blob/main/docs/client-setup.md"
 Changelog = "https://github.com/Z-Han-Z/apple-music-playlists/blob/main/CHANGELOG.md"
 Issues = "https://github.com/Z-Han-Z/apple-music-playlists/issues"
+MCP-Directory = "https://glama.ai/mcp/servers/Z-Han-Z/apple-music-playlists"
 
 [project.scripts]
 # 装完之后 MCP 注册可以退化成 {"command": "am-mcp"}，
