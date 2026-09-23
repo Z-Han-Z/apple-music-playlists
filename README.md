@@ -104,9 +104,9 @@ including a zero-dependency one).
 | `playlist_flow.py` | **Audio-feature audit**: BPM / key / loudness / energy / valence, adjacency checks, arc shape |
 | `playlist_optimize.py` | Simulated-annealing **track ordering** against the measured rules |
 | `listening_stats.py` | **Listening history**: recently played, and per-track/album/artist **play counts** (Apple Music Replay backend) |
-| `profile_library.py` | **Taste profile**: what your most-played music actually sounds like (BPM / energy / valence spread, mood quadrants) |
+| `profile_library.py` | **Descriptive sample profile**: measured BPM / energy / valence spread and sample-relative quadrants; it does not define the user's taste |
 | `am_library.py` | **Your library**: paged export of every catalog-backed song you own, enriched with ISRC / year / genre |
-| `build_pool.py` | **Candidate pool**: pick a pool out of your library (most-played → favourite artists → variety filler) and fetch its features |
+| `build_pool.py` | **Listening-evidence pool**: merge recent plays with multiple Replay years, retaining dates and play counts for the LLM to interpret |
 
 Supporting modules:
 
@@ -317,6 +317,7 @@ More in [`docs/apple-music-api-notes.md`](docs/apple-music-api-notes.md) and
 | [`docs/how-to-build-a-good-playlist.md`](docs/how-to-build-a-good-playlist.md) | Curation methodology: adjacency physics, arc data, six narrative shapes, the ISO principle |
 | [`docs/playlist-curation-survey.md`](docs/playlist-curation-survey.md) | Survey of published curation guidance (platform rules, DJ methods, academic findings) |
 | [`docs/evaluation-signals.md`](docs/evaluation-signals.md) | LLM-native curation: direct candidate comparison, catalog grounding, readable constraints, and why scalar theme scores stay out of the critical path |
+| [`docs/algorithm-review.md`](docs/algorithm-review.md) | Review boundary for early heuristics: which decisions belong to the LLM and which deterministic algorithms should retain |
 | [`docs/platform-adapters.md`](docs/platform-adapters.md) | The platform-adapter boundary: what is platform-neutral, what an adapter must provide, and what breaks on a service that exposes no ISRC |
 | [`skill/`](skill/) | Agent skill: workflow + the accumulated gotcha list |
 | [`CHANGELOG.md`](CHANGELOG.md) | Release history, including behaviour changes between versions |

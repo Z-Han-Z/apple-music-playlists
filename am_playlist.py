@@ -882,7 +882,7 @@ def cmd_library(args) -> int:
         return 0
     print(lib.library_report(items))
     print(f"\n缓存文件：{lib.cache_path()}")
-    print("（--refresh 重抓；这份缓存是 build_pool.py 的输入）")
+    print("（--refresh 重抓；可供离线分析或由 LLM 从个人收藏中策划）")
     return 0
 
 
@@ -1135,7 +1135,7 @@ def main() -> int:
                    help="最多显示多少个（默认全部）")
     p.set_defaults(fn=cmd_list)
 
-    p = sub.add_parser("library", help="导出我的音乐库（含 ISRC，是 build_pool.py 的输入）")
+    p = sub.add_parser("library", help="导出我的完整音乐库（含 ISRC）")
     p.add_argument("--refresh", action="store_true", help="忽略缓存，重新拉取")
     p.add_argument("--limit", type=int, default=None, help="最多取多少首（默认全部）")
     p.add_argument("--json", action="store_true", help="直接输出 JSON")

@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Refactored `build_pool.py` from an aesthetic candidate selector into a cross-period listening-
+  evidence collector. It now merges recent plays with multiple Replay years and preserves source,
+  rank, play-count, and first/last-played facts for direct interpretation by the host LLM. The
+  favourite-artist expansion, equal-step "variety filler", and implicit theme decisions are gone.
+- Reworded `profile_library.py` as a descriptive report: its high/low quadrants are relative to the
+  current sample medians and must not be presented as a definition of the user's taste.
+- Added an algorithm-review boundary that separates semantic curation (LLM responsibility) from
+  evidence normalization, catalog resolution, descriptive statistics, and optional physical
+  sequencing (deterministic service responsibilities).
+
 ### Fixed
 
 - `am_playlist.best_song_match` no longer falls back to the first search result when nothing
@@ -18,8 +30,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   surviving candidate is reported as missed. `am_resolve_candidates` already surfaces that as
   `unmatched`, and the CLI reports it before creating or writing anything. Filtering first also
   fixes picking the wrong artist when the correct one is present but ranked lower by relevance.
-  Matching preserves Unicode letters across Korean, Japanese, Chinese, and other scripts, folds
-  Latin accents for comparison, and accepts spaced hyphen, en-dash, or em-dash delimiters.
+   Matching preserves Unicode letters across Korean, Japanese, Chinese, and other scripts, folds
+   Latin accents for comparison, and accepts spaced hyphen, en-dash, or em-dash delimiters.
 
 ## [1.3.0] - 2026-09-22
 
