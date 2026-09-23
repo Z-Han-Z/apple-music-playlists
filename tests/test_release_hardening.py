@@ -480,6 +480,28 @@ class TestStableReleaseAssets(unittest.TestCase):
             self.assertIn(required, text)
         self.assertNotIn("playlist generator", text.lower())
 
+    def test_curation_evals_are_multilingual_tasks_not_golden_lists(self):
+        path = self.ROOT / "examples" / "curation-evals.json"
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        self.assertEqual(payload["schema_version"], 1)
+        self.assertEqual(
+            {case["locale"] for case in payload["cases"]},
+            {"en", "zh-CN", "ja", "ko", "es"},
+        )
+        self.assertGreaterEqual(len(payload["cases"]), 5)
+        for case in payload["cases"]:
+            for required in ("id", "locale", "target_tracks", "brief", "hard_checks",
+                             "semantic_checks", "blind_questions"):
+                self.assertIn(required, case, f"{case.get('id')} is missing {required}")
+            self.assertGreaterEqual(len(case["hard_checks"]), 3)
+            self.assertGreaterEqual(len(case["semantic_checks"]), 3)
+            self.assertGreaterEqual(len(case["blind_questions"]), 3)
+            self.assertNotIn("expected_tracks", case)
+            self.assertNotIn("golden_tracks", case)
+
+        serialized = json.dumps(payload, ensure_ascii=False).lower()
+        self.assertNotIn("theme_fit", serialized)
+
 
 class TestCommunityHealth(unittest.TestCase):
     ROOT = Path(__file__).resolve().parent.parent

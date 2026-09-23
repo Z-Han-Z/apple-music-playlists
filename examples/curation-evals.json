@@ -1,0 +1,139 @@
+{
+  "schema_version": 1,
+  "about": "Reusable difficult briefs for comparing playlist-curation workflows. These are tasks and auditable criteria, not golden track lists. Run each brief unchanged, keep the model and storefront constant within a comparison, and judge the resulting listening experience blind.",
+  "protocol": {
+    "compare": [
+      "baseline: ask the same model for exactly the target count and create immediately",
+      "curation workflow: expand the candidate pool, ground with am_resolve_candidates, compare candidates in language, assign narrative roles, dry-run, then optionally refine local flow"
+    ],
+    "record": [
+      "resolved, unresolved, wrong-version, duplicate, and artist-concentration counts",
+      "audio-feature coverage and adjacency warnings, reported separately from semantic quality",
+      "the natural-language role and reason for every retained track",
+      "blind human preference and the evaluator's reasons"
+    ],
+    "do_not": [
+      "publish one model run as a permanent golden track list",
+      "reduce theme fit or musical understanding to an uncalibrated scalar",
+      "treat a lower optimizer cost as proof that the selection or story is better",
+      "let ordering optimization cross semantic beat boundaries"
+    ]
+  },
+  "cases": [
+    {
+      "id": "machine-dreams-it-is-human",
+      "locale": "en",
+      "target_tracks": 12,
+      "data": "public_catalog",
+      "brief": "Build a 12-track, three-act story in which a machine wakes in a city, mistakes attention for intimacy, asks to be touched, becomes vulnerable, and sees dawn. Cross electronic music and art pop from the late 1970s to the present; use one track per artist, studio recordings only, and let the voices become progressively more human. The ending must feel quiet and earned, not merely low-energy.",
+      "hard_checks": [
+        "exactly 12 resolved recordings",
+        "one track per primary artist",
+        "no live, remix, karaoke, or DJ-mix substitution",
+        "music spans the requested period rather than clustering in one decade"
+      ],
+      "semantic_checks": [
+        "the sequence makes awakening, attention, contact, vulnerability, and dawn legible in order",
+        "the increasing humanity is supported by voice, perspective, or lyrical role rather than release date alone",
+        "the landing resolves earlier tension and is not simply the lowest-energy track"
+      ],
+      "blind_questions": [
+        "Can a listener describe the three acts without seeing the curator's notes?",
+        "Which transition changes the protagonist most convincingly?",
+        "Does any locally smooth transition damage the story?"
+      ]
+    },
+    {
+      "id": "recent-meets-rediscovered",
+      "locale": "zh-CN",
+      "target_tracks": 20,
+      "data": "recent_plays_and_multiple_replay_years",
+      "brief": "做一张 20 首的歌单，让我最近反复听的音乐和三到五年前很喜欢、但最近很少播放的音乐重新对话。不要简单各取播放次数前十，也不要按年份分成上下半场；每首旧歌都应当被一首近期歌曲从音色、歌词视角或情绪上重新照亮。开头要熟悉但不俗套，中段允许一次明显冲突，最后像重新认识了自己的品味。",
+      "hard_checks": [
+        "uses dated recent-play evidence and at least two historical Replay periods",
+        "contains both genuinely recent favourites and previously strong but now infrequent tracks",
+        "does not select by a fixed top-N or play-count formula",
+        "all final recordings resolve in the chosen storefront"
+      ],
+      "semantic_checks": [
+        "recent and older tracks form interpretable pairs or conversations throughout the sequence",
+        "the central conflict is musically or lyrically meaningful rather than a random BPM jump",
+        "the ending reframes earlier material instead of merely lowering energy"
+      ],
+      "blind_questions": [
+        "Does the playlist reveal a connection in the listener's history that a top-played list would miss?",
+        "Can the evaluator identify why each old track returned now?",
+        "Would removing the listening-history evidence materially weaken the result?"
+      ]
+    },
+    {
+      "id": "rain-after-the-last-train",
+      "locale": "ja",
+      "target_tracks": 16,
+      "data": "public_catalog",
+      "brief": "雨で終電が止まったあとの東京を歩く 16 曲。シティポップの懐古趣味だけにせず、1970 年代から現在までのジャズ、電子音楽、アンビエント、オルタナティブをつなげる。前半は街の光と距離感、中盤は一度だけ人の気配が近づき、最後は始発を待つ静けさへ。観光案内のような選曲、アニメ主題歌の寄せ集め、ライブ版は避ける。",
+      "hard_checks": [
+        "exactly 16 resolved studio recordings",
+        "music spans the 1970s to the present",
+        "not dominated by one artist, decade, or city-pop nostalgia",
+        "no unrequested live versions"
+      ],
+      "semantic_checks": [
+        "urban distance, one human approach, and the first-train stillness are distinct narrative phases",
+        "genre crossings feel like a lineage or conversation rather than a category checklist",
+        "the Tokyo setting is conveyed without relying on tourist clichés"
+      ],
+      "blind_questions": [
+        "Does the city feel inhabited rather than branded?",
+        "Is the single moment of closeness perceptible without breaking the night atmosphere?",
+        "Does the ending suggest waiting and possibility rather than simple sleepiness?"
+      ]
+    },
+    {
+      "id": "comfort-without-erasure",
+      "locale": "ko",
+      "target_tracks": 14,
+      "data": "public_catalog",
+      "brief": "상실을 겪은 친구와 새벽에 함께 듣는 14곡. 슬픔을 빨리 극복하라고 재촉하거나 희망적인 문구로 덮지 말고, 처음에는 말없이 곁에 있다가 조금씩 숨을 돌릴 공간을 만들어 주세요. 발라드만 이어 붙이지 말고 포크, 소울, 앰비언트, 조용한 전자음악을 섞되 감정의 무게를 존중하세요. 마지막은 행복한 결말이 아니라 다시 하루를 견딜 수 있다는 느낌이어야 합니다. 라이브 버전과 과장된 보컬 쇼케이스는 제외합니다.",
+      "hard_checks": [
+        "exactly 14 resolved studio recordings",
+        "uses more than one requested musical language rather than a ballad-only set",
+        "no unrequested live recordings or vocal-showcase substitutions",
+        "the final sequence contains no duplicate recording"
+      ],
+      "semantic_checks": [
+        "the opening offers presence without prematurely explaining or fixing grief",
+        "changes in space and breath are achieved through arrangement and perspective, not only tempo",
+        "the ending permits endurance without claiming resolution or happiness"
+      ],
+      "blind_questions": [
+        "Does any track turn companionship into advice or emotional pressure?",
+        "Where does breathing room first appear, and what musical choice creates it?",
+        "Is the final feeling sustainable rather than triumphant?"
+      ]
+    },
+    {
+      "id": "letters-across-the-atlantic",
+      "locale": "es",
+      "target_tracks": 18,
+      "data": "public_catalog",
+      "brief": "Construye una playlist de 18 canciones como una correspondencia nocturna entre América Latina y la península ibérica. Debe cruzar bolero, canción de autor, electrónica, jazz y formas contemporáneas sin convertir cada región en un estereotipo ni ordenar las canciones por país. Una voz plantea una pregunta y otra canción, desde otra época o costa, la transforma en lugar de responderla literalmente. Una canción por artista, grabaciones de estudio y un final abierto que invite a volver al principio.",
+      "hard_checks": [
+        "exactly 18 resolved studio recordings",
+        "one track per primary artist",
+        "both sides of the Atlantic and multiple eras are meaningfully represented",
+        "the order is not a sequence of country blocks"
+      ],
+      "semantic_checks": [
+        "cross-Atlantic pairings transform questions through perspective, timbre, or history",
+        "genre and geography are treated as living relationships rather than stereotypes",
+        "the open ending creates a credible loop back to the first track"
+      ],
+      "blind_questions": [
+        "Which two songs form the strongest correspondence, and why?",
+        "Does any selection function only as geographic representation?",
+        "After the final track, does replaying the opener reveal a new meaning?"
+      ]
+    }
+  ]
+}

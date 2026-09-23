@@ -418,6 +418,7 @@ More in [`docs/apple-music-api-notes.md`](docs/apple-music-api-notes.md) and
 | [`docs/how-to-build-a-good-playlist.md`](docs/how-to-build-a-good-playlist.md) | Curation methodology: adjacency physics, arc data, six narrative shapes, the ISO principle |
 | [`docs/playlist-curation-survey.md`](docs/playlist-curation-survey.md) | Survey of published curation guidance (platform rules, DJ methods, academic findings) |
 | [`docs/evaluation-signals.md`](docs/evaluation-signals.md) | LLM-native curation: direct candidate comparison, catalog grounding, readable constraints, and why scalar theme scores stay out of the critical path |
+| [`examples/curation-evals.json`](examples/curation-evals.json) | Five difficult multilingual briefs with auditable constraints and blind-listening questions—no golden track lists |
 | [`docs/algorithm-review.md`](docs/algorithm-review.md) | Review boundary for early heuristics: which decisions belong to the LLM and which deterministic algorithms should retain |
 | [`docs/platform-adapters.md`](docs/platform-adapters.md) | The platform-adapter boundary: what is platform-neutral, what an adapter must provide, and what breaks on a service that exposes no ISRC |
 | [`llms.txt`](llms.txt) | Concise agent-readable map of the curation boundary and the most useful project documents |

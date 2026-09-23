@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `am_resolve_candidates` now returns each grounded recording's Apple Music URL so users can
   audition and verify the exact catalog version before a playlist is written.
+- A root `llms.txt` gives agents and directory crawlers a concise, spec-shaped map of the project's
+  curation boundary, setup, research, and implementation documentation.
+- A reusable multilingual curation evaluation set provides five difficult briefs with auditable
+  constraints and blind-listening questions, without freezing any model's selections as truth.
 
 ### Changed
 
@@ -18,8 +22,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   playlist sequencing instead of a generic playlist generator.
 - All localized READMEs and both client guides now document the official MCP Registry's `uvx`
   launch path for running the PyPI package without a permanent install.
-- A root `llms.txt` gives agents and directory crawlers a concise, spec-shaped map of the project's
-  curation boundary, setup, research, and implementation documentation.
 
 ## [1.4.0] - 2026-09-23
 

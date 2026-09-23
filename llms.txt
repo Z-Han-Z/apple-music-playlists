@@ -17,6 +17,7 @@ The runtime has no third-party dependencies. The published PyPI package can be l
 ## Curation model
 
 - [LLM-native evaluation signals](https://github.com/Z-Han-Z/apple-music-playlists/blob/main/docs/evaluation-signals.md): Direct candidate comparison, readable constraints, catalog grounding, and why scalar theme scores stay out of the critical path.
+- [Multilingual curation evaluations](https://github.com/Z-Han-Z/apple-music-playlists/blob/main/examples/curation-evals.json): Five difficult briefs with hard checks, semantic checks, and blind-listening questions but no golden track lists.
 - [Algorithm boundary review](https://github.com/Z-Han-Z/apple-music-playlists/blob/main/docs/algorithm-review.md): Which decisions belong to the host model and which deterministic utilities remain useful.
 - [How to build a good playlist](https://github.com/Z-Han-Z/apple-music-playlists/blob/main/docs/how-to-build-a-good-playlist.md): Evidence and reasoning behind transitions, pacing, narrative shapes, and curation choices.
 - [Curation research survey](https://github.com/Z-Han-Z/apple-music-playlists/blob/main/docs/playlist-curation-survey.md): Platform guidance, professional practice, and academic findings used by the project.
