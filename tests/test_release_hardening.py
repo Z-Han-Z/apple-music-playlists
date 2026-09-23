@@ -432,6 +432,20 @@ class TestStableReleaseAssets(unittest.TestCase):
         self.assertIn("tracks are not in the current source", example)
         self.assertNotRegex(example, r"[\u4e00-\u9fff]")
 
+    def test_ci_reads_the_single_version_source(self):
+        workflows = (
+            self.ROOT / ".github" / "workflows" / "test.yml",
+            self.ROOT / ".github" / "workflows" / "container.yml",
+        )
+        for path in workflows:
+            text = path.read_text(encoding="utf-8")
+            self.assertIn("from am_paths import VERSION", text)
+            self.assertNotIn(
+                f'"version": "{mcp.SERVER_INFO["version"]}"',
+                text,
+                f"{path.name} must not hardcode the current release version",
+            )
+
 
 class TestCommunityHealth(unittest.TestCase):
     ROOT = Path(__file__).resolve().parent.parent
