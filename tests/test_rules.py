@@ -280,59 +280,5 @@ class TestMarkerHits(unittest.TestCase):
         self.assertEqual(core.marker_hits(None, ("live",), ("现场",)), [])
 
 
-class TestFoldArtifactGating(unittest.TestCase):
-    """折叠把一首歌推过「慢歌」阈值时，tempo 类规则不该把幽灵当事实。
-
-    背景：`fold_tempo` 是取模映射，所以不保序。真实误伤——一首 160.1BPM 的曲子
-    被折成 80，和同样被折的 176BPM 曲子一起被判「两首慢歌相邻」；而它和 150BPM
-    的邻居（150 原样保留）被判「BPM 无理由大跳 -47%」。两条都是折叠造出来的。
-    """
-
-    @staticmethod
-    def F(raw, folded, key="8B", energy=0.5):
-        return {"name": "t", "bpm": folded, "raw_bpm": raw, "key": key, "energy": energy}
-
-    def test_crossing_is_detected(self):
-        self.assertTrue(core.fold_crosses_slow_cut(self.F(160.1, 80.0)))
-        self.assertTrue(core.fold_crosses_slow_cut(self.F(176.0, 88.0)))
-        # 向上折也可能跨线：55 被加倍成 110，从慢变快
-        self.assertTrue(core.fold_crosses_slow_cut(self.F(55, 110.0)))
-
-    def test_no_crossing_when_fold_keeps_the_side(self):
-        self.assertFalse(core.fold_crosses_slow_cut(self.F(150.0, 150.0)))
-        self.assertFalse(core.fold_crosses_slow_cut(self.F(82.5, 82.5)))
-        self.assertFalse(core.fold_crosses_slow_cut(self.F(89.6, 89.6)))
-
-    def test_missing_raw_bpm_is_backward_compatible(self):
-        """老调用方不给 raw_bpm 时一律不判——行为必须与从前一致。"""
-        self.assertFalse(core.fold_crosses_slow_cut(P(80)))
-        self.assertFalse(core.fold_crosses_slow_cut(None))
-        self.assertFalse(core.fold_crosses_slow_cut({"bpm": 80}))
-        self.assertFalse(core.fold_crosses_slow_cut({"bpm": 0, "raw_bpm": 0}))
-
-    def test_phantom_two_slow_is_suppressed(self):
-        """160.1→176 生值都是快歌；折叠成 80→88 后被误报成两首慢歌。"""
-        self.assertEqual(core.check_pair(self.F(160.1, 80.0), self.F(176.0, 88.0)), set())
-
-    def test_phantom_big_jump_is_suppressed(self):
-        """150→160.1 生值只差 7%；折叠成 150→80 后被误报成大跳 -47%。"""
-        self.assertEqual(core.check_pair(self.F(150.0, 150.0), self.F(160.1, 80.0)), set())
-
-    def test_genuine_two_slow_still_reported(self):
-        """真的两首慢歌（折叠没动它们）照旧要报。"""
-        self.assertEqual(core.check_pair(self.F(82.5, 82.5), self.F(89.6, 89.6)),
-                         {"two_slow"})
-
-    def test_energy_clash_survives_the_gate(self):
-        """energy_clash 不看 tempo，扣留 tempo 判断时它必须照常生效。"""
-        got = core.check_pair(self.F(160.1, 80.0, "8B", 0.9),
-                              self.F(176.0, 88.0, "3A", 0.3))
-        self.assertEqual(got, {"energy_clash"})
-
-    def test_without_raw_bpm_the_old_rules_still_fire(self):
-        self.assertEqual(core.check_pair(P(80, "8B"), P(130, "3A")), {"big_jump"})
-        self.assertEqual(core.check_pair(P(95, "8B"), P(95, "3A")), {"two_slow"})
-
-
 if __name__ == "__main__":
     unittest.main(verbosity=2)

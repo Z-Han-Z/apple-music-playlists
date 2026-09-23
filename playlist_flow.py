@@ -63,7 +63,6 @@ from playlist_core import (  # noqa: E402
     classify_coverage,
     classify_shape,
     coverage_report,
-    fold_crosses_slow_cut,
     fold_tempo,
     harmonic_ok,
     norm,
@@ -202,8 +201,7 @@ def analyze(rows: list[dict]) -> None:
     # 100BPM），于是工具用一套定义诊断、用另一套定义修；另外它也从来没检查过
     # BPM 大跳（优化器却会惩罚），导致那一项"能被优化但不会被报告"。
     print(f"\n【3】相邻衔接（规则定义见 playlist_core.check_pair）")
-    pair_tracks = [{"name": r["name"], "bpm": tempo[i], "raw_bpm": r["f"].get("tempo", 0),
-                    "key": keys[i], "energy": energy[i]}
+    pair_tracks = [{"name": r["name"], "bpm": tempo[i], "key": keys[i], "energy": energy[i]}
                    for i, r in enumerate(rows)]
     hits = scan_adjacency(pair_tracks)
 
@@ -232,11 +230,6 @@ def analyze(rows: list[dict]) -> None:
     show("energy_clash", lambda p, d: f"#{p-1}→#{p}  {d['a']['name'][:20]} "
                                       f"E {d['a']['energy']:.2f}→{d['b']['energy']:.2f} "
                                       f"({d['a']['key']}→{d['b']['key']})")
-    withheld = [i + 1 for i, t in enumerate(pair_tracks) if fold_crosses_slow_cut(t)]
-    if withheld:
-        print(f"     ℹ️  折叠把 #{'、#'.join(map(str, withheld))} 推过了「慢歌」阈值——"
-              f"这几首的『≈』不是它们的真实速度档，涉及它们的衔接不判 tempo 类规则"
-              f"（否则报出来的是取模幽灵，不是排序缺陷）")
     print(f"     （「慢歌」阈值 = {slow_cut():.0f}BPM，与优化器同源。"
           f"若某条规则大面积命中，先想清楚是不是定义使然——"
           f"比如整张都是慢歌，two_slow 命中每一对是**真实**的，不是排序失败。）")
