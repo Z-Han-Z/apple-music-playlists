@@ -16,6 +16,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Package discovery metadata now describes the project as semantic curation and narrative
   playlist sequencing instead of a generic playlist generator.
+- All localized READMEs and both client guides now document the official MCP Registry's `uvx`
+  launch path for running the PyPI package without a permanent install.
 
 ## [1.4.0] - 2026-09-23
 

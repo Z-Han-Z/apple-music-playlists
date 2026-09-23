@@ -33,6 +33,13 @@ am-playlist status
 am-playlist login
 ```
 
+如果已安装 `uv`，也可以直接运行同一个 PyPI 正式版，无需永久安装：
+
+```bash
+uvx --from apple-music-playlists am-playlist status
+uvx --from apple-music-playlists am-playlist login
+```
+
 `login` 只需交互一次。不同系统用户、WSL、远程主机和容器不会自动共享宿主机配置；配置
 路径和三种登录方式见 [SETUP.md](../SETUP.md)。注册后重启客户端，先让它调用 `am_status`，
 不要用“创建歌单”来测试连接。
@@ -46,6 +53,20 @@ Claude Desktop、Cursor、Windsurf、Gemini CLI 和许多 Agent Harness 都接�
   "mcpServers": {
     "applemusic": {
       "command": "am-mcp",
+      "env": {"PYTHONIOENCODING": "utf-8"}
+    }
+  }
+}
+```
+
+如果希望由 `uvx` 按需解析并缓存已发布的包，可使用官方 MCP Registry 中的安装配置：
+
+```json
+{
+  "mcpServers": {
+    "applemusic": {
+      "command": "uvx",
+      "args": ["--from", "apple-music-playlists", "am-mcp"],
       "env": {"PYTHONIOENCODING": "utf-8"}
     }
   }

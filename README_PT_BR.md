@@ -36,6 +36,18 @@ am-playlist status
 am-playlist login
 ```
 
+Se você já usa [uv](https://docs.astral.sh/uv/concepts/tools/), também pode executar sem instalar o
+pacote de forma permanente:
+
+```bash
+uvx --from apple-music-playlists am-playlist status
+uvx --from apple-music-playlists am-playlist login
+uvx --from apple-music-playlists am-mcp
+```
+
+Para usar `uvx` em um cliente MCP, configure `"command":"uvx"` e
+`"args":["--from","apple-music-playlists","am-mcp"]`.
+
 Isso instala `am-playlist` (CLI) e `am-mcp` (servidor MCP stdio). Para desenvolvimento use
 `pip install -e .`.
 

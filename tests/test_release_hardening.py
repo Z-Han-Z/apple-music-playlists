@@ -344,8 +344,14 @@ class TestStableReleaseAssets(unittest.TestCase):
             text = (self.ROOT / name).read_text(encoding="utf-8")
             for required in ("pip install", "am-playlist login", "am-mcp",
                              "docker build", "python -m unittest", "SETUP",
-                             "create_playlist_from_description"):
+                             "create_playlist_from_description",
+                             "uvx --from apple-music-playlists am-mcp"):
                 self.assertIn(required, text, f"{name} is missing {required}")
+            self.assertRegex(
+                text,
+                r'"args"\s*:\s*\[\s*"--from"\s*,\s*"apple-music-playlists"\s*,\s*"am-mcp"\s*\]',
+                f"{name} is missing the uvx MCP arguments",
+            )
             self.assertIn("pip install apple-music-playlists", text)
             self.assertNotIn("git+https://github.com/Z-Han-Z/apple-music-playlists", text)
 
@@ -375,10 +381,15 @@ class TestStableReleaseAssets(unittest.TestCase):
 
     def test_client_guide_covers_supported_surfaces_and_harness_boundary(self):
         text = (self.ROOT / "docs" / "client-setup.md").read_text(encoding="utf-8")
+        zh_text = (self.ROOT / "docs" / "client-setup.zh-CN.md").read_text(
+            encoding="utf-8")
         for client in ("Codex", "Claude", "Cursor", "VS Code", "Gemini CLI",
                        "Windsurf", "Cordis", "Harness Platform", "Docker"):
             self.assertIn(client, text)
         self.assertIn("require a network URL and API key", text)
+        for guide in (text, zh_text):
+            self.assertIn("uvx", guide)
+            self.assertIn('"--from", "apple-music-playlists", "am-mcp"', guide)
 
     def test_pypi_publishing_is_manual_oidc_and_registry_ready(self):
         readme = (self.ROOT / "README.md").read_text(encoding="utf-8")

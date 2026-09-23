@@ -36,6 +36,17 @@ am-playlist status
 am-playlist login
 ```
 
+[uv](https://docs.astral.sh/uv/concepts/tools/) がある場合は、パッケージを永続インストールせずに起動できます：
+
+```bash
+uvx --from apple-music-playlists am-playlist status
+uvx --from apple-music-playlists am-playlist login
+uvx --from apple-music-playlists am-mcp
+```
+
+MCP クライアントから `uvx` を使う場合は、`"command":"uvx"` と
+`"args":["--from","apple-music-playlists","am-mcp"]` を設定します。
+
 `am-playlist` CLI と `am-mcp` MCP stdio サーバーが利用可能になります。開発用は
 `pip install -e .` を使用してください。
 

@@ -35,6 +35,13 @@ am-playlist status
 am-playlist login
 ```
 
+Or, with `uv`, use the same PyPI release without a permanent install:
+
+```bash
+uvx --from apple-music-playlists am-playlist status
+uvx --from apple-music-playlists am-playlist login
+```
+
 `login` is a one-time interactive step. Clients launched as another OS user, in WSL, on a remote
 host, or in a container do not automatically share the host user's config. See [SETUP.en.md](../SETUP.en.md)
 for config paths and all login methods.
@@ -54,6 +61,21 @@ Claude Desktop, Cursor, Windsurf, Gemini CLI, and many agent harnesses accept th
       "env": {
         "PYTHONIOENCODING": "utf-8"
       }
+    }
+  }
+}
+```
+
+To let `uvx` resolve and cache the published package on demand, use the installation shape from
+the official MCP Registry:
+
+```json
+{
+  "mcpServers": {
+    "applemusic": {
+      "command": "uvx",
+      "args": ["--from", "apple-music-playlists", "am-mcp"],
+      "env": {"PYTHONIOENCODING": "utf-8"}
     }
   }
 }

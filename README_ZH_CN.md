@@ -29,6 +29,17 @@ am-playlist status
 am-playlist login
 ```
 
+如果已经安装 [uv](https://docs.astral.sh/uv/concepts/tools/)，也可不永久安装本包：
+
+```bash
+uvx --from apple-music-playlists am-playlist status
+uvx --from apple-music-playlists am-playlist login
+uvx --from apple-music-playlists am-mcp
+```
+
+使用 `uvx` 时，MCP 配置使用 `"command":"uvx"` 和
+`"args":["--from","apple-music-playlists","am-mcp"]`。
+
 在 MCP 客户端注册 `am-mcp`：
 
 ```json

@@ -63,6 +63,23 @@ am-playlist status
 am-playlist login       # one-time Apple ID sign-in
 ```
 
+Already use [uv](https://docs.astral.sh/uv/concepts/tools/)? Run the published package without a
+permanent install:
+
+```bash
+uvx --from apple-music-playlists am-playlist status
+uvx --from apple-music-playlists am-playlist login
+uvx --from apple-music-playlists am-mcp
+```
+
+For an MCP client, the equivalent Registry-aligned configuration is:
+
+```json
+{ "mcpServers": { "applemusic": { "command": "uvx",
+    "args": ["--from", "apple-music-playlists", "am-mcp"],
+    "env": { "PYTHONIOENCODING": "utf-8" } } } }
+```
+
 Register `am-mcp` in the client. The common configuration shape is:
 
 ```json
