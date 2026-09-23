@@ -391,6 +391,14 @@ class TestStableReleaseAssets(unittest.TestCase):
         self.assertIn("Do not add `server.json` until", guide)
         self.assertIn(registry_name, guide)
 
+    def test_english_readme_coverage_example_is_english(self):
+        readme = (self.ROOT / "README.md").read_text(encoding="utf-8")
+        section = readme.split("**Coverage is reported, never silently dropped.**", 1)[1]
+        example = section.split("That distinction is the point.", 1)[0]
+        self.assertIn("Audio-feature coverage:", example)
+        self.assertIn("tracks have no ISRC", example)
+        self.assertNotRegex(example, r"[\u4e00-\u9fff]")
+
 
 class TestCommunityHealth(unittest.TestCase):
     ROOT = Path(__file__).resolve().parent.parent
