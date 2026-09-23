@@ -419,6 +419,10 @@ def t_resolve_candidates(args: dict) -> str:
         else:
             duplicate_count += 1
         duration_ms = item.get("durationInMillis")
+        title = item.get("name") or ""
+        version_markers = am.version_noise_hits(title)
+        if am.has_unrequested_title_suffix(query, title):
+            version_markers.append("unrequested-suffix")
         row = {
             "input_index": index,
             "input": query,
@@ -433,7 +437,7 @@ def t_resolve_candidates(args: dict) -> str:
             "content_rating": item.get("contentRating"),
             "has_lyrics": item.get("hasLyrics") if "hasLyrics" in item else None,
             "isrc": item.get("isrc"),
-            "version_markers": am.version_noise_hits(item.get("name") or ""),
+            "version_markers": version_markers,
         }
         if duplicate_of is not None:
             row["duplicate_of_input_index"] = duplicate_of

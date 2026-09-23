@@ -40,6 +40,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Version grounding now marks the catalog suffix `(Mixed)` and unknown, unrequested trailing title
+  qualifiers as suspicious. The README demo found real searches that silently preferred a track
+  from a 2025 DJ Mix, then a 2026 alternate called `(under the fabric)`, over the requested studio
+  recording; the resolver now exposes these in `version_markers` for the host model to review.
 - `am_playlist.best_song_match` no longer falls back to the first search result when nothing
   matches the query. A `Title - Artist` query used to resolve to an unrelated track whenever the
   requested artist did not have that recording — one real case returned a karaoke version

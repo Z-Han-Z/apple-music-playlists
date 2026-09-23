@@ -247,6 +247,7 @@ class TestMcpCompatibility(unittest.TestCase):
         self.assertFalse(payload["candidates"][0]["has_lyrics"])
         self.assertIsNone(payload["candidates"][4]["has_lyrics"])
         self.assertIn("live", payload["candidates"][3]["version_markers"])
+        self.assertIn("unrequested-suffix", payload["candidates"][3]["version_markers"])
         self.assertEqual(payload["summary"]["artists_over_two_tracks"],
                          [{"artist": "Night Driver", "count": 3}])
         self.assertFalse(any("score" in key.lower()
