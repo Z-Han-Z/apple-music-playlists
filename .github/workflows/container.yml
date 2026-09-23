@@ -18,5 +18,6 @@ jobs:
         shell: bash
         run: |
           response="$({ printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"ci","version":"1"}}}'; } | docker run --rm -i apple-music-playlists:test)"
+          expected_version="$(python -c 'from am_paths import VERSION; print(VERSION)')"
           grep -q '"name": "apple-music-playlists"' <<<"$response"
-          grep -q '"version": "1.3.0"' <<<"$response"
+          grep -q "\"version\": \"${expected_version}\"" <<<"$response"

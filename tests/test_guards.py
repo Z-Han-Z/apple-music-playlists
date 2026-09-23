@@ -598,6 +598,18 @@ class TestVersionNoiseMatching(unittest.TestCase):
         """"mix" 单独按整词列会漏掉 "Remix"，所以合成词要显式进表。"""
         self.assertIn("remix", self.am.version_noise_hits("Song (Remix)"))
 
+    def test_mixed_dj_set_version_is_detected(self):
+        """真实 catalog 结果：`(Mixed)` 可能来自 DJ Mix，而不是录音室原版。"""
+        self.assertIn("mixed", self.am.version_noise_hits("Open Eye Signal (Mixed)"))
+
+    def test_unrequested_unknown_suffix_is_detected_structurally(self):
+        self.assertTrue(self.am.has_unrequested_title_suffix(
+            "Open Eye Signal - Jon Hopkins", "Open Eye Signal (under the fabric)"))
+        self.assertFalse(self.am.has_unrequested_title_suffix(
+            "O Superman (For Massenet) - Laurie Anderson", "O Superman (For Massenet)"))
+        self.assertFalse(self.am.has_unrequested_title_suffix(
+            "Song Live - Artist", "Song (Live)"))
+
     def test_cjk_uses_substring(self):
         self.assertIn("现场", self.am.version_noise_hits("某曲 现场版"))
         self.assertIn("伴奏", self.am.version_noise_hits("某曲（伴奏）"))
@@ -624,6 +636,11 @@ class TestBestSongMatch(unittest.TestCase):
 
     def test_penalizes_unrequested_live(self):
         songs = [self._song("Song (Live)", "X"), self._song("Song", "X")]
+        got = self.am.best_song_match("Song - X", songs)
+        self.assertEqual(got["attributes"]["name"], "Song")
+
+    def test_penalizes_unrequested_mixed_version(self):
+        songs = [self._song("Song (Mixed)", "X"), self._song("Song", "X")]
         got = self.am.best_song_match("Song - X", songs)
         self.assertEqual(got["attributes"]["name"], "Song")
 

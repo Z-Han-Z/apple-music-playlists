@@ -38,14 +38,14 @@ library. Choose one method; after success, normal use is automatic until the tok
 Sign in to the Microsoft Store Apple Music app, then:
 
 ```powershell
-pip install "apple-music-playlists[windows-cookies] @ git+https://github.com/Z-Han-Z/apple-music-playlists.git@v1.3.0"
+pip install "apple-music-playlists[windows-cookies]"
 am-playlist login
 ```
 
 ### B. Playwright browser sign-in
 
 ```bash
-pip install "apple-music-playlists[browser-login] @ git+https://github.com/Z-Han-Z/apple-music-playlists.git@v1.3.0"
+pip install "apple-music-playlists[browser-login]"
 am-playlist login
 ```
 

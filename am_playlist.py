@@ -566,7 +566,7 @@ def cmd_status(args) -> int:
 # 这类合成词要显式进表（remix / re-mix）。
 VERSION_NOISE_WORDS = (
     "remastered", "instrumental", "acoustic", "karaoke", "remaster", "reprise",
-    "deluxe", "stereo", "version", "remix", "re-mix", "bonus", "cover", "live",
+    "deluxe", "stereo", "version", "remix", "re-mix", "mixed", "bonus", "cover", "live",
     "demo", "edit", "mono",
 )
 VERSION_NOISE_CJK = ("现场", "演唱会", "伴奏", "翻唱", "重制", "纯音乐")
@@ -581,6 +581,30 @@ def version_noise_hits(title: str) -> list[str]:
     匹配机制来自 `playlist_core.marker_hits`：拉丁词按整词匹配，CJK 按子串匹配。
     """
     return marker_hits(title, VERSION_NOISE_WORDS, VERSION_NOISE_CJK)
+
+
+def has_unrequested_title_suffix(query: str, resolved_title: str) -> bool:
+    """Whether catalog resolution appended a version-like title qualifier.
+
+    Catalog search sometimes returns an otherwise matching alternate whose only difference is an
+    unrequested trailing parenthetical, bracket, or dash subtitle.  A fixed vocabulary cannot
+    cover names such as ``(under the fabric)``, so surface the structural mismatch for the host
+    model to review.  Qualifiers explicitly present in the query are not flagged.
+    """
+    parts = re.split(r"\s+(?:-|—|–)\s+", query or "", maxsplit=1)
+    wanted = parts[0].strip()
+    actual = (resolved_title or "").strip()
+    if not wanted or not actual or wanted.casefold() == actual.casefold():
+        return False
+    match = re.match(re.escape(wanted), actual, flags=re.IGNORECASE)
+    if not match:
+        return False
+    suffix = actual[match.end():].lstrip()
+    if not suffix.startswith(("(", "[", "-", "–", "—")):
+        return False
+    requested_markers = set(version_noise_hits(wanted))
+    actual_markers = set(version_noise_hits(actual))
+    return not bool(requested_markers & actual_markers)
 
 
 def best_song_match(query: str, songs: list[dict]) -> dict | None:

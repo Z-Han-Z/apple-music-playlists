@@ -1,4 +1,4 @@
-# Apple Music プレイリスト・ツールキット
+# Apple Music MCP プレイリスト・キュレーター
 
 ![Apple Music MCP — Apple Music カタログで検証する自然言語プレイリスト](.github/assets/social-preview.jpg)
 
@@ -6,7 +6,8 @@
 日本語 | [한국어](README_KR.md) | [Español](README_ES.md) |
 [Português do Brasil](README_PT_BR.md) | [Deutsch](README_DE.md) | [Français](README_FR.md)
 
-**聴きたいプレイリストを説明するだけで、MCP エージェントが選曲し、Apple Music で検証・プレビューして作成します。**
+**感情、場面、時代、緊張感、物語の弧を言葉にすると、MCP エージェントが正確なバージョン、
+自然な起伏とつながりを備えた、最初から最後まで聴ける Apple Music プレイリストへ仕上げます。**
 
 中心となるインターフェースはローカルの `am-mcp` stdio サービスです。MCP クライアント側の
 モデルが自然言語の要望を解釈し、本サービスがカタログ検索、正確な照合、アカウント操作を
@@ -30,7 +31,7 @@ python am_playlist.py create --name "My Playlist" --tracks "Song A - Artist X, S
 コマンドとしてインストールする場合：
 
 ```bash
-pip install "apple-music-playlists @ git+https://github.com/Z-Han-Z/apple-music-playlists.git@v1.3.0"
+pip install apple-music-playlists
 am-playlist status
 am-playlist login
 ```
@@ -91,7 +92,7 @@ Windsurf、Docker、Cordis/DSH、Harness の設定は
 [docs/client-setup.md](docs/client-setup.md) を参照してください。
 
 ```bash
-docker build -t apple-music-playlists:1.3.0 .
+docker build -t apple-music-playlists:1.4.0 .
 ```
 
 stdio コンテナでは `-i` が必須で、`-d` は使用できません。ホストでログインした後、専用設定ディレクトリを

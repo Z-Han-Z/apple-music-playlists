@@ -1,4 +1,4 @@
-# Herramientas para listas de Apple Music
+# Curador MCP de listas de Apple Music
 
 ![Apple Music MCP — listas en lenguaje natural verificadas en el catálogo de Apple Music](.github/assets/social-preview.jpg)
 
@@ -6,7 +6,8 @@
 [日本語](README_JP.md) | [한국어](README_KR.md) | Español |
 [Português do Brasil](README_PT_BR.md) | [Deutsch](README_DE.md) | [Français](README_FR.md)
 
-**Describe la lista que quieres; tu agente MCP la selecciona, valida cada tema en Apple Music, la previsualiza y la crea.**
+**Describe una emoción, escena, época, tensión o arco narrativo; el agente MCP lo convierte en una
+lista de Apple Music con versiones precisas, progresión coherente y transiciones que invitan a escucharla completa.**
 
 La interfaz principal es el servicio local stdio `am-mcp`. El modelo del cliente MCP interpreta la
 descripción y este servicio busca en el catálogo, resuelve las canciones y opera la cuenta. No
@@ -30,7 +31,7 @@ python am_playlist.py create --name "Mi lista" --tracks "Canción A - Artista X,
 O instálalo como comandos:
 
 ```bash
-pip install "apple-music-playlists @ git+https://github.com/Z-Han-Z/apple-music-playlists.git@v1.3.0"
+pip install apple-music-playlists
 am-playlist status
 am-playlist login
 ```
@@ -91,7 +92,7 @@ Gemini CLI, Windsurf, Docker, Cordis/DSH y Harness está en
 [docs/client-setup.md](docs/client-setup.md).
 
 ```bash
-docker build -t apple-music-playlists:1.3.0 .
+docker build -t apple-music-playlists:1.4.0 .
 ```
 
 Un contenedor stdio necesita `-i` y no debe ejecutarse con `-d`. Inicia sesión en el host y monta la

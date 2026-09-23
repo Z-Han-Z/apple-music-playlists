@@ -1,0 +1,92 @@
+name: publish MCP Registry metadata
+
+run-name: Publish MCP Registry ${{ inputs.version }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version to publish, without v (must already exist on PyPI)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mcp-registry-publish
+  cancel-in-progress: false
+
+env:
+  MCP_PUBLISHER_VERSION: "1.8.1"
+  MCP_PUBLISHER_SHA256: "a06c9096dcb9727c13555b6be26c7effa707b01f06a4c561ba7a3635443cf2cc"
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: refs/tags/v${{ inputs.version }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Confirm release metadata versions
+        env:
+          REQUESTED_VERSION: ${{ inputs.version }}
+        shell: python
+        run: |
+          import json
+          import os
+          import sys
+
+          sys.path.insert(0, os.environ["GITHUB_WORKSPACE"])
+          from am_paths import VERSION
+
+          requested = os.environ["REQUESTED_VERSION"]
+          if requested.startswith("v"):
+              raise SystemExit("enter the version without a leading 'v'")
+          server = json.load(open("server.json", encoding="utf-8"))
+          package_versions = {package.get("version") for package in server["packages"]}
+          if requested != VERSION or server["version"] != requested:
+              raise SystemExit(
+                  f"requested={requested!r}, package={VERSION!r}, server={server['version']!r}"
+              )
+          if package_versions != {requested}:
+              raise SystemExit(f"registry package versions do not match: {package_versions!r}")
+      - name: Download and verify MCP Publisher
+        run: |
+          archive="mcp-publisher_linux_amd64.tar.gz"
+          url="https://github.com/modelcontextprotocol/registry/releases/download/v${MCP_PUBLISHER_VERSION}/${archive}"
+          curl --fail --location --retry 3 --output "${archive}" "${url}"
+          echo "${MCP_PUBLISHER_SHA256}  ${archive}" | sha256sum --check --strict
+          tar --extract --gzip --file "${archive}" mcp-publisher
+          chmod +x mcp-publisher
+      - name: Validate Registry metadata
+        run: ./mcp-publisher validate server.json
+
+  publish:
+    needs: validate
+    runs-on: ubuntu-latest
+    environment:
+      name: mcp-registry
+      url: https://registry.modelcontextprotocol.io/v0.1/servers?search=io.github.Z-Han-Z%2Fapple-music-playlists
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: refs/tags/v${{ inputs.version }}
+      - name: Download and verify MCP Publisher
+        run: |
+          archive="mcp-publisher_linux_amd64.tar.gz"
+          url="https://github.com/modelcontextprotocol/registry/releases/download/v${MCP_PUBLISHER_VERSION}/${archive}"
+          curl --fail --location --retry 3 --output "${archive}" "${url}"
+          echo "${MCP_PUBLISHER_SHA256}  ${archive}" | sha256sum --check --strict
+          tar --extract --gzip --file "${archive}" mcp-publisher
+          chmod +x mcp-publisher
+      - name: Authenticate with GitHub OIDC
+        run: ./mcp-publisher login github-oidc
+      - name: Publish Registry metadata
+        run: ./mcp-publisher publish server.json
