@@ -217,9 +217,8 @@ Results are cached locally, so the network cost is paid once per playlist.
 track could not be measured:
 
 ```
-音频特征覆盖：1395/1581 可用（88%）
-  ·  186 首 没有 ISRC —— 特征链的硬边界，换特征源也解决不了
-  · 1395 首 不在特征缓存里（这批还没抓过）
+Audio-feature coverage: 1,395/1,581 usable (88%)
+  · 186 tracks have no ISRC — the feature chain cannot start, so changing sources will not help
 ```
 
 That distinction is the point. **No ISRC** means the chain cannot start at all — a different
