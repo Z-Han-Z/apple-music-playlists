@@ -1,4 +1,4 @@
-# Kit de playlists do Apple Music
+# Curador MCP de playlists do Apple Music
 
 ![Apple Music MCP — playlists em linguagem natural validadas no catálogo do Apple Music](.github/assets/social-preview.jpg)
 
@@ -6,7 +6,8 @@
 [日本語](README_JP.md) | [한국어](README_KR.md) | [Español](README_ES.md) |
 Português do Brasil | [Deutsch](README_DE.md) | [Français](README_FR.md)
 
-**Descreva a playlist desejada; o agente MCP faz a curadoria, valida cada faixa no Apple Music, pré-visualiza e cria.**
+**Descreva uma sensação, cena, época, tensão ou arco narrativo; o agente MCP transforma isso em uma
+playlist do Apple Music com versões corretas, progressão coerente e transições que funcionam do início ao fim.**
 
 A interface principal é o serviço stdio local `am-mcp`. O modelo do cliente MCP interpreta a
 descrição; este serviço pesquisa o catálogo, resolve as faixas e opera a conta. Não há outro LLM
@@ -30,7 +31,7 @@ python am_playlist.py create --name "Minha playlist" --tracks "Música A - Artis
 Ou instale os comandos:
 
 ```bash
-pip install "apple-music-playlists @ git+https://github.com/Z-Han-Z/apple-music-playlists.git@v1.3.0"
+pip install apple-music-playlists
 am-playlist status
 am-playlist login
 ```
@@ -90,7 +91,7 @@ operação destrutiva. A configuração para Codex, Claude, Cursor, VS Code/Copi
 Windsurf, Docker, Cordis/DSH e Harness está em [docs/client-setup.md](docs/client-setup.md).
 
 ```bash
-docker build -t apple-music-playlists:1.3.0 .
+docker build -t apple-music-playlists:1.4.0 .
 ```
 
 O contêiner stdio precisa de `-i` e não deve usar `-d`. Faça login no host, monte a configuração

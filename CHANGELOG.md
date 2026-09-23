@@ -7,8 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-09-23
+
+### Added
+
+- Published the project as the zero-runtime-dependency `apple-music-playlists` package on PyPI and
+  made that package the default installation path across all nine localized READMEs and client
+  setup guides.
+- Added a reviewed `server.json` plus a manual, approval-gated GitHub OIDC workflow for publishing
+  matching releases to the official MCP Registry. The publisher binary is version- and checksum-
+  pinned, and registry metadata is never published before its PyPI package exists.
+- Added complete community-health files, issue forms, a pull-request template, a shared social
+  preview, Glama discovery metadata, and richer MCP tool titles/descriptions.
+
 ### Changed
 
+- Reframed the project around deep playlist curation: direct language understanding, catalog-
+  grounded song and version selection, narrative structure, and flow-aware sequencing. Generic
+  platform connection is supporting infrastructure rather than the product claim.
 - Refactored `build_pool.py` from an aesthetic candidate selector into a cross-period listening-
   evidence collector. It now merges recent plays with multiple Replay years and preserves source,
   rank, play-count, and first/last-played facts for direct interpretation by the host LLM. The
@@ -30,7 +46,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   surviving candidate is reported as missed. `am_resolve_candidates` already surfaces that as
   `unmatched`, and the CLI reports it before creating or writing anything. Filtering first also
   fixes picking the wrong artist when the correct one is present but ranked lower by relevance.
-   Matching preserves Unicode letters across Korean, Japanese, Chinese, and other scripts, folds
+- Matching preserves Unicode letters across Korean, Japanese, Chinese, and other scripts, folds
    Latin accents for comparison, and accepts spaced hyphen, en-dash, or em-dash delimiters.
 
 ## [1.3.0] - 2026-09-22
@@ -264,7 +280,8 @@ First working toolkit.
 - `docs/` — the curation research the sequencing rules are derived from.
 - `skill/` and `preset/` — an agent skill, and a Cordis preset that mounts the MCP server.
 
-[Unreleased]: https://github.com/Z-Han-Z/apple-music-playlists/compare/v1.3.0...HEAD
+[Unreleased]: https://github.com/Z-Han-Z/apple-music-playlists/compare/v1.4.0...HEAD
+[1.4.0]: https://github.com/Z-Han-Z/apple-music-playlists/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/Z-Han-Z/apple-music-playlists/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/Z-Han-Z/apple-music-playlists/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/Z-Han-Z/apple-music-playlists/compare/v1.0.0...v1.1.0

@@ -30,7 +30,7 @@ MCP flow.
 ## 1. Install and authenticate
 
 ```bash
-pip install "apple-music-playlists @ git+https://github.com/Z-Han-Z/apple-music-playlists.git@v1.3.0"
+pip install apple-music-playlists
 am-playlist status
 am-playlist login
 ```
@@ -186,7 +186,7 @@ Official reference: [Harness — Worker Agent reference](https://developer.harne
 Build the local image:
 
 ```bash
-docker build -t apple-music-playlists:1.3.0 .
+docker build -t apple-music-playlists:1.4.0 .
 ```
 
 On Linux, the default container user is UID/GID 1000. If your host user differs, build with
@@ -200,7 +200,7 @@ writable because the server refreshes and persists the public developer token. L
 docker run --rm -i \
   -v "$HOME/.config/am-playlist:/home/app/.config/am-playlist" \
   -v am-playlist-cache:/home/app/.cache/am-playlist \
-  apple-music-playlists:1.3.0
+  apple-music-playlists:1.4.0
 ```
 
 Windows PowerShell example:
@@ -209,7 +209,7 @@ Windows PowerShell example:
 docker run --rm -i `
   -v "${env:APPDATA}\am-playlist:/home/app/.config/am-playlist" `
   -v "am-playlist-cache:/home/app/.cache/am-playlist" `
-  apple-music-playlists:1.3.0
+  apple-music-playlists:1.4.0
 ```
 
 Do not add `-d`: an MCP stdio server must remain attached to the client's stdin/stdout. A client's
@@ -230,7 +230,7 @@ Minimal protocol smoke test:
 ```
 
 Send that as one line to `am-mcp`; the response should name `apple-music-playlists` and version
-`1.3.0`. Then use the client to call `am_status`.
+`1.4.0`. Then use the client to call `am_status`.
 
 | Symptom | Fix |
 |---|---|

@@ -319,7 +319,10 @@ class TestMcpCompatibility(unittest.TestCase):
         )
         messages = [json.loads(line) for line in result.stdout.splitlines()]
         self.assertEqual(messages[0]["error"]["code"], -32700)
-        self.assertEqual(messages[1]["result"]["serverInfo"]["version"], "1.3.0")
+        self.assertEqual(
+            messages[1]["result"]["serverInfo"]["version"],
+            mcp.SERVER_INFO["version"],
+        )
         self.assertEqual(result.stderr, "")
 
 
@@ -338,6 +341,8 @@ class TestStableReleaseAssets(unittest.TestCase):
                              "docker build", "python -m unittest", "SETUP",
                              "create_playlist_from_description"):
                 self.assertIn(required, text, f"{name} is missing {required}")
+            self.assertIn("pip install apple-music-playlists", text)
+            self.assertNotIn("git+https://github.com/Z-Han-Z/apple-music-playlists", text)
 
     def test_every_locale_links_to_every_other_locale(self):
         for name in self.LOCALES:
@@ -374,7 +379,11 @@ class TestStableReleaseAssets(unittest.TestCase):
         readme = (self.ROOT / "README.md").read_text(encoding="utf-8")
         workflow = (self.ROOT / ".github" / "workflows" / "publish-pypi.yml").read_text(
             encoding="utf-8")
+        registry_workflow = (
+            self.ROOT / ".github" / "workflows" / "publish-mcp-registry.yml"
+        ).read_text(encoding="utf-8")
         guide = (self.ROOT / "docs" / "publishing.md").read_text(encoding="utf-8")
+        manifest = json.loads((self.ROOT / "server.json").read_text(encoding="utf-8"))
 
         registry_name = "io.github.Z-Han-Z/apple-music-playlists"
         self.assertIn(f"mcp-name: {registry_name}", readme)
@@ -388,8 +397,31 @@ class TestStableReleaseAssets(unittest.TestCase):
         self.assertIn("id-token: write", workflow)
         self.assertIn("pypa/gh-action-pypi-publish@release/v1", workflow)
         self.assertNotIn("secrets.", workflow)
-        self.assertIn("Do not add `server.json` until", guide)
+        self.assertIn("do not publish that metadata until", guide)
         self.assertIn(registry_name, guide)
+
+        self.assertEqual(manifest["name"], registry_name)
+        self.assertEqual(manifest["version"], mcp.SERVER_INFO["version"])
+        self.assertEqual(manifest["packages"][0]["version"], mcp.SERVER_INFO["version"])
+        self.assertEqual(manifest["packages"][0]["registryType"], "pypi")
+        self.assertEqual(manifest["packages"][0]["identifier"], "apple-music-playlists")
+        self.assertEqual(manifest["packages"][0]["runtimeHint"], "uvx")
+        self.assertEqual(manifest["packages"][0]["packageArguments"][0]["value"], "am-mcp")
+        self.assertEqual(manifest["packages"][0]["transport"]["type"], "stdio")
+
+        self.assertIn("workflow_dispatch:", registry_workflow)
+        self.assertIn("ref: refs/tags/v${{ inputs.version }}", registry_workflow)
+        self.assertIn("name: mcp-registry", registry_workflow)
+        self.assertIn("id-token: write", registry_workflow)
+        self.assertIn("login github-oidc", registry_workflow)
+        self.assertIn("publish server.json", registry_workflow)
+        self.assertIn("MCP_PUBLISHER_VERSION: \"1.8.1\"", registry_workflow)
+        self.assertIn(
+            "a06c9096dcb9727c13555b6be26c7effa707b01f06a4c561ba7a3635443cf2cc",
+            registry_workflow,
+        )
+        self.assertNotIn("secrets.", registry_workflow)
+        self.assertNotIn("pull_request_target:", registry_workflow)
 
     def test_english_readme_coverage_example_is_english(self):
         readme = (self.ROOT / "README.md").read_text(encoding="utf-8")
@@ -397,6 +429,7 @@ class TestStableReleaseAssets(unittest.TestCase):
         example = section.split("That distinction is the point.", 1)[0]
         self.assertIn("Audio-feature coverage:", example)
         self.assertIn("tracks have no ISRC", example)
+        self.assertIn("tracks are not in the current source", example)
         self.assertNotRegex(example, r"[\u4e00-\u9fff]")
 
 

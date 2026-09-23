@@ -1,4 +1,4 @@
-# Apple Music 플레이리스트 툴킷
+# Apple Music MCP 플레이리스트 큐레이터
 
 ![Apple Music MCP — Apple Music 카탈로그로 검증하는 자연어 플레이리스트](.github/assets/social-preview.jpg)
 
@@ -6,7 +6,8 @@
 [日本語](README_JP.md) | 한국어 | [Español](README_ES.md) |
 [Português do Brasil](README_PT_BR.md) | [Deutsch](README_DE.md) | [Français](README_FR.md)
 
-**원하는 플레이리스트를 설명하면 MCP 에이전트가 선곡하고 Apple Music에서 검증·미리보기 후 생성합니다.**
+**감정, 장면, 시대, 긴장감 또는 서사의 흐름을 설명하면 MCP 에이전트가 정확한 버전과 자연스러운
+전개·전환을 갖춘, 처음부터 끝까지 들을 수 있는 Apple Music 플레이리스트로 큐레이션합니다.**
 
 기본 인터페이스는 로컬 `am-mcp` stdio 서비스입니다. MCP 클라이언트의 모델이 자연어 요청을
 해석하고, 이 서비스가 카탈로그 검색, 정확한 곡 매칭 및 계정 작업을 담당합니다. 별도의 LLM이나
@@ -30,7 +31,7 @@ python am_playlist.py create --name "My Playlist" --tracks "Song A - Artist X, S
 명령으로 설치하려면:
 
 ```bash
-pip install "apple-music-playlists @ git+https://github.com/Z-Han-Z/apple-music-playlists.git@v1.3.0"
+pip install apple-music-playlists
 am-playlist status
 am-playlist login
 ```
@@ -90,7 +91,7 @@ annotation을 포함합니다. Codex, Claude, Cursor, VS Code/Copilot, Gemini CL
 Cordis/DSH 및 Harness 설정은 [docs/client-setup.md](docs/client-setup.md)를 참고하세요.
 
 ```bash
-docker build -t apple-music-playlists:1.3.0 .
+docker build -t apple-music-playlists:1.4.0 .
 ```
 
 stdio 컨테이너는 `-i`가 필요하며 `-d`를 사용하면 안 됩니다. 호스트에서 로그인한 뒤 전용 설정 디렉터리를

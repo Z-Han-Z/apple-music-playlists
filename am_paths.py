@@ -19,7 +19,7 @@ import sys
 from pathlib import Path
 
 APP = "am-playlist"
-VERSION = "1.3.0"
+VERSION = "1.4.0"
 
 
 def enable_utf8_stdout() -> None:

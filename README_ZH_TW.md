@@ -1,4 +1,4 @@
-# Apple Music 歌單工具箱
+# Apple Music MCP 歌單策劃器
 
 ![Apple Music MCP——經 Apple Music 曲庫驗證的自然語言歌單](.github/assets/social-preview.jpg)
 
@@ -6,7 +6,8 @@
 [日本語](README_JP.md) | [한국어](README_KR.md) | [Español](README_ES.md) |
 [Português do Brasil](README_PT_BR.md) | [Deutsch](README_DE.md) | [Français](README_FR.md)
 
-**描述想聽的歌單；MCP Agent 負責策劃、在 Apple Music 逐首驗證、預演並建立。**
+**描述一種感覺、場景、年代、張力或敘事弧；MCP Agent 將它策劃成版本準確、起伏合理、
+銜接自然，能從頭聽到尾的 Apple Music 歌單。**
 
 主要入口是本機 `am-mcp` stdio 服務。MCP 客戶端既有的模型理解自然語言描述並挑選候選曲目；
 本服務負責目錄搜尋、精確配對和帳號操作，不內建模型，也不需要另一組 LLM API key。
@@ -29,7 +30,7 @@ python am_playlist.py create --name "我的歌單" --tracks "歌名 A - 藝人 X
 也可安裝成全域命令：
 
 ```bash
-pip install "apple-music-playlists @ git+https://github.com/Z-Han-Z/apple-music-playlists.git@v1.3.0"
+pip install apple-music-playlists
 am-playlist status
 am-playlist login
 ```
@@ -87,7 +88,7 @@ Codex、Claude、Cursor、VS Code/Copilot、Gemini CLI、Windsurf、Docker、Cor
 的完整設定請見 [docs/client-setup.zh-CN.md](docs/client-setup.zh-CN.md)。
 
 ```bash
-docker build -t apple-music-playlists:1.3.0 .
+docker build -t apple-music-playlists:1.4.0 .
 ```
 
 stdio 容器必須保留 `-i`、不可使用 `-d`。將應用專用憑證目錄掛載到

@@ -1,8 +1,9 @@
 # Publishing to PyPI and the official MCP Registry
 
-This is a maintainer-only checklist. Normal users install from GitHub and do not need any of these
-steps. Do not add `server.json` until the referenced package version is publicly available: the
-official MCP Registry verifies the package and rejects metadata that points at a missing artifact.
+This is a maintainer-only checklist. Normal users install from PyPI and do not need any of these
+steps. A release may contain its matching `server.json`, but do not publish that metadata until the
+referenced package version is publicly available: the official MCP Registry verifies the package
+and rejects metadata that points at a missing artifact.
 
 ## 1. One-time PyPI setup
 
@@ -31,7 +32,7 @@ Official references:
 
 1. Confirm the target version in `am_paths.VERSION`, the Git tag, GitHub Release, and changelog.
 2. Run the **publish PyPI package** workflow manually and enter the version without a leading `v`
-   (for example, `1.3.0`). The workflow checks out the immutable `v<version>` tag before testing
+   (for example, `1.4.0`). The workflow checks out the immutable `v<version>` tag before testing
    and building, so the PyPI artifact is made from the same source as the GitHub Release.
 3. Approve the `pypi` environment deployment only after the build and offline test job succeeds.
 4. Verify both the wheel and source distribution at
@@ -53,15 +54,18 @@ Only after the matching PyPI version exists:
    <!-- mcp-name: io.github.Z-Han-Z/apple-music-playlists -->
    ```
 
-2. Generate `server.json` with the current `mcp-publisher init`, then review every field. Use:
+2. Review the release's `server.json` and confirm every field. It uses:
    - name: `io.github.Z-Han-Z/apple-music-playlists`
    - package registry type: `pypi`
    - package identifier: `apple-music-playlists`
    - transport: `stdio`
    - package version: the exact published version, never `latest`
-3. Run `mcp-publisher validate server.json`.
-4. Authenticate with GitHub and publish. Interactive use is `mcp-publisher login github`; CI may
-   use `mcp-publisher login github-oidc` with narrowly scoped `id-token: write` permission.
+3. Run the manual **publish MCP Registry metadata** workflow with the same version. Its validation
+   job checks out the immutable release tag, verifies the version fields, downloads a checksum-
+   pinned publisher binary, and runs `mcp-publisher validate server.json`.
+4. Approve the `mcp-registry` environment only after validation succeeds. The publish job uses
+   GitHub OIDC with narrowly scoped `id-token: write`; it stores no registry token or repository
+   secret.
 5. Read the published record back from the Registry API and verify its package, version,
    repository, title, and description.
 

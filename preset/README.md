@@ -104,7 +104,7 @@ python am_playlist.py login          # 见仓库 SETUP.md 的三种方式
 装完之后模块进了 site-packages，**不再需要绝对脚本路径，也不依赖 cwd**：
 
 ```bash
-pip install "apple-music-playlists @ git+https://github.com/Z-Han-Z/apple-music-playlists.git"
+pip install apple-music-playlists
 # 或者已经在仓库里：  pip install -e .
 ```
 

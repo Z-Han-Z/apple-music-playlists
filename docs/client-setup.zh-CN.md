@@ -28,7 +28,7 @@ CLI 是配套的登录、诊断、脚本、体检和手动维护入口；正常 
 ## 1. 安装与登录
 
 ```bash
-pip install "apple-music-playlists @ git+https://github.com/Z-Han-Z/apple-music-playlists.git@v1.3.0"
+pip install apple-music-playlists
 am-playlist status
 am-playlist login
 ```
@@ -149,7 +149,7 @@ Windsurf 把通用 `mcpServers` 对象放到 `~/.codeium/windsurf/mcp_config.jso
 ## 4. Docker
 
 ```bash
-docker build -t apple-music-playlists:1.3.0 .
+docker build -t apple-music-playlists:1.4.0 .
 ```
 
 Linux 镜像默认使用 UID/GID 1000。如果宿主用户不是 1000，构建时加
@@ -163,7 +163,7 @@ developer token；缓存目录也保持可写。Windows PowerShell：
 docker run --rm -i `
   -v "${env:APPDATA}\am-playlist:/home/app/.config/am-playlist" `
   -v "am-playlist-cache:/home/app/.cache/am-playlist" `
-  apple-music-playlists:1.3.0
+  apple-music-playlists:1.4.0
 ```
 
 macOS / Linux：
@@ -172,7 +172,7 @@ macOS / Linux：
 docker run --rm -i \
   -v "$HOME/.config/am-playlist:/home/app/.config/am-playlist" \
   -v am-playlist-cache:/home/app/.cache/am-playlist \
-  apple-music-playlists:1.3.0
+  apple-music-playlists:1.4.0
 ```
 
 不要加 `-d`：stdio MCP 必须前台连接客户端的 stdin/stdout。客户端使用容器时，`command`
@@ -184,7 +184,7 @@ Compose 用法：设置 `AM_PLAYLIST_CONFIG_DIR` 为宿主机配置目录，再�
 
 ## 5. 验证与排错
 
-向 `am-mcp` 发送一行初始化请求，响应应包含 `apple-music-playlists` 和 `1.3.0`：
+向 `am-mcp` 发送一行初始化请求，响应应包含 `apple-music-playlists` 和 `1.4.0`：
 
 ```text
 {"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"smoke","version":"1"}}}

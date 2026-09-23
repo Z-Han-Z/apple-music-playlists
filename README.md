@@ -1,4 +1,4 @@
-# Apple Music MCP Playlist Toolkit
+# Apple Music MCP Curator
 
 <!-- mcp-name: io.github.Z-Han-Z/apple-music-playlists -->
 
@@ -7,6 +7,7 @@
 [![Tests](https://github.com/Z-Han-Z/apple-music-playlists/actions/workflows/test.yml/badge.svg)](https://github.com/Z-Han-Z/apple-music-playlists/actions/workflows/test.yml)
 [![Container](https://github.com/Z-Han-Z/apple-music-playlists/actions/workflows/container.yml/badge.svg)](https://github.com/Z-Han-Z/apple-music-playlists/actions/workflows/container.yml)
 [![Release](https://img.shields.io/github/v/release/Z-Han-Z/apple-music-playlists)](https://github.com/Z-Han-Z/apple-music-playlists/releases/latest)
+[![PyPI](https://img.shields.io/pypi/v/apple-music-playlists)](https://pypi.org/project/apple-music-playlists/)
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Glama quality score](https://glama.ai/mcp/servers/Z-Han-Z/apple-music-playlists/badges/score.svg)](https://glama.ai/mcp/servers/Z-Han-Z/apple-music-playlists)
@@ -15,8 +16,9 @@ English | [简体中文](README_ZH_CN.md) | [繁體中文](README_ZH_TW.md) |
 [日本語](README_JP.md) | [한국어](README_KR.md) | [Español](README_ES.md) |
 [Português do Brasil](README_PT_BR.md) | [Deutsch](README_DE.md) | [Français](README_FR.md)
 
-**A local, open-source Apple Music MCP server: describe the playlist you want, and your agent
-curates it, verifies every track in Apple Music, previews the match, and creates it for you.**
+**Deep playlist curation for Apple Music: describe a feeling, scene, era, tension, or narrative arc;
+your agent turns it into a catalog-grounded selection whose versions, pacing, and transitions hold
+together as a listening experience.**
 
 Pure Python standard library — no `pip install` required to run, and **no Apple Developer Program
 membership needed**. Requires Python 3.10+ and works on Windows / macOS / Linux.
@@ -28,21 +30,25 @@ API key, artist list, or fixed theme. The CLI remains available for login, diagn
 audits, and advanced sequencing.
 
 ```
-  describe  →  curate  →  catalog-check  →  dry-run  →  create
+  understand  →  curate  →  ground  →  shape the arc  →  dry-run  →  create
 ```
 
 ## Why this project
 
-- **Natural-language first.** Works with Codex, Claude, Cursor, VS Code/Copilot, Gemini CLI,
-  Windsurf, Cordis/DSH, Harness, and other clients that can launch a stdio MCP server.
-- **Safer writes.** Candidate grounding catches missing tracks, duplicates, suspicious live or
-  remastered versions, and artist concentration before the dry run and final create step.
+- **The brief stays semantic.** The host LLM reasons directly about imagery, mood, lyrical angle,
+  era, cultural context, contrast, and the role of each song. It is not reduced to a handful of
+  user-supplied sliders or an opaque theme-fit number.
+- **Selection and sequencing stay separate.** The model decides what belongs; measured BPM, key,
+  energy, valence, and loudness can then diagnose transitions or refine order inside narrative
+  blocks without overriding the musical idea.
+- **Every candidate is grounded.** Catalog resolution catches missing tracks, duplicates, wrong
+  artists, and suspicious live/remastered versions before the dry run and final create step.
+- **Listening evidence remains evidence.** Replay history, recent plays, dates, and play counts can
+  inform curation without silently becoming an algorithmic definition of the user's taste.
 - **Local and private by design.** The server runs on your machine; credentials stay in the local
   app config, and there is no bundled model, telemetry service, or extra LLM API key.
-- **No paid developer account.** The standard-library runtime can obtain the public Apple Music
-  web token automatically; only your normal Apple Music account login is required.
-- **More than creation.** The same toolkit can inspect Replay listening history, audit existing
-  playlists, diagnose transitions, and optionally optimize ordering inside chosen narrative blocks.
+- **Portable MCP stdio.** Works with Codex, Claude, Cursor, VS Code/Copilot, Gemini CLI, Windsurf,
+  Cordis/DSH, Harness, and other clients that can launch a local stdio server.
 
 ---
 
@@ -51,7 +57,7 @@ audits, and advanced sequencing.
 **Recommended — install the MCP stdio service:**
 
 ```bash
-pip install git+https://github.com/Z-Han-Z/apple-music-playlists.git
+pip install apple-music-playlists
 am-playlist status
 am-playlist login       # one-time Apple ID sign-in
 ```
@@ -162,7 +168,7 @@ Docker, Cordis/DSH, and Harness are in **[docs/client-setup.md](docs/client-setu
 Build the non-root local container with:
 
 ```bash
-docker build -t apple-music-playlists:1.3.0 .
+docker build -t apple-music-playlists:1.4.0 .
 ```
 
 The client must run it attached with `docker run --rm -i`; mount only the app config directory and
@@ -218,7 +224,8 @@ track could not be measured:
 
 ```
 Audio-feature coverage: 1,395/1,581 usable (88%)
-  · 186 tracks have no ISRC — the feature chain cannot start, so changing sources will not help
+  ·  80 tracks have no ISRC — the feature chain cannot start, so changing sources will not help
+  · 106 tracks are not in the current source — switch sources or analyse the audio locally
 ```
 
 That distinction is the point. **No ISRC** means the chain cannot start at all — a different
