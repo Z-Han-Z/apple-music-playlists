@@ -297,19 +297,34 @@ TOOLS = [
 # infer behaviour from translated prose. Tool annotations are hints, not an authorization
 # mechanism; the server still enforces confirm=true for deletion.
 _ENGLISH_TOOL_DESCRIPTIONS = {
-    "am_status": "Check developer-token validity and Apple Music login status. Run before writes.",
-    "am_search_songs": "Search the Apple Music catalog and return stable catalog IDs.",
-    "am_resolve_candidates": "Ground an LLM-curated candidate pool in Apple Music metadata; flag duplicates and version markers without scoring theme fit.",
-    "am_list_playlists": "List every playlist in the current user's library, including IDs.",
-    "am_show_playlist": "Show the tracks in a playlist selected by name or ID.",
-    "am_create_playlist": "Create a playlist from 'Title - Artist' strings or ISRCs; supports dry-run matching.",
-    "am_add_tracks": "Append resolved tracks to a playlist created by this API client.",
-    "am_delete_playlist": "Delete a playlist. Destructive; confirm=true is mandatory.",
-    "am_audit_playlist": "Read-only metadata audit: length, artists, genres, eras, duplicates, and interludes.",
-    "am_analyze_flow": "Read-only audio-feature and sequencing audit; may fetch and cache remote feature data.",
-    "am_optimize_order": "Read-only: compute a better track order (simulated annealing over the adjacency rules and a chosen narrative arc). Returns the order; writes nothing. May fetch and cache remote feature data.",
-    "am_recently_played": "Read recently played or recently added Apple Music content.",
-    "am_top_played": "Read Apple Music Replay play-count rankings by song, album, or artist.",
+    "am_status": "Check developer-token validity and Apple Music login status. Use before any library write; this check changes nothing.",
+    "am_search_songs": "Search the Apple Music catalog for a small exploratory lookup and return stable catalog IDs. For an LLM-proposed playlist-sized pool, use am_resolve_candidates instead.",
+    "am_resolve_candidates": "Ground an LLM-curated candidate pool in Apple Music metadata before final selection or creation. It flags unresolved tracks, duplicate recordings, artist concentration, and version markers; it never scores theme fit or writes to the library.",
+    "am_list_playlists": "List every playlist in the current user's library, including IDs. Use am_show_playlist when the tracks of one playlist are needed.",
+    "am_show_playlist": "Show the tracks in one playlist selected by name or ID. Use am_list_playlists first when the exact playlist is unknown.",
+    "am_create_playlist": "Create a new playlist from 'Title - Artist' strings or ISRCs. Use dry_run=true to verify catalog matching without writing; use am_add_tracks for an existing playlist.",
+    "am_add_tracks": "Append resolved tracks to an existing playlist created by this API client. Use dry_run=true to preview matching; use am_create_playlist for a new playlist.",
+    "am_delete_playlist": "Delete one playlist permanently after it has been shown to the user. This is destructive, requires confirm=true, and does not delete the underlying songs from the library.",
+    "am_audit_playlist": "Read-only metadata audit of playlist length, artist concentration, genres, eras, duplicates, and possible interludes. For BPM, key, energy, and transitions, use am_analyze_flow.",
+    "am_analyze_flow": "Read-only diagnosis of BPM, key, loudness, energy, mood, adjacent transitions, and overall arc. It may fetch and cache remote feature data; use am_optimize_order only when a proposed replacement order is wanted.",
+    "am_optimize_order": "Compute a proposed order after the LLM has selected the songs and narrative blocks. It balances adjacent audio transitions with a chosen qualitative arc, returns an order without writing, and may fetch cached remote features; it must not choose songs or judge theme fit.",
+    "am_recently_played": "Read recent listening or recently added Apple Music content when recency matters. This API does not provide play counts; use am_top_played for Replay rankings.",
+    "am_top_played": "Read Apple Music Replay play-count rankings by song, album, or artist when frequency matters. Use am_recently_played for latest listening; all-time data may be unavailable, so retry with a specific year.",
+}
+_TOOL_TITLES = {
+    "am_status": "Check Apple Music Status",
+    "am_search_songs": "Search Apple Music Catalog",
+    "am_resolve_candidates": "Resolve Playlist Candidates",
+    "am_list_playlists": "List Library Playlists",
+    "am_show_playlist": "Show Playlist Tracks",
+    "am_create_playlist": "Create Playlist",
+    "am_add_tracks": "Add Tracks to Playlist",
+    "am_delete_playlist": "Delete Playlist",
+    "am_audit_playlist": "Audit Playlist Metadata",
+    "am_analyze_flow": "Analyze Playlist Flow",
+    "am_optimize_order": "Optimize Track Order",
+    "am_recently_played": "Get Recent Listening",
+    "am_top_played": "Get Replay Rankings",
 }
 _READ_ONLY_TOOLS = {
     "am_status", "am_search_songs", "am_resolve_candidates", "am_list_playlists", "am_show_playlist",
@@ -318,6 +333,7 @@ _READ_ONLY_TOOLS = {
 }
 for _tool in TOOLS:
     _name = _tool["name"]
+    _tool["title"] = _TOOL_TITLES[_name]
     _tool["description"] = f"{_ENGLISH_TOOL_DESCRIPTIONS[_name]} / 中文：{_tool['description']}"
     _tool["annotations"] = {
         "readOnlyHint": _name in _READ_ONLY_TOOLS,
