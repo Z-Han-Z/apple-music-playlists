@@ -5,6 +5,7 @@
 [![Release](https://img.shields.io/github/v/release/Z-Han-Z/apple-music-playlists)](https://github.com/Z-Han-Z/apple-music-playlists/releases/latest)
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Glama quality score](https://glama.ai/mcp/servers/Z-Han-Z/apple-music-playlists/badges/score.svg)](https://glama.ai/mcp/servers/Z-Han-Z/apple-music-playlists)
 
 English | [简体中文](README_ZH_CN.md) | [繁體中文](README_ZH_TW.md) |
 [日本語](README_JP.md) | [한국어](README_KR.md) | [Español](README_ES.md) |
