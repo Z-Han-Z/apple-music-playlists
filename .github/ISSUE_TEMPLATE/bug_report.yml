@@ -1,0 +1,58 @@
+name: Bug report
+description: Report a reproducible CLI, MCP, catalog-matching, or playlist workflow problem
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Never paste Apple Music tokens, cookies, `.p8` keys, or personal listening history.
+        Replace song and playlist details with synthetic examples when possible.
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Release tag or commit SHA
+      placeholder: v1.3.0
+    validations:
+      required: true
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Surface
+      options:
+        - MCP stdio server
+        - CLI
+        - Docker / Compose
+        - Playlist audit or optimizer
+        - Documentation / client setup
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Minimal reproduction
+      description: Include redacted commands or JSON-RPC input and the exact observed output.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: OS, Python version, MCP client, and storefront if relevant
+    validations:
+      required: true
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Safety check
+      options:
+        - label: I removed credentials, cookies, private keys, account identifiers, and personal listening data.
+          required: true

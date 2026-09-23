@@ -1,0 +1,30 @@
+name: Feature request
+description: Propose a focused improvement to the MCP, CLI, adapters, or curation workflow
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: User problem
+      description: What should become possible or easier? Describe the outcome, not only an API shape.
+    validations:
+      required: true
+  - type: textarea
+    id: workflow
+    attributes:
+      label: Proposed workflow
+      description: Explain which decisions belong to the host LLM and which belong to deterministic tooling.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+  - type: checkboxes
+    id: scope
+    attributes:
+      label: Scope check
+      options:
+        - label: This request does not require embedding credentials or a second hosted LLM in the server.
+          required: true
