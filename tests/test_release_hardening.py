@@ -178,7 +178,15 @@ class TestMcpCompatibility(unittest.TestCase):
 
     def test_tools_expose_bilingual_descriptions_and_risk_annotations(self):
         tools = {tool["name"]: tool for tool in mcp.TOOLS}
+        self.assertEqual(len(tools), len(mcp.TOOLS))
+        self.assertTrue(all(tool.get("title") for tool in tools.values()))
+        self.assertEqual(len({tool["title"] for tool in tools.values()}), len(tools))
         self.assertIn("中文", tools["am_status"]["description"])
+        self.assertIn("use am_resolve_candidates instead", tools["am_search_songs"]["description"])
+        self.assertIn("never scores theme fit", tools["am_resolve_candidates"]["description"])
+        self.assertIn("use am_analyze_flow", tools["am_audit_playlist"]["description"])
+        self.assertIn("must not choose songs", tools["am_optimize_order"]["description"])
+        self.assertIn("does not provide play counts", tools["am_recently_played"]["description"])
         self.assertTrue(tools["am_status"]["annotations"]["readOnlyHint"])
         self.assertTrue(tools["am_delete_playlist"]["annotations"]["destructiveHint"])
         self.assertFalse(tools["am_delete_playlist"]["annotations"]["readOnlyHint"])
