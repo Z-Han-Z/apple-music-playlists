@@ -1,5 +1,7 @@
 # Apple Music MCP Playlist Toolkit
 
+![Apple Music MCP — natural-language playlists grounded in Apple Music](.github/assets/social-preview.jpg)
+
 [![Tests](https://github.com/Z-Han-Z/apple-music-playlists/actions/workflows/test.yml/badge.svg)](https://github.com/Z-Han-Z/apple-music-playlists/actions/workflows/test.yml)
 [![Container](https://github.com/Z-Han-Z/apple-music-playlists/actions/workflows/container.yml/badge.svg)](https://github.com/Z-Han-Z/apple-music-playlists/actions/workflows/container.yml)
 [![Release](https://img.shields.io/github/v/release/Z-Han-Z/apple-music-playlists)](https://github.com/Z-Han-Z/apple-music-playlists/releases/latest)

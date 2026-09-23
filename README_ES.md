@@ -1,5 +1,7 @@
 # Herramientas para listas de Apple Music
 
+![Apple Music MCP — listas en lenguaje natural verificadas en el catálogo de Apple Music](.github/assets/social-preview.jpg)
+
 [English](README.md) | [简体中文](README_ZH_CN.md) | [繁體中文](README_ZH_TW.md) |
 [日本語](README_JP.md) | [한국어](README_KR.md) | Español |
 [Português do Brasil](README_PT_BR.md) | [Deutsch](README_DE.md) | [Français](README_FR.md)
