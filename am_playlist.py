@@ -43,6 +43,7 @@ import os
 import random
 import re
 import sys
+import unicodedata
 import time
 import urllib.error
 import urllib.parse
@@ -594,15 +595,18 @@ def best_song_match(query: str, songs: list[dict]) -> dict | None:
     比静默写错一首安全。
     """
     def norm(s: str) -> str:
-        return re.sub(r"[^0-9a-z\u4e00-\u9fff]+", "", (s or "").lower())
+        # The previous ASCII+CJK range erased Hangul and Japanese kana. Unicode
+        # alphanumerics preserve every script; NFKD also folds Latin accents.
+        decomposed = unicodedata.normalize("NFKD", (s or "").casefold())
+        return "".join(ch for ch in decomposed if ch.isalnum())
 
     if not songs:
         return None
-    if " - " in query:
-        want_t, want_a = query.split(" - ", 1)
-    else:
-        want_t, want_a = query, ""
+    parts = re.split(r"\s+(?:-|—|–)\s+", query, maxsplit=1)
+    want_t, want_a = (parts[0], parts[1]) if len(parts) == 2 else (query, "")
     nt, na = norm(want_t), norm(want_a)
+    if not nt and not na:
+        return None
 
     def title_ok(t: str) -> bool:
         return not nt or nt == t or nt in t or t in nt

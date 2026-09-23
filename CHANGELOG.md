@@ -18,6 +18,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   surviving candidate is reported as missed. `am_resolve_candidates` already surfaces that as
   `unmatched`, and the CLI reports it before creating or writing anything. Filtering first also
   fixes picking the wrong artist when the correct one is present but ranked lower by relevance.
+  Matching preserves Unicode letters across Korean, Japanese, Chinese, and other scripts, folds
+  Latin accents for comparison, and accepts spaced hyphen, en-dash, or em-dash delimiters.
 
 ## [1.3.0] - 2026-09-22
 

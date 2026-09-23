@@ -632,6 +632,32 @@ class TestBestSongMatch(unittest.TestCase):
         got = self.am.best_song_match("Song - wanted band", songs)
         self.assertEqual(got["id"], "Song")
 
+    def test_korean_query_does_not_collapse_to_empty_and_pick_first(self):
+        songs = [self._song("완전히 다른 노래", "다른 가수"),
+                 self._song("좋은 날", "아이유")]
+        got = self.am.best_song_match("좋은 날 - 아이유", songs)
+        self.assertEqual(got["id"], "좋은 날")
+
+    def test_kana_title_selects_the_right_song_by_the_same_artist(self):
+        songs = [self._song("ハルジオン", "YOASOBI"),
+                 self._song("アイドル", "YOASOBI")]
+        got = self.am.best_song_match("アイドル - YOASOBI", songs)
+        self.assertEqual(got["id"], "アイドル")
+
+    def test_accented_latin_matches_plain_spelling(self):
+        songs = [self._song("Corazón", "Artista")]
+        got = self.am.best_song_match("Corazon - Artista", songs)
+        self.assertEqual(got["id"], "Corazón")
+
+    def test_spaced_unicode_dash_is_a_supported_delimiter(self):
+        songs = [self._song("Song", "Artist")]
+        got = self.am.best_song_match("Song — Artist", songs)
+        self.assertEqual(got["id"], "Song")
+
+    def test_punctuation_only_query_is_not_an_arbitrary_match(self):
+        songs = [self._song("Song", "Artist")]
+        self.assertIsNone(self.am.best_song_match("!!!", songs))
+
     def test_title_only_query_still_resolves(self):
         """查询没写艺人时不该加上艺人门槛。"""
         songs = [self._song("Song", "Any Artist At All")]
