@@ -17,7 +17,7 @@
 | 登录一次之后能全自动多久？ | 约 **6 个月**（`music-user-token` 的寿命）。过期后重跑一次 `login`；developer token 由脚本自动续抓，无需干预。 |
 | 本机最佳路径 | 网页播放器内部 API `amp-api.music.apple.com`，脚本已实现并**端到端跑通**。 |
 | 当前状态 | ✅ **已跑通**。登录已完成，实测建成歌单「演示歌单」（8 首，顺序正确），删除也已验证。 |
-| 已经交付了什么 | `am_playlist.py`（命令行工具，纯标准库）、`am_mcp_server.py`（MCP 服务，7 个工具）、DSH 新预设「音乐歌单」。 |
+| 已经交付了什么 | `am_playlist.py`（命令行工具，纯标准库）、`am_mcp_server.py`（MCP 服务，13 个工具）、DSH 新预设「音乐歌单」。 |
 
 ---
 
