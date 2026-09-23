@@ -367,6 +367,7 @@ class TestDocsDoNotLie(unittest.TestCase):
         claims = [("README.md", r"\*\*(\d+) tools\*\*"),
                   ("skill/SKILL.md", r"MCP 工具（(\d+) 个）"),
                   ("preset/README.md", r"获得 (\d+) 个 Apple Music 工具"),
+                  ("docs/apple-music-api-notes.md", r"MCP 服务，(\d+) 个工具"),
                   ("docs/apple-music-api-notes.md", r"暴露成 (\d+) 个工具"),
                   ("docs/apple-music-api-notes.md", r"暴露 (\d+) 个工具")]
         for rel, pat in claims:
