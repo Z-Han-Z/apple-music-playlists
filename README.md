@@ -2,7 +2,7 @@
 
 <!-- mcp-name: io.github.Z-Han-Z/apple-music-playlists -->
 
-![Apple Music MCP — natural-language playlists grounded in Apple Music](.github/assets/social-preview.jpg)
+![Apple Music MCP — natural-language playlists grounded in Apple Music](https://raw.githubusercontent.com/Z-Han-Z/apple-music-playlists/main/.github/assets/social-preview.jpg)
 
 [![Tests](https://github.com/Z-Han-Z/apple-music-playlists/actions/workflows/test.yml/badge.svg)](https://github.com/Z-Han-Z/apple-music-playlists/actions/workflows/test.yml)
 [![Container](https://github.com/Z-Han-Z/apple-music-playlists/actions/workflows/container.yml/badge.svg)](https://github.com/Z-Han-Z/apple-music-playlists/actions/workflows/container.yml)

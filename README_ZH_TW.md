@@ -1,6 +1,6 @@
 # Apple Music MCP 歌單策劃器
 
-![Apple Music MCP——經 Apple Music 曲庫驗證的自然語言歌單](.github/assets/social-preview.jpg)
+![Apple Music MCP——經 Apple Music 曲庫驗證的自然語言歌單](https://raw.githubusercontent.com/Z-Han-Z/apple-music-playlists/main/.github/assets/social-preview.jpg)
 
 [English](README.md) | [简体中文](README_ZH_CN.md) | 繁體中文 |
 [日本語](README_JP.md) | [한국어](README_KR.md) | [Español](README_ES.md) |

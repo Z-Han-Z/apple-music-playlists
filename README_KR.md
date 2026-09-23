@@ -1,6 +1,6 @@
 # Apple Music MCP 플레이리스트 큐레이터
 
-![Apple Music MCP — Apple Music 카탈로그로 검증하는 자연어 플레이리스트](.github/assets/social-preview.jpg)
+![Apple Music MCP — Apple Music 카탈로그로 검증하는 자연어 플레이리스트](https://raw.githubusercontent.com/Z-Han-Z/apple-music-playlists/main/.github/assets/social-preview.jpg)
 
 [English](README.md) | [简体中文](README_ZH_CN.md) | [繁體中文](README_ZH_TW.md) |
 [日本語](README_JP.md) | 한국어 | [Español](README_ES.md) |

@@ -1,6 +1,6 @@
 # Apple Music MCP プレイリスト・キュレーター
 
-![Apple Music MCP — Apple Music カタログで検証する自然言語プレイリスト](.github/assets/social-preview.jpg)
+![Apple Music MCP — Apple Music カタログで検証する自然言語プレイリスト](https://raw.githubusercontent.com/Z-Han-Z/apple-music-playlists/main/.github/assets/social-preview.jpg)
 
 [English](README.md) | [简体中文](README_ZH_CN.md) | [繁體中文](README_ZH_TW.md) |
 日本語 | [한국어](README_KR.md) | [Español](README_ES.md) |
