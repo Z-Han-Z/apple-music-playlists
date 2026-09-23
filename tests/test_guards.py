@@ -592,9 +592,81 @@ class TestBestSongMatch(unittest.TestCase):
     def test_empty_returns_none(self):
         self.assertIsNone(self.am.best_song_match("anything", []))
 
-    def test_falls_back_to_first_result(self):
+    def test_unmatched_returns_none(self):
+        """对不上就报未找到：不能兜底返回搜索第一条，那是无关的曲子。"""
         songs = [self._song("完全无关", "Y"), self._song("也无关", "Z")]
-        self.assertIs(self.am.best_song_match("Something - Someone", songs), songs[0])
+        self.assertIsNone(self.am.best_song_match("Something - Someone", songs))
+
+    def test_falls_back_to_first_result(self):
+        """回归：旧实现无条件返回 songs[0]，会把无关结果写进歌单。"""
+        songs = [self._song("完全无关", "Y"), self._song("也无关", "Z")]
+        self.assertNotIn(self.am.best_song_match("Something - Someone", songs), songs)
+
+    def test_matching_artist_and_title_still_resolves(self):
+        songs = [self._song("Song", "Wanted Band")]
+        got = self.am.best_song_match("Song - Wanted Band", songs)
+        self.assertEqual(got["id"], "Song")
+
+    def test_wrong_artist_is_rejected(self):
+        """真实误伤：查询的艺人没有这首歌时，别家的同名伴奏版不是这首歌。"""
+        songs = [self._song("Song (Karaoke)", "Karaoke Studio")]
+        self.assertIsNone(self.am.best_song_match("Song - Wanted Band", songs))
+
+    def test_different_song_by_right_artist_is_rejected(self):
+        songs = [self._song("Mountain", "Wanted Band")]
+        self.assertIsNone(self.am.best_song_match("River - Wanted Band", songs))
+
+    def test_correct_artist_beats_wrong_artist_karaoke(self):
+        songs = [self._song("Song (Karaoke)", "Karaoke Studio"),
+                 self._song("Song", "Wanted Band")]
+        got = self.am.best_song_match("Song - Wanted Band", songs)
+        self.assertEqual(got["attributes"]["artistName"], "Wanted Band")
+
+    def test_artist_gate_rejects_blank_artist_name(self):
+        """空艺人名必须挡住：空串是任何串的子串，否则这道门形同虚设。"""
+        songs = [self._song("Song", "")]
+        self.assertIsNone(self.am.best_song_match("Song - Wanted Band", songs))
+
+    def test_artist_match_tolerates_punctuation_and_case(self):
+        songs = [self._song("Song", "Wanted-Band!!")]
+        got = self.am.best_song_match("Song - wanted band", songs)
+        self.assertEqual(got["id"], "Song")
+
+    def test_korean_query_does_not_collapse_to_empty_and_pick_first(self):
+        songs = [self._song("완전히 다른 노래", "다른 가수"),
+                 self._song("좋은 날", "아이유")]
+        got = self.am.best_song_match("좋은 날 - 아이유", songs)
+        self.assertEqual(got["id"], "좋은 날")
+
+    def test_kana_title_selects_the_right_song_by_the_same_artist(self):
+        songs = [self._song("ハルジオン", "YOASOBI"),
+                 self._song("アイドル", "YOASOBI")]
+        got = self.am.best_song_match("アイドル - YOASOBI", songs)
+        self.assertEqual(got["id"], "アイドル")
+
+    def test_accented_latin_matches_plain_spelling(self):
+        songs = [self._song("Corazón", "Artista")]
+        got = self.am.best_song_match("Corazon - Artista", songs)
+        self.assertEqual(got["id"], "Corazón")
+
+    def test_spaced_unicode_dash_is_a_supported_delimiter(self):
+        songs = [self._song("Song", "Artist")]
+        got = self.am.best_song_match("Song — Artist", songs)
+        self.assertEqual(got["id"], "Song")
+
+    def test_punctuation_only_query_is_not_an_arbitrary_match(self):
+        songs = [self._song("Song", "Artist")]
+        self.assertIsNone(self.am.best_song_match("!!!", songs))
+
+    def test_title_only_query_still_resolves(self):
+        """查询没写艺人时不该加上艺人门槛。"""
+        songs = [self._song("Song", "Any Artist At All")]
+        got = self.am.best_song_match("Song", songs)
+        self.assertEqual(got["id"], "Song")
+
+    def test_title_only_query_rejects_other_title(self):
+        songs = [self._song("Mountain", "Any Artist At All")]
+        self.assertIsNone(self.am.best_song_match("River", songs))
 
 
 if __name__ == "__main__":
