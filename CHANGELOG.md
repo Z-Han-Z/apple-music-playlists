@@ -18,6 +18,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   playlist sequencing instead of a generic playlist generator.
 - All localized READMEs and both client guides now document the official MCP Registry's `uvx`
   launch path for running the PyPI package without a permanent install.
+- A root `llms.txt` gives agents and directory crawlers a concise, spec-shaped map of the project's
+  curation boundary, setup, research, and implementation documentation.
 
 ## [1.4.0] - 2026-09-23
 

@@ -1,0 +1,35 @@
+# Apple Music MCP Curator
+
+> A local Python stdio MCP server for deep Apple Music playlist curation from nuanced natural-language briefs. The host LLM chooses and explains the music; the server grounds exact catalog recordings, exposes listening and flow evidence, verifies versions, and performs dry-run or approved library writes.
+
+Use this project for semantic selection, narrative arcs, and flow-aware sequencing—not as a playback controller, generic application connector, or server-side theme-scoring algorithm. `am_resolve_candidates` returns catalog facts and Apple Music links without deciding what fits. Audio features may diagnose transitions or refine order inside model-chosen narrative blocks, but they do not replace musical understanding.
+
+The runtime has no third-party dependencies. The published PyPI package can be launched as a local MCP server with `uvx --from apple-music-playlists am-mcp` or installed with `pip install apple-music-playlists`.
+
+## Start here
+
+- [Project README](https://github.com/Z-Han-Z/apple-music-playlists/blob/main/README.md): Positioning, installation, MCP workflow, tool list, and a difficult real curation demo with exact Apple Music recordings.
+- [Client setup](https://github.com/Z-Han-Z/apple-music-playlists/blob/main/docs/client-setup.md): Tested configuration for Codex, Claude, Cursor, VS Code, Gemini CLI, Windsurf, Docker, Cordis/DSH, and Harness.
+- [Credentials and login](https://github.com/Z-Han-Z/apple-music-playlists/blob/main/SETUP.en.md): Developer-token behavior, Apple Music login methods, configuration paths, security, and troubleshooting.
+- [PyPI package](https://pypi.org/project/apple-music-playlists/): Published Python package providing `am-playlist` and `am-mcp`.
+- [Official MCP Registry entry](https://registry.modelcontextprotocol.io/v0.1/servers?search=io.github.Z-Han-Z%2Fapple-music-playlists): Versioned stdio installation metadata.
+
+## Curation model
+
+- [LLM-native evaluation signals](https://github.com/Z-Han-Z/apple-music-playlists/blob/main/docs/evaluation-signals.md): Direct candidate comparison, readable constraints, catalog grounding, and why scalar theme scores stay out of the critical path.
+- [Algorithm boundary review](https://github.com/Z-Han-Z/apple-music-playlists/blob/main/docs/algorithm-review.md): Which decisions belong to the host model and which deterministic utilities remain useful.
+- [How to build a good playlist](https://github.com/Z-Han-Z/apple-music-playlists/blob/main/docs/how-to-build-a-good-playlist.md): Evidence and reasoning behind transitions, pacing, narrative shapes, and curation choices.
+- [Curation research survey](https://github.com/Z-Han-Z/apple-music-playlists/blob/main/docs/playlist-curation-survey.md): Platform guidance, professional practice, and academic findings used by the project.
+
+## Implementation
+
+- [MCP server](https://github.com/Z-Han-Z/apple-music-playlists/blob/main/am_mcp_server.py): stdio protocol implementation, prompt, tool schemas, safety annotations, and handlers.
+- [Agent skill](https://github.com/Z-Han-Z/apple-music-playlists/blob/main/skill/SKILL.md): End-to-end curation workflow and operational rules for agents.
+- [Registry manifest](https://github.com/Z-Han-Z/apple-music-playlists/blob/main/server.json): Official MCP Registry package and transport declaration.
+- [Platform adapter boundary](https://github.com/Z-Han-Z/apple-music-playlists/blob/main/docs/platform-adapters.md): Platform-neutral curation logic and Apple Music-specific responsibilities.
+
+## Optional
+
+- [Changelog](https://github.com/Z-Han-Z/apple-music-playlists/blob/main/CHANGELOG.md): Release history and unreleased changes.
+- [Contributing](https://github.com/Z-Han-Z/apple-music-playlists/blob/main/CONTRIBUTING.md): Development workflow, architecture constraints, tests, and contribution standards.
+- [Security policy](https://github.com/Z-Han-Z/apple-music-playlists/blob/main/SECURITY.md): Private reporting route and credential-handling rules.

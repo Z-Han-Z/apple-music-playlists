@@ -468,6 +468,18 @@ class TestStableReleaseAssets(unittest.TestCase):
         self.assertIn('"narrative-playlists"', metadata)
         self.assertNotIn('"playlist-generator"', metadata)
 
+    def test_llms_index_preserves_the_curation_boundary(self):
+        text = (self.ROOT / "llms.txt").read_text(encoding="utf-8")
+        self.assertTrue(text.startswith("# Apple Music MCP Curator\n\n> "))
+        for heading in ("## Start here", "## Curation model", "## Implementation",
+                        "## Optional"):
+            self.assertIn(heading, text)
+        for required in ("host LLM chooses", "grounds exact catalog recordings",
+                         "without deciding what fits", "uvx --from apple-music-playlists am-mcp",
+                         "docs/evaluation-signals.md", "docs/algorithm-review.md", "server.json"):
+            self.assertIn(required, text)
+        self.assertNotIn("playlist generator", text.lower())
+
 
 class TestCommunityHealth(unittest.TestCase):
     ROOT = Path(__file__).resolve().parent.parent
