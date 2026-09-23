@@ -14,9 +14,9 @@ license-files = ["LICENSE"]
 # 零运行时依赖是这个项目的卖点之一，不是巧合——别加东西进来。
 dependencies = []
 keywords = [
-    "apple-music", "apple-music-api", "playlist", "playlist-generator", "mcp", "mcp-server",
+    "apple-music", "apple-music-api", "playlist", "semantic-curation", "mcp", "mcp-server",
     "model-context-protocol", "llm", "curation", "music", "music-analysis", "cli",
-    "sequencing", "playlist-curation", "playlist-sequencing",
+    "narrative-playlists", "sequencing", "playlist-curation", "playlist-sequencing",
 ]
 classifiers = [
     "Development Status :: 5 - Production/Stable",

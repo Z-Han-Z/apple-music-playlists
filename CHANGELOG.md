@@ -12,6 +12,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `am_resolve_candidates` now returns each grounded recording's Apple Music URL so users can
   audition and verify the exact catalog version before a playlist is written.
 
+### Changed
+
+- Package discovery metadata now describes the project as semantic curation and narrative
+  playlist sequencing instead of a generic playlist generator.
+
 ## [1.4.0] - 2026-09-23
 
 ### Added

@@ -451,6 +451,12 @@ class TestStableReleaseAssets(unittest.TestCase):
                 f"{path.name} must not hardcode the current release version",
             )
 
+    def test_package_metadata_uses_curator_positioning(self):
+        metadata = (self.ROOT / "pyproject.toml").read_text(encoding="utf-8")
+        self.assertIn('"semantic-curation"', metadata)
+        self.assertIn('"narrative-playlists"', metadata)
+        self.assertNotIn('"playlist-generator"', metadata)
+
 
 class TestCommunityHealth(unittest.TestCase):
     ROOT = Path(__file__).resolve().parent.parent
