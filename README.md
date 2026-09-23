@@ -1,11 +1,17 @@
-# Apple Music Playlist Toolkit
+# Apple Music MCP Playlist Toolkit
+
+[![Tests](https://github.com/Z-Han-Z/apple-music-playlists/actions/workflows/test.yml/badge.svg)](https://github.com/Z-Han-Z/apple-music-playlists/actions/workflows/test.yml)
+[![Container](https://github.com/Z-Han-Z/apple-music-playlists/actions/workflows/container.yml/badge.svg)](https://github.com/Z-Han-Z/apple-music-playlists/actions/workflows/container.yml)
+[![Release](https://img.shields.io/github/v/release/Z-Han-Z/apple-music-playlists)](https://github.com/Z-Han-Z/apple-music-playlists/releases/latest)
+[![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 English | [简体中文](README_ZH_CN.md) | [繁體中文](README_ZH_TW.md) |
 [日本語](README_JP.md) | [한국어](README_KR.md) | [Español](README_ES.md) |
 [Português do Brasil](README_PT_BR.md) | [Deutsch](README_DE.md) | [Français](README_FR.md)
 
-**Describe the playlist you want. Your MCP agent curates it, verifies every track in Apple Music,
-previews the match, and creates it for you.**
+**A local, open-source Apple Music MCP server: describe the playlist you want, and your agent
+curates it, verifies every track in Apple Music, previews the match, and creates it for you.**
 
 Pure Python standard library — no `pip install` required to run, and **no Apple Developer Program
 membership needed**. Requires Python 3.10+ and works on Windows / macOS / Linux.
@@ -19,6 +25,19 @@ audits, and advanced sequencing.
 ```
   describe  →  curate  →  catalog-check  →  dry-run  →  create
 ```
+
+## Why this project
+
+- **Natural-language first.** Works with Codex, Claude, Cursor, VS Code/Copilot, Gemini CLI,
+  Windsurf, Cordis/DSH, Harness, and other clients that can launch a stdio MCP server.
+- **Safer writes.** Candidate grounding catches missing tracks, duplicates, suspicious live or
+  remastered versions, and artist concentration before the dry run and final create step.
+- **Local and private by design.** The server runs on your machine; credentials stay in the local
+  app config, and there is no bundled model, telemetry service, or extra LLM API key.
+- **No paid developer account.** The standard-library runtime can obtain the public Apple Music
+  web token automatically; only your normal Apple Music account login is required.
+- **More than creation.** The same toolkit can inspect Replay listening history, audit existing
+  playlists, diagnose transitions, and optionally optimize ordering inside chosen narrative blocks.
 
 ---
 

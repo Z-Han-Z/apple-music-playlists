@@ -6,14 +6,17 @@ build-backend = "setuptools.build_meta"
 name = "apple-music-playlists"
 # 版本号只有一个来源：am_paths.VERSION。手写第二份必然对不上。
 dynamic = ["version"]
-description = "Build, analyze, and sequence Apple Music playlists from the CLI or an MCP-capable agent"
+description = "Local Apple Music MCP server for natural-language playlist creation, audits, and sequencing"
 readme = "README.md"
 requires-python = ">=3.10"
 license = "MIT"
 license-files = ["LICENSE"]
 # 零运行时依赖是这个项目的卖点之一，不是巧合——别加东西进来。
 dependencies = []
-keywords = ["apple-music", "playlist", "mcp", "curation", "music", "cli", "sequencing"]
+keywords = [
+    "apple-music", "apple-music-api", "playlist", "playlist-generator", "mcp", "mcp-server",
+    "model-context-protocol", "llm", "curation", "music", "cli", "sequencing",
+]
 classifiers = [
     "Development Status :: 5 - Production/Stable",
     "Environment :: Console",
@@ -29,7 +32,9 @@ classifiers = [
 
 [project.urls]
 Homepage = "https://github.com/Z-Han-Z/apple-music-playlists"
+Documentation = "https://github.com/Z-Han-Z/apple-music-playlists/blob/main/docs/client-setup.md"
 Changelog = "https://github.com/Z-Han-Z/apple-music-playlists/blob/main/CHANGELOG.md"
+Issues = "https://github.com/Z-Han-Z/apple-music-playlists/issues"
 
 [project.scripts]
 # 装完之后 MCP 注册可以退化成 {"command": "am-mcp"}，
