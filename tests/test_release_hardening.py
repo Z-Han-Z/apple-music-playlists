@@ -379,6 +379,8 @@ class TestStableReleaseAssets(unittest.TestCase):
         registry_name = "io.github.Z-Han-Z/apple-music-playlists"
         self.assertIn(f"mcp-name: {registry_name}", readme)
         self.assertIn("workflow_dispatch:", workflow)
+        self.assertIn("ref: refs/tags/v${{ inputs.version }}", workflow)
+        self.assertIn("without a leading 'v'", workflow)
         self.assertNotIn("release:", workflow)
         self.assertNotIn("pull_request_target:", workflow)
         self.assertIn("name: pypi", workflow)

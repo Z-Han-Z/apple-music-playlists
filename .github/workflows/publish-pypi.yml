@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: Version to publish (must match am_paths.VERSION)
+        description: Version to publish, without v (must match tag and am_paths.VERSION)
         required: true
         type: string
 
@@ -22,6 +22,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: refs/tags/v${{ inputs.version }}
       - uses: actions/setup-python@v5
         with:
           python-version: "3.13"
@@ -33,7 +35,9 @@ jobs:
           import os
           from am_paths import VERSION
 
-          requested = os.environ["REQUESTED_VERSION"].removeprefix("v")
+          requested = os.environ["REQUESTED_VERSION"]
+          if requested.startswith("v"):
+              raise SystemExit("enter the version without a leading 'v'")
           if requested != VERSION:
               raise SystemExit(
                   f"requested {requested!r}, but am_paths.VERSION is {VERSION!r}"
