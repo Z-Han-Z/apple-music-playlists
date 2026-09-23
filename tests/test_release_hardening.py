@@ -381,6 +381,7 @@ class TestStableReleaseAssets(unittest.TestCase):
         self.assertIn("workflow_dispatch:", workflow)
         self.assertIn("ref: refs/tags/v${{ inputs.version }}", workflow)
         self.assertIn("without a leading 'v'", workflow)
+        self.assertIn('sys.path.insert(0, os.environ["GITHUB_WORKSPACE"])', workflow)
         self.assertNotIn("release:", workflow)
         self.assertNotIn("pull_request_target:", workflow)
         self.assertIn("name: pypi", workflow)
