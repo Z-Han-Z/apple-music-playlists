@@ -354,5 +354,32 @@ class TestStableReleaseAssets(unittest.TestCase):
         self.assertIn("require a network URL and API key", text)
 
 
+class TestCommunityHealth(unittest.TestCase):
+    ROOT = Path(__file__).resolve().parent.parent
+
+    def test_community_health_files_are_present_and_actionable(self):
+        required = (
+            "README.md", "LICENSE", "CONTRIBUTING.md", "CODE_OF_CONDUCT.md",
+            "SUPPORT.md", "SECURITY.md", ".github/pull_request_template.md",
+        )
+        for name in required:
+            path = self.ROOT / name
+            self.assertTrue(path.is_file(), f"missing community health file: {name}")
+            self.assertTrue(path.read_text(encoding="utf-8").strip(),
+                            f"empty community health file: {name}")
+
+        conduct = (self.ROOT / "CODE_OF_CONDUCT.md").read_text(encoding="utf-8")
+        self.assertIn("Contributor Covenant", conduct)
+        self.assertIn("security/advisories/new", conduct)
+        self.assertNotIn("INSERT CONTACT METHOD", conduct)
+
+    def test_issue_forms_have_github_required_fields(self):
+        forms = self.ROOT / ".github" / "ISSUE_TEMPLATE"
+        for name in ("bug_report.yml", "feature_request.yml", "question.yml"):
+            text = (forms / name).read_text(encoding="utf-8")
+            for key in ("name:", "description:", "body:"):
+                self.assertIn(key, text, f"{name} is missing {key}")
+
+
 if __name__ == "__main__":
     unittest.main()

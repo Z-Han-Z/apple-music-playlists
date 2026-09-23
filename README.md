@@ -329,6 +329,15 @@ For the complete Simplified Chinese guide, see **[README_ZH_CN.md](README_ZH_CN.
 
 ---
 
+## Community
+
+- [Contributing](CONTRIBUTING.md) — development workflow, architecture boundaries, and review expectations
+- [Support](SUPPORT.md) — where to ask questions, report bugs, or propose features
+- [Code of Conduct](CODE_OF_CONDUCT.md) — participation standards and private reporting route
+- [Security policy](SECURITY.md) — supported versions and confidential vulnerability reporting
+
+---
+
 ## License
 
 MIT — see [LICENSE](LICENSE).
