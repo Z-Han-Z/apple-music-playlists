@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- `am_playlist.best_song_match` no longer falls back to the first search result when nothing
+  matches the query. A `Title - Artist` query used to resolve to an unrelated track whenever the
+  requested artist did not have that recording — one real case returned a karaoke version
+  credited to a different artist, and another returned the original artist's recording instead of
+  the band's cover. Candidates are now filtered on title and artist before scoring, an empty
+  `artistName` never passes (an empty string is a substring of everything), and a query with no
+  surviving candidate is reported as missed. `am_resolve_candidates` already surfaces that as
+  `unmatched`, and the CLI reports it before creating or writing anything. Filtering first also
+  fixes picking the wrong artist when the correct one is present but ranked lower by relevance.
+
 ## [1.3.0] - 2026-09-22
 
 ### Added

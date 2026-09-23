@@ -583,7 +583,16 @@ def version_noise_hits(title: str) -> list[str]:
 
 
 def best_song_match(query: str, songs: list[dict]) -> dict | None:
-    """从搜索结果里挑最匹配的一首：标题/艺人相似度打分，并惩罚没被要求的版本后缀。"""
+    """从搜索结果里挑最匹配的一首：先按查询条件硬过滤，再按相似度打分。
+
+    过滤是硬条件——查询里带了艺人，就只保留艺人能对上的候选；带了曲名，
+    就只保留曲名能对上的候选。**一个候选都留不下时返回 None。**
+
+    为什么不能兜底返回搜索第一条：搜索结果的排序受热度影响，未必是这首歌。
+    真实误伤是「某艺人的一首翻唱并未上架，搜索首条成了别家录的伴奏版」，
+    兜底会把一首完全无关的曲子无提示地写进歌单。漏掉会明确报「未找到」，
+    比静默写错一首安全。
+    """
     def norm(s: str) -> str:
         return re.sub(r"[^0-9a-z\u4e00-\u9fff]+", "", (s or "").lower())
 
@@ -594,6 +603,23 @@ def best_song_match(query: str, songs: list[dict]) -> dict | None:
     else:
         want_t, want_a = query, ""
     nt, na = norm(want_t), norm(want_a)
+
+    def title_ok(t: str) -> bool:
+        return not nt or nt == t or nt in t or t in nt
+
+    def artist_ok(ar: str) -> bool:
+        # 艺人名为空的候选不能放行：`"" in na` 恒为真，等于没过滤。
+        return not na or (bool(ar) and (na in ar or ar in na))
+
+    kept = []
+    for s in songs:
+        a = s.get("attributes", {})
+        if title_ok(norm(a.get("name") or "")) and artist_ok(norm(a.get("artistName") or "")):
+            kept.append(s)
+    if not kept:
+        return None
+    songs = kept
+
     # 查询自己提到的版本词不算"没被要求"。这里也要用同一套整词判定——
     # 否则查询 "Alive" 会因为自身含 "live" 而豁免所有现场版罚分。
     q_hits = set(version_noise_hits(want_t))
@@ -605,15 +631,10 @@ def best_song_match(query: str, songs: list[dict]) -> dict | None:
         t, ar = norm(raw_t), norm(a.get("artistName", ""))
         score = 0.0
         if nt:
-            if nt == t:
-                score += 3.0            # 曲名完全一致，最理想
-            elif nt in t or t in nt:
-                score += 2.0
+            # 进得来的候选一定是完全一致或包含关系，这里只需区分两者
+            score += 3.0 if nt == t else 2.0
         if na:
-            if na == ar:
-                score += 2.0            # 艺人完全一致
-            elif na in ar or ar in na:
-                score += 1.5
+            score += 2.0 if na == ar else 1.5
         # 曲名里带查询没要求的版本后缀 → 扣分（"Live" 之类）
         for w in version_noise_hits(raw_t):
             if w not in q_hits:
@@ -621,7 +642,7 @@ def best_song_match(query: str, songs: list[dict]) -> dict | None:
                 break
         scored.append((score, s))
     scored.sort(key=lambda x: -x[0])
-    return scored[0][1] if scored[0][0] > 0 else songs[0]
+    return scored[0][1]
 
 
 def resolve_tracks(items: list[str], dev: str, storefront: str, *,
