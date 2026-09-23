@@ -1,0 +1,76 @@
+name: publish PyPI package
+
+run-name: Publish PyPI ${{ inputs.version }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version to publish, without v (must match tag and am_paths.VERSION)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pypi-publish
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: refs/tags/v${{ inputs.version }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Confirm requested version
+        env:
+          REQUESTED_VERSION: ${{ inputs.version }}
+        shell: python
+        run: |
+          import os
+          from am_paths import VERSION
+
+          requested = os.environ["REQUESTED_VERSION"]
+          if requested.startswith("v"):
+              raise SystemExit("enter the version without a leading 'v'")
+          if requested != VERSION:
+              raise SystemExit(
+                  f"requested {requested!r}, but am_paths.VERSION is {VERSION!r}"
+              )
+      - name: Run offline test suite
+        run: python -m unittest discover -s tests -v
+      - name: Build distributions
+        run: |
+          python -m pip install --upgrade build
+          python -m build
+      - name: Verify the built wheel
+        run: |
+          python -m pip install --force-reinstall --no-deps dist/*.whl
+          am-playlist --help
+          python -c "from importlib.metadata import version; assert version('apple-music-playlists') == '${{ inputs.version }}'.removeprefix('v')"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: python-package-distributions
+          path: dist/
+          if-no-files-found: error
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/apple-music-playlists
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: python-package-distributions
+          path: dist/
+      - name: Publish distributions to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
