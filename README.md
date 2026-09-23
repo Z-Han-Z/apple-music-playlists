@@ -1,5 +1,7 @@
 # Apple Music MCP Playlist Toolkit
 
+<!-- mcp-name: io.github.Z-Han-Z/apple-music-playlists -->
+
 ![Apple Music MCP — natural-language playlists grounded in Apple Music](.github/assets/social-preview.jpg)
 
 [![Tests](https://github.com/Z-Han-Z/apple-music-playlists/actions/workflows/test.yml/badge.svg)](https://github.com/Z-Han-Z/apple-music-playlists/actions/workflows/test.yml)
@@ -316,6 +318,7 @@ More in [`docs/apple-music-api-notes.md`](docs/apple-music-api-notes.md) and
 |---|---|
 | [`SETUP.en.md`](SETUP.en.md) | Credentials: what tokens exist, how to get each one, security notes, troubleshooting |
 | [`docs/client-setup.md`](docs/client-setup.md) | Client-specific MCP, Docker, Cordis/DSH, generic harness, and Harness Platform setup |
+| [`docs/publishing.md`](docs/publishing.md) | Maintainer-only PyPI and official MCP Registry publishing checklist |
 | [`docs/apple-music-api-notes.md`](docs/apple-music-api-notes.md) | Token model, endpoint contracts, measured API behaviour, eval of 7 automation approaches |
 | [`docs/how-to-build-a-good-playlist.md`](docs/how-to-build-a-good-playlist.md) | Curation methodology: adjacency physics, arc data, six narrative shapes, the ISO principle |
 | [`docs/playlist-curation-survey.md`](docs/playlist-curation-survey.md) | Survey of published curation guidance (platform rules, DJ methods, academic findings) |

@@ -370,6 +370,24 @@ class TestStableReleaseAssets(unittest.TestCase):
             self.assertIn(client, text)
         self.assertIn("require a network URL and API key", text)
 
+    def test_pypi_publishing_is_manual_oidc_and_registry_ready(self):
+        readme = (self.ROOT / "README.md").read_text(encoding="utf-8")
+        workflow = (self.ROOT / ".github" / "workflows" / "publish-pypi.yml").read_text(
+            encoding="utf-8")
+        guide = (self.ROOT / "docs" / "publishing.md").read_text(encoding="utf-8")
+
+        registry_name = "io.github.Z-Han-Z/apple-music-playlists"
+        self.assertIn(f"mcp-name: {registry_name}", readme)
+        self.assertIn("workflow_dispatch:", workflow)
+        self.assertNotIn("release:", workflow)
+        self.assertNotIn("pull_request_target:", workflow)
+        self.assertIn("name: pypi", workflow)
+        self.assertIn("id-token: write", workflow)
+        self.assertIn("pypa/gh-action-pypi-publish@release/v1", workflow)
+        self.assertNotIn("secrets.", workflow)
+        self.assertIn("Do not add `server.json` until", guide)
+        self.assertIn(registry_name, guide)
+
 
 class TestCommunityHealth(unittest.TestCase):
     ROOT = Path(__file__).resolve().parent.parent
