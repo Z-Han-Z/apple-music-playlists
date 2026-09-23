@@ -136,6 +136,7 @@ def _track(cid, name, block, feat, *, isrc=None, stage_hint=None):
         "f": feat,
         "stage": "ok",
         "bpm": fold_tempo(feat.get("tempo", 0)),
+        "raw_bpm": feat.get("tempo", 0),
         "key": camelot(feat.get("key", 0), feat.get("mode", 0)),
         "energy": feat.get("energy", 0.0),
         "valence": feat.get("valence", 0.0),

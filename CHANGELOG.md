@@ -18,6 +18,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   surviving candidate is reported as missed. `am_resolve_candidates` already surfaces that as
   `unmatched`, and the CLI reports it before creating or writing anything. Filtering first also
   fixes picking the wrong artist when the correct one is present but ranked lower by relevance.
+- Tempo rules no longer fire on jumps that octave folding invented. `fold_tempo` is a modulo map,
+  so it cannot preserve order: a measured 160.1 BPM is folded to 80 while 150 is left alone. A
+  150 → 160.1 pair therefore read as a 47 % plunge, and two fast songs both folded below the
+  slow-song threshold were reported as a slow pair. `check_pair` now withholds the tempo rules
+  for any pair whose fold crossed that threshold, and the flow report names those tracks instead
+  of presenting the artefact as a sequencing defect. Non-tempo rules such as `energy_clash` still
+  apply, and a caller that does not supply the raw BPM keeps the previous behaviour, so no
+  existing caller changes meaning until it opts in.
 
 ## [1.3.0] - 2026-09-22
 

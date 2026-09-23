@@ -120,11 +120,36 @@ def slow_cut(tempos=None) -> float:
     return SLOW_BPM
 
 
+def fold_crosses_slow_cut(track: dict | None) -> bool:
+    """折叠是否把这首歌推过了「慢歌」阈值？
+
+    `fold_tempo` 是**取模**映射，所以不保序。实测：raw 160.1 折成 80、raw 176
+    折成 88，而 raw 150 原样留下。于是一首 160BPM 的快歌被当成慢歌，还和 150BPM
+    的邻居被算成「BPM 无理由大跳 -47%」——两条都是折叠造出来的幽灵，不是测量。
+
+    判据只取一件事：折叠**改变了「慢/不慢」的归类**吗。改变了就说明这条 tempo
+    判断是折叠的产物，不该当成排序缺陷。只有调用方给了 `raw_bpm` 才检查；
+    没给（老调用方、纯理论用例）时一律 False，行为与从前一致。
+    """
+    if not track:
+        return False
+    raw = track.get("raw_bpm") or 0.0
+    folded = track.get("bpm") or 0.0
+    if not raw or not folded:
+        return False
+    return (raw < SLOW_BPM) != (folded < SLOW_BPM)
+
+
 def check_pair(a: dict | None, b: dict | None) -> set[str]:
     """检查一对相邻曲目踩了哪些规则，返回规则名集合。
 
-    a/b 需要 {"bpm": 折叠后的 BPM, "key": Camelot 码, "energy": 0..1}。
+    a/b 需要 {"bpm": 折叠后的 BPM, "key": Camelot 码, "energy": 0..1}，
+    可选 "raw_bpm"（折叠前的原始估计）。
+
     任一为 None 或缺 BPM 时返回空集——没有特征就不该凭空惩罚。
+    若任一首的折叠改变了「慢/不慢」的归类，就跳过整组 tempo 类规则：
+    那几条都会把折叠幽灵当成事实（见 fold_crosses_slow_cut）。energy_clash
+    不看 tempo，所以照常判。
     """
     if not a or not b:
         return set()
@@ -136,14 +161,15 @@ def check_pair(a: dict | None, b: dict | None) -> set[str]:
     pct = (tb - ta) / ta * 100
 
     bad: set[str] = set()
-    if ta < SLOW_BPM and tb < SLOW_BPM:
-        bad.add("two_slow")
-    if ta > tb and 0 < -pct < SMALL_DROP_PCT:
-        bad.add("small_drop")
-    if abs(pct) < SIMILAR_PCT and harmonic_ok(ka, kb):
-        bad.add("both_similar")
-    if abs(pct) > BIG_JUMP_PCT:
-        bad.add("big_jump")
+    if not (fold_crosses_slow_cut(a) or fold_crosses_slow_cut(b)):
+        if ta < SLOW_BPM and tb < SLOW_BPM:
+            bad.add("two_slow")
+        if ta > tb and 0 < -pct < SMALL_DROP_PCT:
+            bad.add("small_drop")
+        if abs(pct) < SIMILAR_PCT and harmonic_ok(ka, kb):
+            bad.add("both_similar")
+        if abs(pct) > BIG_JUMP_PCT:
+            bad.add("big_jump")
     if abs(ea - eb) > ENERGY_CLASH and not harmonic_ok(ka, kb):
         bad.add("energy_clash")
     return bad
