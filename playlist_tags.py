@@ -589,26 +589,35 @@ def axis_summary(tags) -> dict:
     return out
 
 
-def _mark(tag) -> str:
-    """定性标记。刻意不用数字——数字会被读成精度。"""
+def _mark(tag, zh: bool = True) -> str:
+    """定性标记。刻意不用数字——数字会被读成精度。
+
+    [P1] 评审：英文路径曾经写 `evidence: …`，而中文路径已经改成「已声明的来源（未与标签核对）」。
+    同一份东西在两种语言里说法不同，就会让英文客户端把它当成已核实的证据。
+    所以这里两种语言都说清「声明 / 未核对」。
+    """
     bits = []
     if tag["emphasis"] == BOOST:
-        bits.append("强调")
+        bits.append("强调" if zh else "emphasize")
     elif tag["emphasis"] == SOFTEN:
-        bits.append("弱化")
+        bits.append("弱化" if zh else "soften")
     if tag.get("axis") == CONTEXT:
         # 行为类标签的来源要**露出来**，而且要让用户分得清「已核对」与「自述」。
         ev = tag.get("evidence")
         if not ev:
-            bits.append("证据缺失")
+            bits.append("证据缺失" if zh else "no evidence")
         elif ev.get("kind") == "claim":
-            bits.append(f"来源自述：{ev.get('raw')}（未校验）")
+            bits.append(f"来源自述：{ev.get('raw')}（未校验）" if zh else
+                        f"unverified provenance claim: {ev.get('raw')}")
         else:
             # 刻意不写「证据」：标签是自由文本，本模块无法核对它与 basis 是否相符，
             # 所以只能说这是**已声明的来源**。
             bits.append(f"声明来源：{ev.get('basis')} via {ev.get('call')} "
-                        f"ref={ev.get('ref')}（未与标签核对）")
-    return f"{tag['label']}（{' · '.join(bits)}）" if bits else tag["label"]
+                        f"ref={ev.get('ref')}（未与标签核对）" if zh else
+                        f"declared source: {ev.get('basis')} via {ev.get('call')} "
+                        f"ref={ev.get('ref')} (not checked against the label)")
+    left, right = ("（", "）") if zh else (" (", ")")
+    return f"{tag['label']}{left}{' · '.join(bits)}{right}" if bits else tag["label"]
 
 
 def render_tags(tags, language: str = "en") -> str:
@@ -624,7 +633,7 @@ def render_tags(tags, language: str = "en") -> str:
         members = [t for t in tags if t.get("axis", UNSPECIFIED) == axis]
         if not members:
             continue
-        body = " · ".join(_mark(t) for t in members)
+        body = " · ".join(_mark(t, zh) for t in members)
         parts.append(f"{label} — {body}" if label else body)
     return "  ‖  ".join(parts)
 
@@ -709,8 +718,8 @@ def direction_note(tags, language: str = "zh") -> str:
             elif ev.get("kind") == "claim":
                 bits.append(f"unverified provenance claim: {ev.get('raw')}")
             else:
-                ref = f" {ev['ref']}" if ev.get("ref") else ""
-                bits.append(f"evidence: {ev.get('basis')} via {ev.get('call')}{ref}")
+                bits.append(f"declared source: {ev.get('basis')} via {ev.get('call')} "
+                            f"ref={ev.get('ref')} (not checked against the label)")
         return f"{t['label']} ({', '.join(bits)})"
     body = " / ".join(one_en(t) for t in tags)
     tail = ""

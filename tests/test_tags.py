@@ -770,5 +770,94 @@ class TestBriefIsRequired(unittest.TestCase):
         self.assertIn("「more in-library」→ [applied]", got)
 
 
+class TestStructuredAdjustmentsReachable(unittest.TestCase):
+    """[P1] 评审：模块支持结构化 adjustment，但 **MCP schema 只声明了 string**，
+    `_validate_tool_arguments` 在到达 handler 之前就拒了——那段新代码是死代码。
+
+    所以回归测试必须**走 MCP 契约**，不能只直接调 `apply_adjustments()`。
+    """
+
+    def setUp(self):
+        import am_mcp_server as srv
+        self.srv = srv
+
+    def _args(self, adjustments):
+        return {"tags": [{"label": "in-library", "axis": "context",
+                          "evidence": {"basis": "playlist-membership",
+                                       "call": "am_show_playlist", "ref": "p.x"}}],
+                "adjustments": adjustments,
+                "brief": "照我歌单里的来。"}
+
+    def test_schema_declares_both_string_and_object_forms(self):
+        tool = next(t for t in self.srv.TOOLS if t["name"] == "am_tag_directions")
+        items = tool["inputSchema"]["properties"]["adjustments"]["items"]
+        kinds = [b.get("type") for b in items["anyOf"]]
+        self.assertIn("string", kinds)
+        self.assertIn("object", kinds)
+
+    def test_validator_accepts_a_string_adjustment(self):
+        err = self.srv._validate_tool_arguments(
+            "am_tag_directions", self._args(["more in-library"]))
+        self.assertIsNone(err)
+
+    def test_validator_accepts_a_structured_adjustment(self):
+        """这一条就是评审说的「走不到」——以前会在这里被拒。"""
+        err = self.srv._validate_tool_arguments(
+            "am_tag_directions",
+            self._args([{"op": "add", "label": "recent", "axis": "context",
+                         "evidence": {"basis": "recent-listening",
+                                      "call": "am_recently_played", "ref": "kind=tracks"}}]))
+        self.assertIsNone(err, err)
+
+    def test_handler_records_a_structured_adjustments_evidence(self):
+        got = self.srv.t_tag_directions(
+            self._args([{"op": "add", "label": "recent", "axis": "context",
+                         "evidence": {"basis": "recent-listening",
+                                      "call": "am_recently_played", "ref": "kind=tracks"}}]))
+        self.assertIn("[added]", got)
+        self.assertIn("recent-listening", got)
+        self.assertIn("kind=tracks", got)
+
+
+class TestEnglishRenderingDoesNotOverclaim(unittest.TestCase):
+    """[P1] 评审：英文路径仍写 `evidence: …`，而中文路径已改成「已声明的来源（未与标签核对）」。
+
+    同一份东西两种语言说法不同，英文客户端就会把它当成已核实的证据。
+    """
+
+    @staticmethod
+    def _tags():
+        return pt.normalize_tags([{
+            "label": "in-library", "axis": "context",
+            "evidence": {"basis": "playlist-membership", "call": "am_show_playlist",
+                         "ref": "p.x"}}])[0]
+
+    def test_english_direction_note_says_declared_not_evidence(self):
+        note = pt.direction_note(self._tags(), "en")
+        self.assertIn("declared source", note)
+        self.assertIn("not checked against the label", note)
+        self.assertNotIn("evidence:", note)
+
+    def test_english_render_does_not_say_evidence(self):
+        out = pt.render_tags(self._tags(), "en")
+        self.assertIn("declared source", out)
+        self.assertNotIn("evidence", out)
+
+    def test_chinese_and_english_both_refuse_to_claim_verification(self):
+        zh = pt.direction_note(self._tags(), "zh")
+        en = pt.direction_note(self._tags(), "en")
+        self.assertIn("声明", zh)
+        self.assertIn("未与标签核对", zh)
+        self.assertIn("declared", en)
+        self.assertIn("not checked", en)
+
+    def test_english_free_text_is_still_an_unverified_claim(self):
+        tags = pt.normalize_tags([{"label": "recent", "axis": "context",
+                                   "evidence": "trust me"}])[0]
+        out = pt.render_tags(tags, "en")
+        self.assertIn("unverified provenance claim", out)
+        self.assertNotIn("evidence:", out)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

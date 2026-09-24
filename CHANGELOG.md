@@ -44,6 +44,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   dropped silently. A dict label carrying a `context:` prefix now splits the same way the string
   form does.
 
+  Adjustments are accepted in both the documented string form and a structured
+  `{op, label, axis?, evidence?}` form — the schema declares both and shares one evidence schema
+  with the tag contract, so the module and the public MCP surface cannot disagree. The English and
+  Chinese renderings of a structured source now say the same thing: a **declared** source that was
+  not checked against the free-text label, rather than English clients seeing `evidence:` while
+  Chinese clients see the weaker claim.
+
   `docs/evaluation-signals.md` explains why collapsing requirements into tags or weights loses
   scoped negation, reference semantics, and narrative beats; this feature does not reopen that. The
   tags supplement the brief rather than replacing it, and `direction_note()` states all three

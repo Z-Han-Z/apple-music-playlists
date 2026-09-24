@@ -116,6 +116,32 @@ PROMPTS = [
     }
 ]
 
+# context 标签的 provenance 形状。tags 与 adjustments 两处都要用同一份——
+# 写两份必然漂移（评审正是先在这里找到「模块支持、schema 不支持」的落差）。
+_EVIDENCE_SCHEMA = {"anyOf": [
+    {"type": "string",
+     "description": "自由文本来源。会被接受，但只当作**未经校验的来源自述**，不当作证据"},
+    {"type": "object",
+     "properties": {
+         "basis": {"type": "string",
+                   "enum": ["recent-listening", "play-count",
+                            "playlist-membership", "derived"],
+                   "description": "这条行为断言属于哪一类"},
+         "call": {"type": "string",
+                  "enum": ["am_recently_played", "am_top_played", "am_show_playlist"],
+                  "description": "能支撑该 basis 的调用；注意 am_list_playlists 只列歌单名，"
+                                 "证明不了曲目在不在里面"},
+         "ref": {"type": "string",
+                 "description": "**必填**：调用参数，用于复核。如 kind=tracks、year-2026、"
+                                "歌单名或 p.xxxx"},
+     },
+     "required": ["basis", "call", "ref"],
+     "additionalProperties": False},
+],
+    "description": "支撑该 context 标签的 provenance。写成 {basis, call, ref} 才会被校验；"
+                   "校验的是 **basis↔call↔ref 自洽**，标签是自由文本、无法核对，"
+                   "所以展示为「已声明的来源（未与标签核对）」，不声称已核实"}
+
 TOOLS = [
     {
         "name": "am_status",
@@ -320,36 +346,7 @@ TOOLS = [
                                   "axis": {"type": "string", "enum": ["sonic", "context"]},
                                   "emphasis": {"type": "string",
                                                "enum": ["soften", "neutral", "boost"]},
-                                  "evidence": {"anyOf": [
-                                      {"type": "string",
-                                       "description": "自由文本来源。会被接受，但只当作"
-                                                      "**未经校验的来源自述**，不当作证据"},
-                                      {"type": "object",
-                                       "properties": {
-                                           "basis": {"type": "string",
-                                                     "enum": ["recent-listening", "play-count",
-                                                              "playlist-membership", "derived"],
-                                                     "description": "这条行为断言属于哪一类"},
-                                           "call": {"type": "string",
-                                                    "enum": ["am_recently_played", "am_top_played",
-                                                             "am_show_playlist"],
-                                                    "description": "能支撑该 basis 的调用；"
-                                                                   "注意 am_list_playlists 只列歌单名，"
-                                                                   "证明不了曲目在不在里面"},
-                                           "ref": {"type": "string",
-                                                   "description": "**必填**：调用参数，用于复核。"
-                                                                  "如 kind=tracks、year-2026、"
-                                                                  "歌单名或 p.xxxx"},
-                                       },
-                                       "required": ["basis", "call", "ref"],
-                                       "additionalProperties": False},
-                                  ],
-                                      "description": "支撑该 context 标签的 provenance。"
-                                                     "写成 {basis, call, ref} 才会被校验；"
-                                                     "校验的是 **basis↔call↔ref 自洽**，"
-                                                     "标签是自由文本、无法核对，"
-                                                     "所以展示为「已声明的来源（未与标签核对）」，"
-                                                     "不声称已核实"},
+                                  "evidence": _EVIDENCE_SCHEMA,
                               },
                               "required": ["label"], "additionalProperties": False},
                          ]},
@@ -358,9 +355,28 @@ TOOLS = [
                                         "侧重只有 soften/neutral/boost 三档定性状态，没有数值。"
                                         "context（行为）标签要带 evidence——没有证据的会被接受但报出来，"
                                         "并在展示串里标成「证据缺失」"},
-                "adjustments": {"type": "array", "items": {"type": "string"},
-                                "description": "用户对方向的调整，如 more funk / less disco / drop dark / "
-                                               "add ambient（也认「多一点/少一点」与 +funk/-disco）"},
+                # [P1] 评审：模块支持 dict 形式（可带 evidence / axis），但这里只声明了 string，
+                # `_validate_tool_arguments` 于是在到达 handler 之前就拒了——新代码成了死代码。
+                # 两种形式都要声明，并共用同一份 _EVIDENCE_SCHEMA，避免再次漂移。
+                "adjustments": {"type": "array",
+                                "items": {"anyOf": [
+                                    {"type": "string"},
+                                    {"type": "object",
+                                     "properties": {
+                                         "op": {"type": "string",
+                                                "enum": ["more", "less", "drop", "add"]},
+                                         "label": {"type": "string"},
+                                         "axis": {"type": "string",
+                                                  "enum": ["sonic", "context"]},
+                                         "evidence": _EVIDENCE_SCHEMA,
+                                     },
+                                     "required": ["op", "label"],
+                                     "additionalProperties": False},
+                                ]},
+                                "description": "用户对方向的调整。字符串形式：more funk / less disco / "
+                                               "drop dark / add ambient（也认「多一点/少一点」与 "
+                                               "+funk/-disco）；结构化形式 {op, label, axis?, evidence?}，"
+                                               "用 add 新增行为标签时可一并带上 provenance"},
                 "language": {"type": "string",
                              "description": "方向说明所用语言，zh 或 en，默认 zh"},
                 "brief": {"type": "string", "minLength": 1,

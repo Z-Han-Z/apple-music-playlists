@@ -158,6 +158,17 @@
 | `drop dark` / `去掉 dark` | 直接移除 |
 | `add ambient` / `加上 ambient` | 补一个（侧重 neutral） |
 
+调整有**两种写法，schema 都声明**（少了任一种，调用就会在到达 handler 之前被校验层拒掉）：
+
+```text
+字符串： more funk / less disco / drop dark / add ambient
+结构化： {"op": "add", "label": "recent", "axis": "context",
+          "evidence": {"basis": "recent-listening",
+                       "call": "am_recently_played", "ref": "kind=tracks"}}
+```
+
+结构化写法主要用于 `add` 时**一并带上 provenance**；`evidence` / `axis` 出现在非 `add` 操作上会被报成「已忽略」，而不是悄悄丢掉。
+
 三条性质是刻意保证的：
 
 1. **确定性**：同样的输入永远得到同样的输出。侧重是定性记账，不是模型即兴。
