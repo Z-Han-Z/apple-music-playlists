@@ -10,16 +10,34 @@
 
 **它只做三件确定性的事：**
 
-1. 校验一组标签（数量上限、权重区间、去重、轴归属），把问题和修法一并报出来；
-2. 按用户说的 `more funk` / `less disco` 调权重——这是**记账**，不是审美判断，
+1. 校验一组标签（数量上限、去重、轴归属、侧重档位），把问题和修法一并报出来；
+2. 按用户说的 `more funk` / `less disco` 改侧重档——这是**记账**，不是审美判断，
    所以它属于代码而不属于模型；
-3. 把结果渲染成一句能塞回 brief 的方向说明，供下一轮策展使用。
+3. 把结果渲染成一份可读的**修订记录**，供下一轮策展参考。
 
-**它不替代 brief，只是操纵面。** 仓库里的
-`docs/evaluation-signals.md` 说明了为什么把需求压成标签或权重表
-会丢掉否定范围、参照语义和叙事节点。这里刻意反着用：标签是给用户的**风格化、
-抽象化的修改方向**，brief 与策展契约始终是唯一权威；方向说明只是对它的补充，
-冲突时以 brief 为准。这一点也写进了 `direction_note()` 的输出里，宿主模型读得到。
+## 为什么没有数值权重
+
+第一版给每个标签一个 `0.0–2.0` 的小数权重，`more` / `less` 各加减 `0.5`。
+评审否掉了它，理由成立：**那会把自然语言里的审美判断伪装成有精度的数值**，
+与项目已经确定的原则（模型直接理解 brief，不要把主题契合度压成参数化分数）冲突。
+
+所以侧重只有三档**定性**状态，且**原始措辞一律留存**：
+
+    soften   弱化（用户说 less / 少一点）
+    neutral  中性（默认）
+    boost    强调（用户说 more / 多一点）
+
+`more` 在档位上走一格，到 `boost` 为止；`less` 走一格，低于 `soften` 就移除。
+全程没有浮点数，因此不存在「1.5 到底比 1.0 多多少」这种假精度。
+
+**侧重不是选曲依据。** 它是一份给用户看、可编辑的策展摘要，记录「往哪边挪」；
+选哪些歌仍然只由模型对 brief 的理解决定，`direction_note()` 会把这条边界写进输出。
+
+## 与 brief 的关系：操纵面，不是替代品
+
+`docs/evaluation-signals.md` 说明了为什么把需求压成标签或权重表会丢掉否定范围、
+参照语义和叙事节点。本模块不推翻这个结论，而是反过来用：方向标签是**给用户的操纵面**，
+brief 与策展契约始终是唯一权威，冲突时以 brief 为准。
 
 两个轴把「音乐本身」和「用户行为」分开，因为它们的可信度不同：
 
@@ -31,45 +49,50 @@
 音乐库），不能凭印象写——这是「catalog 事实 / 收听证据 / 模型推断」三分法的延伸。
 """
 
-import re
 import unicodedata
 
 # ---------------------------------------------------------------- 契约参数
 
 TARGET_TAG_COUNT = 5     # 用户要的「约 5 个」
 MAX_TAGS = 8             # 超过就不是操纵面，是清单了
-BASE_WEIGHT = 1.0
-MIN_WEIGHT = 0.0
-MAX_WEIGHT = 2.0
-DEFAULT_STEP = 0.5       # 「多一点 / 少一点」一次动多少
 
 SONIC = "sonic"
 CONTEXT = "context"
 UNSPECIFIED = "unspecified"
 AXES = (SONIC, CONTEXT, UNSPECIFIED)
 
+# 侧重：三档定性状态，没有数值，也不做算术。
+SOFTEN = "soften"
+NEUTRAL = "neutral"
+BOOST = "boost"
+EMPHASES = (SOFTEN, NEUTRAL, BOOST)
+_LEVEL = {SOFTEN: 0, NEUTRAL: 1, BOOST: 2}
+_BY_LEVEL = {0: SOFTEN, 1: NEUTRAL, 2: BOOST}
+
 # 不靠词表猜轴——只认显式写法。猜轴需要一份流派/行为词库，那就等于把
-# 「这个模块不认识音乐」这句话作废了。
+# 「这个模块不认识音乐」这句话作废。
 AXIS_PREFIX = (SONIC + ":", CONTEXT + ":")
 
-# 操作词表。纯记账用的语法糖，不涉及任何音乐知识。
-# 长的先匹配，否则 `no` 会抢走 `nothing` 这类前缀。
-_MORE = ("more", "increase", "boost", "emphasise", "emphasize", "up",
-         "多一点", "多一些", "更多", "加强", "强化", "加重")
-_LESS = ("less", "fewer", "decrease", "reduce", "lower", "down", "soften",
-         "少一点", "少一些", "更少", "减弱", "弱化", "淡化", "减轻")
-_DROP = ("drop", "remove", "delete", "without", "exclude", "no",
-         "去掉", "移除", "删除", "不要", "去掉", "别要")
-_ADD = ("add", "also", "include", "加上", "加入", "再加", "补上")
-
-_OP_WORDS = sorted(
-    [(w, "more") for w in _MORE] + [(w, "less") for w in _LESS] +
-    [(w, "drop") for w in _DROP] + [(w, "add") for w in _ADD],
+# 操作词。拉丁词**必须**后接词边界：否则 `nothing but jazz` 会被读成
+# `drop "thing but jazz"`、`downbeat` 读成 `less "beat"`、`morello` 读成 `more "llo"`，
+# 把正常句子篡改成相反甚至破坏性的调整。CJK 没有词边界，但操作词本身
+# 足够长且具体，直接前缀匹配。
+_LATIN_OPS = sorted(
+    [(w, "more") for w in ("more", "increase", "boost", "emphasise", "emphasize", "up")] +
+    [(w, "less") for w in ("less", "fewer", "decrease", "reduce", "lower", "down", "soften")] +
+    [(w, "drop") for w in ("drop", "remove", "delete", "without", "exclude", "no")] +
+    [(w, "add") for w in ("add", "also", "include")],
+    key=lambda p: -len(p[0]),
+)
+_CJK_OPS = sorted(
+    [(w, "more") for w in ("多一点", "多一些", "更多", "加强", "强化", "加重")] +
+    [(w, "less") for w in ("少一点", "少一些", "更少", "减弱", "弱化", "淡化", "减轻")] +
+    [(w, "drop") for w in ("去掉", "移除", "删除", "不要", "别要")] +
+    [(w, "add") for w in ("加上", "加入", "再加", "补上")],
     key=lambda p: -len(p[0]),
 )
 
-_TRAILING_AMOUNT = re.compile(r"^(?P<label>.*?)[\s:：]*"
-                              r"(?P<amount>[0-9]+(?:\.[0-9]+)?)$")
+_SEPARATORS = " \t:：,，、;；"
 
 
 # ---------------------------------------------------------------- 基础工具
@@ -78,25 +101,15 @@ def tag_key(label: str) -> str:
     """标签的匹配键：NFKC + casefold + 只留字母数字。
 
     用 `isalnum()` 而不是 `[^0-9a-z\\u4e00-\\u9fff]`：后者会把日文假名和韩文
-    整个抹掉（这个仓库在别处刚修过同一类 bug，见 `am_playlist.best_song_match`）。
+    整个抹掉（这个仓库在别处修过同一类 bug，见 `am_playlist.best_song_match`）。
     """
     s = unicodedata.normalize("NFKC", str(label or "")).casefold()
     return "".join(ch for ch in s if ch.isalnum())
 
 
-def _clamp(weight) -> float:
-    try:
-        w = float(weight)
-    except (TypeError, ValueError):
-        return BASE_WEIGHT
-    if w != w:                      # NaN
-        return BASE_WEIGHT
-    return round(min(max(w, MIN_WEIGHT), MAX_WEIGHT), 3)
-
-
 def _axis_of(raw: str) -> tuple:
     """拆掉 `context:` / `sonic:` 前缀，返回 (标签文本, 轴)。"""
-    text = raw.strip()
+    text = str(raw or "").strip()
     low = text.casefold()
     for prefix in AXIS_PREFIX:
         if low.startswith(prefix):
@@ -104,17 +117,38 @@ def _axis_of(raw: str) -> tuple:
     return text, UNSPECIFIED
 
 
+def _emphasis_of(value) -> tuple:
+    """把 emphasis 归一化成三档之一，返回 (档位, 说明或 None)。"""
+    if value is None or value == "":
+        return NEUTRAL, None
+    text = str(value).strip().casefold()
+    alias = {"strong": BOOST, "more": BOOST, "up": BOOST, "high": BOOST,
+             "normal": NEUTRAL, "none": NEUTRAL, "mid": NEUTRAL,
+             "weak": SOFTEN, "less": SOFTEN, "low": SOFTEN}
+    text = alias.get(text, text)
+    if text in EMPHASES:
+        return text, None
+    return NEUTRAL, (f"侧重「{value}」看不懂；只认 {'/'.join(EMPHASES)}，"
+                      f"已按 {NEUTRAL} 处理")
+
+
 def _coerce(raw) -> tuple:
-    """把 str 或 dict 变成 (label, axis, weight)。"""
+    """把 str 或 dict 变成 (label, axis, emphasis, notes)。"""
+    notes = []
     if isinstance(raw, dict):
         label = raw.get("label") or raw.get("name") or raw.get("tag") or ""
         axis = str(raw.get("axis") or "").strip().casefold()
         if axis not in (SONIC, CONTEXT):
             axis = UNSPECIFIED
-        weight = raw.get("weight", BASE_WEIGHT)
-        return str(label).strip(), axis, _clamp(weight)
+        if "weight" in raw:
+            notes.append("weight 已废弃：数值权重会把审美判断伪装成有精度的数值，"
+                         "改用 emphasis: soften/neutral/boost")
+        emphasis, note = _emphasis_of(raw.get("emphasis"))
+        if note:
+            notes.append(note)
+        return str(label).strip(), axis, emphasis, notes
     label, axis = _axis_of(str(raw or ""))
-    return label, axis, BASE_WEIGHT
+    return label, axis, NEUTRAL, notes
 
 
 # ---------------------------------------------------------------- 校验
@@ -123,14 +157,15 @@ def normalize_tags(items) -> tuple:
     """校验一组标签，返回 (tags, problems)。
 
     `items` 每项可以是 `"night"`、`"context:recent-heavy-rotation"`，或
-    `{"label": ..., "axis": "sonic", "weight": 1.5}`。
+    `{"label": ..., "axis": "sonic", "emphasis": "boost"}`。
 
     problems 是给人看的说明，不是错误码——调用方应当把它们报告给用户，
     而不是静默改完继续。
     """
     by_key, order, problems = {}, [], []
     for raw in items or []:
-        label, axis, weight = _coerce(raw)
+        label, axis, emphasis, notes = _coerce(raw)
+        problems.extend(notes)
         if not label:
             problems.append("跳过了一个没有名字的标签")
             continue
@@ -140,19 +175,18 @@ def normalize_tags(items) -> tuple:
             continue
         if key in by_key:
             kept = by_key[key]
-            if weight > kept["weight"]:
-                kept["weight"] = weight
             if axis != UNSPECIFIED and kept["axis"] == UNSPECIFIED:
                 kept["axis"] = axis
             elif axis != UNSPECIFIED and axis != kept["axis"]:
                 problems.append(f"标签「{label}」给了两种轴（{kept['axis']} / {axis}），"
                                 f"保留先出现的 {kept['axis']}")
-            problems.append(f"标签「{label}」重复出现，合并为一个（权重取较大值）")
+            problems.append(f"标签「{label}」重复出现，保留先出现的那条"
+                            f"（侧重 {kept['emphasis']}）")
             continue
         if axis == UNSPECIFIED:
             problems.append(f"标签「{label}」没写轴；写 sonic: 或 context: 才能区分"
                             f"音乐属性与行为来源")
-        by_key[key] = {"key": key, "label": label, "axis": axis, "weight": weight}
+        by_key[key] = {"key": key, "label": label, "axis": axis, "emphasis": emphasis}
         order.append(key)
 
     tags = [by_key[k] for k in order]
@@ -166,6 +200,24 @@ def normalize_tags(items) -> tuple:
 
 # ---------------------------------------------------------------- 调整
 
+def _match_op(raw: str) -> tuple:
+    """返回 (op, 剩余文本)，匹配不到就 (None, None)。
+
+    拉丁操作词要求后接**词边界**——这条边界是必需的而不是修饰。见文件顶部说明。
+    """
+    low = raw.casefold()
+    for word, op in _CJK_OPS:
+        if low.startswith(word):
+            return op, raw[len(word):]
+    for word, op in _LATIN_OPS:
+        if low.startswith(word):
+            rest = raw[len(word):]
+            if rest and (rest[0].isalnum() or rest[0] == "_"):
+                continue
+            return op, rest
+    return None, None
+
+
 def parse_adjustment(text) -> dict:
     """把 `more funk` / `少一点 disco` / `drop x` / `add y` 解析成结构化调整。
 
@@ -176,9 +228,7 @@ def parse_adjustment(text) -> dict:
         label = str(text.get("label") or text.get("tag") or "").strip()
         if op not in ("more", "less", "drop", "add") or not label:
             return None
-        amount = text.get("amount")
-        return {"op": op, "label": label,
-                "amount": DEFAULT_STEP if amount is None else _step(amount)}
+        return {"op": op, "label": label}
 
     raw = str(text or "").strip()
     if not raw:
@@ -186,45 +236,40 @@ def parse_adjustment(text) -> dict:
 
     # 简写：+funk / -disco
     if raw[0] in "+-" and len(raw) > 1:
-        return {"op": "more" if raw[0] == "+" else "less",
-                "label": raw[1:].strip(), "amount": DEFAULT_STEP}
+        return {"op": "more" if raw[0] == "+" else "less", "label": raw[1:].strip()}
 
-    low = raw.casefold()
-    for word, op in _OP_WORDS:
-        if low.startswith(word):
-            rest = raw[len(word):].strip(" \t:：,，、")
-            if not rest:
-                return None
-            amount = DEFAULT_STEP
-            m = _TRAILING_AMOUNT.match(rest)
-            if m and m.group("label").strip():
-                rest, amount = m.group("label").strip(), _step(m.group("amount"))
-            return {"op": op, "label": rest, "amount": amount}
-    return None
+    op, rest = _match_op(raw)
+    if not op:
+        return None
+    rest = str(rest or "").strip(_SEPARATORS)
+    if not rest:
+        return None
+    return {"op": op, "label": rest}
 
 
-def _step(amount) -> float:
-    try:
-        a = abs(float(amount))
-    except (TypeError, ValueError):
-        return DEFAULT_STEP
-    if a != a or a == 0:
-        return DEFAULT_STEP
-    return round(min(a, MAX_WEIGHT), 3)
+def _shift_level(emphasis: str, steps: int) -> int:
+    """返回**未钳位**的档位数字。
+
+    `less` 要能落到 0 以下才知道「弱化到头、应移除」，所以钳位必须延后到
+    调用方决定完语义之后——先钳位会让那个分支永远走不到。
+    """
+    return _LEVEL.get(emphasis, _LEVEL[NEUTRAL]) + steps
 
 
 def apply_adjustments(tags, adjustments) -> tuple:
-    """按用户的方向调整标签权重，返回 (tags, report)。
+    """按用户的方向调侧重档，返回 (tags, report)。
 
-    语义（刻意做成简单可解释的记账）：
+    语义（刻意做成简单可解释的记账，且全程没有算术）：
 
-        more X   权重 +step（默认 0.5），封顶 MAX_WEIGHT
-        less X   权重 -step，跌到 MIN_WEIGHT 就删掉（并说明）
-        drop X   直接删掉
-        add  X   不存在就补一个，权重 BASE_WEIGHT
+        more X   侧重上移一档（已是 boost 则不动）
+        less X   侧重下移一档；低于 soften 就移除
+        drop X   直接移除
+        add  X   不存在就补一个，侧重 neutral
+
+    report 保留用户的**原始措辞**（`input`），所以整份结果是一份可见的修订记录。
 
     找不到的标签会报 `unknown`，**不会**当成「说过了但没效果」吞掉——
-    用户说 more funk 而歌单里没有 funk 时，必须让他知道。
+    用户说 more funk 而方向里没有 funk 时，必须让他知道。
     """
     current = [dict(t) for t in tags]
     by_key = {t["key"]: t for t in current}
@@ -237,60 +282,74 @@ def apply_adjustments(tags, adjustments) -> tuple:
         report.append(row)
 
     for raw in adjustments or []:
+        # 修订记录要留**用户原话**，不是解析后的标签：用户回看时该看到自己说了什么。
+        orig = raw if isinstance(raw, str) else (
+            raw.get("label") if isinstance(raw, dict) else str(raw))
         adj = parse_adjustment(raw)
         if not adj:
-            entry(str(raw), "unparsed",
+            entry(orig, "unparsed",
                   "没读懂方向；用 more X / less X / drop X / add X 的写法")
             continue
         op, label = adj["op"], adj["label"]
-        key = tag_key(label)
-        step = adj.get("amount", DEFAULT_STEP)
         shown = label
 
         if op == "add":
+            # 新增项必须走同一套规范化：否则 `add !!!` 会塞进一个空 key，
+            # 带 `context:` 前缀的新增项也不会被拆轴。
+            new_label, axis, emphasis, _ = _coerce(label)
+            key = tag_key(new_label)
+            if not key:
+                entry(orig, "rejected",
+                      f"「{shown}」去掉符号后没有可用字符，不能作为标签")
+                continue
             if key in by_key:
-                entry(shown, "already-present",
-                      f"「{shown}」已经在方向里，权重保持 {by_key[key]['weight']}")
+                entry(orig, "already-present",
+                      f"「{new_label}」已经在方向里，侧重保持 {by_key[key]['emphasis']}")
                 continue
             if len(current) >= MAX_TAGS:
-                entry(shown, "rejected",
-                      f"方向已有 {len(current)} 个标签，到上限 {MAX_TAGS}，"
-                      f"删掉一个再加")
+                entry(orig, "rejected",
+                      f"方向已有 {len(current)} 个标签，到上限 {MAX_TAGS}，删掉一个再加")
                 continue
-            new = {"key": key, "label": label, "axis": UNSPECIFIED,
-                   "weight": BASE_WEIGHT}
+            new = {"key": key, "label": new_label, "axis": axis, "emphasis": emphasis}
             current.append(new)
             by_key[key] = new
-            entry(shown, "added", f"新增「{shown}」，权重 {BASE_WEIGHT}（轴未指定）",
-                  weight=BASE_WEIGHT)
+            entry(orig, "added",
+                  f"新增「{new_label}」，侧重 {emphasis}"
+                  f"（轴 {'未指定' if axis == UNSPECIFIED else axis}）")
             continue
 
+        key = tag_key(label)
         if key not in by_key:
-            entry(shown, "unknown",
+            entry(orig, "unknown",
                   f"方向里没有「{shown}」，所以 {op} 没有作用；"
                   f"现有标签：{'、'.join(t['label'] for t in current) or '（空）'}")
             continue
 
         tag = by_key[key]
-        before = tag["weight"]
+        before = tag["emphasis"]
 
         if op == "drop":
             current = [t for t in current if t["key"] != key]
             del by_key[key]
-            entry(shown, "dropped", f"删掉「{shown}」（原权重 {before}）",
+            entry(orig, "dropped", f"删掉「{shown}」（原侧重 {before}）",
                   before=before, after=None)
             continue
 
-        delta = step if op == "more" else -step
-        after = _clamp(before + delta)
-        if after <= MIN_WEIGHT:
+        if op == "more" and before == BOOST:
+            entry(orig, "at-max", f"「{shown}」已经是 {BOOST}，不会再加强",
+                  before=before, after=before)
+            continue
+
+        after = _BY_LEVEL[min(max(_shift_level(before, 1 if op == "more" else -1), 0), 2)]
+        if op == "less" and _shift_level(before, -1) < 0:
             current = [t for t in current if t["key"] != key]
             del by_key[key]
-            entry(shown, "dropped", f"「{shown}」权重降到 {MIN_WEIGHT}，已从方向里移除",
+            entry(orig, "dropped",
+                  f"「{shown}」弱化到头，已从方向里移除（原侧重 {before}）",
                   before=before, after=None)
             continue
-        tag["weight"] = after
-        entry(shown, "applied", f"「{shown}」{before} → {after}",
+        tag["emphasis"] = after
+        entry(orig, "applied", f"「{shown}」{before} → {after}",
               before=before, after=after)
 
     return current, report
@@ -302,16 +361,18 @@ def axis_summary(tags) -> dict:
     """按轴计数。宿主据此判断方向是否只描了音乐、没写行为来源（或反之）。"""
     out = {SONIC: 0, CONTEXT: 0, UNSPECIFIED: 0}
     for t in tags or []:
-        out[t.get("axis", UNSPECIFIED)] = out.get(t.get("axis", UNSPECIFIED), 0) + 1
+        axis = t.get("axis", UNSPECIFIED)
+        out[axis] = out.get(axis, 0) + 1
     return out
 
 
 def _mark(tag) -> str:
-    w = tag["weight"]
-    if w > BASE_WEIGHT:
-        return f"{tag['label']} ↑{w:g}"
-    if w < BASE_WEIGHT:
-        return f"{tag['label']} ↓{w:g}"
+    """定性标记。刻意不用数字——数字会被读成精度。"""
+    e = tag["emphasis"]
+    if e == BOOST:
+        return f"{tag['label']}（强调）"
+    if e == SOFTEN:
+        return f"{tag['label']}（弱化）"
     return tag["label"]
 
 
@@ -319,7 +380,10 @@ def render_tags(tags, language: str = "en") -> str:
     """一行展示串，直接给用户看。"""
     if not tags:
         return ""
-    groups = [(SONIC, "sonic"), (CONTEXT, "context"), (UNSPECIFIED, None)]
+    zh = str(language or "").lower().startswith("zh")
+    groups = [(SONIC, "音乐" if zh else "sonic"),
+              (CONTEXT, "行为" if zh else "context"),
+              (UNSPECIFIED, None)]
     parts = []
     for axis, label in groups:
         members = [t for t in tags if t.get("axis", UNSPECIFIED) == axis]
@@ -333,22 +397,42 @@ def render_tags(tags, language: str = "en") -> str:
 def direction_note(tags, language: str = "zh") -> str:
     """把方向写成一句能塞回 brief 的说明。
 
-    刻意把「这不是 brief」写进输出本身：宿主模型读到的就是带边界的指令，
-    不靠外部文档提醒。
+    刻意把两条边界写进输出本身：宿主模型读到的就是带约束的指令，
+    不靠外部文档提醒——「不是 brief」以及「侧重不是选曲依据」。
     """
     if not tags:
         return ""
-    body = "；".join(
-        f"{t['label']}（{'音乐' if t['axis'] == SONIC else '行为' if t['axis'] == CONTEXT else '未标轴'}，"
-        f"侧重 {t['weight']:g}）" for t in tags)
-    if language.lower().startswith("zh"):
-        return (f"方向标签（约 {TARGET_TAG_COUNT} 个）：{body}。"
+    zh = str(language or "").lower().startswith("zh")
+    focus = [t["label"] for t in tags if t["emphasis"] == BOOST]
+    soften = [t["label"] for t in tags if t["emphasis"] == SOFTEN]
+    if zh:
+        body = "；".join(
+            f"{t['label']}（{'音乐' if t['axis'] == SONIC else '行为' if t['axis'] == CONTEXT else '未标轴'}"
+            f"{'，强调' if t['emphasis'] == BOOST else '，弱化' if t['emphasis'] == SOFTEN else ''}）"
+            for t in tags)
+        tail = ""
+        if focus:
+            tail += f"本轮更偏「{'、'.join(focus)}」。"
+        if soften:
+            tail += f"相应收紧「{'、'.join(soften)}」。"
+        return (f"方向标签（约 {TARGET_TAG_COUNT} 个）：{body}。{tail}"
                 f"这些标签是给用户的操纵面，**不是 brief**：原始需求与策展契约仍然优先，"
-                f"冲突时以 brief 为准；行为类标签必须有真实收听证据支持。")
-    return (f"Direction tags (~{TARGET_TAG_COUNT}): {body}. "
+                f"冲突时以 brief 为准；侧重只是方向提示，**不构成选曲依据**。"
+                f"行为类标签必须有真实收听证据支持。")
+    body = " / ".join(
+        f"{t['label']} ({'sonic' if t['axis'] == SONIC else 'context' if t['axis'] == CONTEXT else 'axis unset'}"
+        f"{', emphasize' if t['emphasis'] == BOOST else ', soften' if t['emphasis'] == SOFTEN else ''})"
+        for t in tags)
+    tail = ""
+    if focus:
+        tail += f" Lean toward {', '.join(focus)}."
+    if soften:
+        tail += f" Hold back on {', '.join(soften)}."
+    return (f"Direction tags (~{TARGET_TAG_COUNT}): {body}.{tail} "
             f"These tags are a user-facing steering surface, **not the brief**: the original "
             f"request and the curation contract stay authoritative, and the brief wins any "
-            f"conflict. Context tags must be backed by real listening evidence.")
+            f"conflict. Emphasis is a direction hint and is **not a selection criterion**; "
+            f"context tags must be backed by real listening evidence.")
 
 
 def summary(tags, problems=None, report=None, language: str = "zh") -> str:
@@ -359,18 +443,18 @@ def summary(tags, problems=None, report=None, language: str = "zh") -> str:
     else:
         lines.append(f"方向标签（{len(tags)} 个，目标约 {TARGET_TAG_COUNT} 个）：")
         for t in tags:
-            lines.append(f"  · {t['label']}  [轴={t['axis']}  权重={t['weight']:g}]")
+            lines.append(f"  · {t['label']}  [轴={t['axis']}  侧重={t['emphasis']}]")
         counts = axis_summary(tags)
         lines.append(f"  轴分布：音乐 {counts[SONIC]} / 行为 {counts[CONTEXT]} / "
                      f"未标 {counts[UNSPECIFIED]}")
-        lines.append(f"  展示：{render_tags(tags)}")
+        lines.append(f"  展示：{render_tags(tags, language)}")
     if problems:
         lines.append("校验说明：")
         lines.extend(f"  ! {p}" for p in problems)
     if report:
-        lines.append("方向调整：")
+        lines.append("方向修订记录（保留原话）：")
         for r in report:
-            lines.append(f"  · [{r['status']}] {r['detail']}")
+            lines.append(f"  · 「{r['input']}」→ [{r['status']}] {r['detail']}")
     if tags:
         lines.append("")
         lines.append(direction_note(tags, language))

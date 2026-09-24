@@ -5,7 +5,7 @@
 
 对应的 MCP 工具是 `am_tag_directions`，实现是 `playlist_tags.py`。
 
-## 边界：标签不是 brief
+## 边界：标签不是 brief，也不是选曲依据
 
 这一点必须先说，因为它决定了这个功能能做什么、不能做什么。
 
@@ -21,10 +21,40 @@
 | 谁写的 | 用户 + 宿主模型 | 宿主模型 |
 | 用途 | 决定选哪些歌 | 让用户能抽象地调方向 |
 
-因此 `direction_note()` 的输出里**自带**这句边界，宿主模型读到的就是带约束的指令，
+`direction_note()` 的输出里**自带**这两条边界，宿主模型读到的就是带约束的指令，
 不依赖外部文档提醒：
 
-> 这些标签是给用户的操纵面，**不是 brief**：原始需求与策展契约仍然优先，冲突时以 brief 为准。
+> 这些标签是给用户的操纵面，**不是 brief**：原始需求与策展契约仍然优先，冲突时以 brief 为准；
+> 侧重只是方向提示，**不构成选曲依据**。
+
+## 为什么没有数值权重
+
+第一版给每个标签一个 `0.0–2.0` 的小数权重，`more` / `less` 各加减 `0.5`。
+评审否掉了它，理由成立：
+
+> 那会把自然语言中的审美判断**伪装成有精度的数值**，与项目已经确定的
+> 「由 LLM 直接理解 brief、不要把主题契合度压成参数化分数」的原则相冲突。
+
+所以现在侧重只有三档**定性**状态，**全程没有浮点数**：
+
+| 侧重 | 含义 | 由什么操作产生 |
+|---|---|---|
+| `soften` | 弱化 | 用户说 `less X` / `少一点 X` |
+| `neutral` | 中性（默认） | 标签的初始状态 |
+| `boost` | 强调 | 用户说 `more X` / `多一点 X` |
+
+`more` 在档位上走一格，到 `boost` 为止；`less` 走一格，低于 `soften` 就移除该标签。
+因此不存在「1.5 到底比 1.0 多多少」这种假精度——**这里没有可以读出精度的东西**。
+
+用户说的**原话会被完整保留**在修订记录里（`report[].input`）。所以整份结果是一份
+可读的、可回看的策展契约修订史，而不是一组参数：
+
+```text
+方向修订记录（保留原话）：
+  · 「多一点 funk」→ [applied]  「funk」neutral → boost
+  · 「less disco」→ [applied]  「disco」neutral → soften
+  · 「more techno」→ [unknown]  方向里没有「techno」…
+```
 
 ## 两个轴
 
@@ -45,35 +75,43 @@
 
 ```text
 字符串：   night
-            sonic:night                     # 显式轴
+            sonic:night                              # 显式轴
             context:recent-heavy-rotation
-           （也接受对象：{"label": "night", "axis": "sonic", "weight": 1.5}）
+对象：     {"label": "night", "axis": "sonic", "emphasis": "boost"}
 ```
 
 约 5 个，上限 8 个——超过 8 个就不是操纵面，而是一份清单了。
-
-权重默认 `1.0`，范围 `0.0 – 2.0`：
-
-- `> 1.0` 表示「往这个方向再走一点」
-- `< 1.0` 表示「这个方向收着点」
 
 ## 用户怎么调
 
 | 用户说 | 效果 |
 |---|---|
-| `more funk` / `多一点 funk` / `+funk` | 权重 +0.5 |
-| `less disco` / `少一点 disco` / `-disco` | 权重 −0.5；降到 0 就移除 |
+| `more funk` / `多一点 funk` / `+funk` | 侧重上一档（boost 到顶就停） |
+| `less disco` / `少一点 disco` / `-disco` | 侧重下一档；低于 soften 就移除 |
 | `drop dark` / `去掉 dark` | 直接移除 |
-| `add ambient` / `加上 ambient` | 补一个（权重 1.0，轴未指定） |
-| `more funk 0.25` | 指定步长 |
+| `add ambient` / `加上 ambient` | 补一个（侧重 neutral） |
 
 三条性质是刻意保证的：
 
-1. **确定性**：同样的输入永远得到同样的输出，权重是显式记账，不是模型即兴。
-2. **可解释**：每条调整都回一句 `before → after`。
-3. **不静默**：找不到的标签回 `unknown` 并**列出实际有哪些**。用户说 `more techno`
-   而方向里没有 techno 时，最坏的结果是「说了但没反应」——所以必须说出来。
-   同理，读不懂的调整回 `unparsed`，而不是当没说过。
+1. **确定性**：同样的输入永远得到同样的输出。侧重是定性记账，不是模型即兴。
+2. **可解释**：每条调整都回一句 `before → after`，并保留用户原话。
+3. **不静默**：找不到的标签回 `unknown` 并**列出实际有哪些**；读不懂的调整回 `unparsed`；
+   去掉符号后没有可用字符的新增项回 `rejected`。用户说 `more techno` 而方向里没有 techno 时，
+   最坏的结果是「说了但没反应」——所以必须说出来。
+
+### 操作词必须有词边界
+
+拉丁操作词只在后面跟词边界时才算操作。这不是修饰，是修 bug：早期用 `startswith()`
+会把正常句子篡改掉——
+
+| 输入 | 曾经被解析成 | 现在 |
+|---|---|---|
+| `nothing but jazz` | `drop "thing but jazz"` | 解析不了 → `unparsed` |
+| `downbeat` | `less "beat"` | 解析不了 → `unparsed` |
+| `morello` | `more "llo"` | 解析不了 → `unparsed` |
+
+中文没有词边界，但操作词本身足够长且具体（`多一点` / `少一点` / `去掉`…），
+直接前缀匹配。
 
 ## 交互流程
 
@@ -81,7 +119,7 @@
 1. 宿主模型读完 brief，完成策展（选择与排序仍按原有流程）。
 2. 模型写约 5 个方向标签，混两个轴，调用 am_tag_directions(tags=[...])。
 3. 把返回的「展示」行给用户看：
-     sonic — synthwave · night · dark   ‖   context — recent-heavy-rotation · in-library
+     音乐 — synthwave · night（强调）· cold（弱化）   ‖   行为 — in-library
 4. 用户回：more night / less dark。
 5. 同一工具带 adjustments 再调一次，得到新的展示行与 direction_note。
 6. 把 direction_note 作为**补充**并入下一轮 brief（原始需求保持不动）。
@@ -89,6 +127,10 @@
 
 这个工具**只读且离线**：不碰 Apple Music，不需要登录，所以方向可以在一开始就谈清楚，
 不必等到写完歌单。
+
+当宿主通过 `create_playlist_from_description` 调用策展流程并带上 `tags` 参数时，
+这些标签会被**渲染进提示词**（含轴、侧重、校验问题，以及「不是选曲依据」的优先级说明），
+所以传入的方向不会石沉大海。
 
 ## 一个完整的例子
 
@@ -99,16 +141,16 @@
 模型给出并展示：
 
 ```text
-sonic — synthwave · night · cold · driving   ‖   context — in-library
+音乐 — synthwave · night · cold   ‖   行为 — in-library
 ```
 
 用户回 `more cold` / `less driving`：
 
 ```text
-[applied] 「cold」1.0 → 1.5
-[applied] 「driving」1.0 → 0.5
+[applied] 「cold」neutral → boost
+[applied] 「driving」neutral → soften
 
-展示：sonic — synthwave · night · cold ↑1.5 · driving ↓0.5   ‖   context — in-library
+展示：音乐 — synthwave · night · cold（强调）· driving（弱化）   ‖   行为 — in-library
 ```
 
 若用户接着回 `more funk`，而方向里没有 funk：
@@ -128,3 +170,10 @@ sonic — synthwave · night · cold · driving   ‖   context — in-library
 | 这次的**方向**是什么、用户想怎么调 | `am_tag_directions` |
 | 段内衔接是否顺 | `am_optimize_order`（可选，不负责选曲） |
 | 需求本身（必须/排除/参照/叙事） | brief 与策展契约，**始终优先** |
+
+## 边界（尚未证明的部分）
+
+- **5 个是不是正确的数量**，以及**这两个轴是不是正确的切分**——需要真实用户与盲听才能判断，
+  不是单元测试能定的。
+- 侧重档位**不参与任何打分或排序**。如果将来有人想把它喂给优化器，那正好是本文开头
+  警告过的那件事，应当先重新论证。

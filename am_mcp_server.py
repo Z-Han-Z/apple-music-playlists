@@ -15,6 +15,7 @@ from __future__ import annotations
 import contextlib
 import io
 import json
+import re
 import sys
 import traceback
 from pathlib import Path
@@ -92,11 +93,13 @@ PROMPTS = [
                 "description": (
                     "Optional direction tags to show the user before or after curation: about five "
                     "labels mixing musical character (sonic) with listening provenance (context, such "
-                    "as recent, high-rotation, or already in the library). The user may reply with "
-                    "adjustments like 'more funk' or 'less disco'; apply them with am_tag_directions. "
-                    "Tags steer the result but never replace the brief. / "
+                    "as recent, high-rotation, or already in the library). They are rendered into the "
+                    "prompt with their priority stated. The user may reply with adjustments like "
+                    "'more funk' or 'less disco'; apply them with am_tag_directions. Emphasis is "
+                    "qualitative (soften/neutral/boost), never a number, and tags steer the result but "
+                    "never replace the brief. / "
                     "可选的方向标签，约 5 个（音乐属性 + 用户行为来源）；用户可用 "
-                    "more X / less Y 调整，用 am_tag_directions 记账。"
+                    "more X / less Y 调整，用 am_tag_directions 记账。侧重是定性的，不是数值。"
                 ),
                 "required": False,
             },
@@ -276,16 +279,17 @@ TOOLS = [
     },
     {
         "name": "am_tag_directions",
-        "description": "把一次策展的**方向**表达成约 5 个可操纵的标签，并按用户的回复调整侧重。"
+        "description": "把一次策展的**方向**表达成约 5 个可操纵的标签，并按用户的回复改侧重。"
                        "标签由你（宿主模型）写：既包括音乐本身的属性（流派/年代/织体/氛围），"
                        "也包括**用户行为来源**（最近在听、高播放、集中循环、本就在库里、来自某个参照曲）。"
                        "两个轴要分清——sonic 是音乐属性，context 是这些歌为什么在这里；"
                        "context 标签必须有真实收听证据（am_recently_played / am_top_played / 音乐库）支持。"
                        "把方向展示给用户后，用户可以回 `more funk` / `less disco` / `drop dark` / `add ambient`，"
-                       "本工具把它做成**显式记账**（权重加减）：找不到的标签会报 unknown，"
-                       "不会静默无效果。**只读且离线**，不碰 Apple Music。"
-                       "标签是给用户的操纵面，**不是 brief**——原始需求与策展契约仍然优先，"
-                       "冲突时以 brief 为准。",
+                       "本工具把它做成**定性记账**：侧重只有 soften / neutral / boost 三档，"
+                       "全程没有数值权重（小数会让人误以为有精度），并保留用户原话作为修订记录。"
+                       "找不到的标签会报 unknown，不会静默无效果。**只读且离线**，不碰 Apple Music。"
+                       "标签是给用户的操纵面，**不是 brief**，也**不是选曲依据**——"
+                       "原始需求与策展契约仍然优先，冲突时以 brief 为准。",
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -296,12 +300,14 @@ TOOLS = [
                               "properties": {
                                   "label": {"type": "string"},
                                   "axis": {"type": "string", "enum": ["sonic", "context"]},
-                                  "weight": {"type": "number"},
+                                  "emphasis": {"type": "string",
+                                               "enum": ["soften", "neutral", "boost"]},
                               },
                               "required": ["label"], "additionalProperties": False},
                          ]},
                          "description": "方向标签，约 5 个。字符串可用 `context:recent-heavy-rotation` "
-                                        "给轴加前缀；也可给对象 {label, axis, weight}"},
+                                        "给轴加前缀；也可给对象 {label, axis, emphasis}。"
+                                        "侧重只有 soften/neutral/boost 三档定性状态，没有数值"},
                 "adjustments": {"type": "array", "items": {"type": "string"},
                                 "description": "用户对方向的调整，如 more funk / less disco / drop dark / "
                                                "add ambient（也认「多一点/少一点」与 +funk/-disco）"},
@@ -361,7 +367,7 @@ _ENGLISH_TOOL_DESCRIPTIONS = {
     "am_audit_playlist": "Read-only metadata audit of playlist length, artist concentration, genres, eras, duplicates, and possible interludes. For BPM, key, energy, and transitions, use am_analyze_flow.",
     "am_analyze_flow": "Read-only diagnosis of BPM, key, loudness, energy, mood, adjacent transitions, and overall arc. It may fetch and cache remote feature data; use am_optimize_order only when a proposed replacement order is wanted.",
     "am_optimize_order": "Compute a proposed order after the LLM has selected the songs and narrative blocks. It balances adjacent audio transitions with a chosen qualitative arc, returns an order without writing, and may fetch cached remote features; it must not choose songs or judge theme fit.",
-    "am_tag_directions": "Present and steer the playlist's direction tags: about five labels the host model authors, covering both musical character (sonic) and listening provenance (context, such as recent, high-rotation, or already in the library). It validates the set, applies user replies like 'more funk' or 'less disco' as explicit weight bookkeeping, and returns a rendered line plus a direction note for the next curation round. Read-only and offline: it touches nothing in Apple Music, and the tags are a steering surface that never replaces the brief.",
+    "am_tag_directions": "Present and steer the playlist's direction tags: about five labels the host model authors, covering both musical character (sonic) and listening provenance (context, such as recent, high-rotation, or already in the library). It validates the set, applies user replies like 'more funk' or 'less disco' as explicit qualitative bookkeeping over three emphasis levels (soften/neutral/boost) with the user's own wording kept as a revision record, and returns a rendered line plus a direction note for the next curation round. There are no numeric weights, because decimals would read as precision the judgement does not have. Read-only and offline: it touches nothing in Apple Music, and the tags are a steering surface that never replaces the brief and never becomes a selection criterion.",
     "am_recently_played": "Read recent listening or recently added Apple Music content when recency matters. This API does not provide play counts; use am_top_played for Replay rankings.",
     "am_top_played": "Read Apple Music Replay play-count rankings by song, album, or artist when frequency matters. Use am_recently_played for latest listening; all-time data may be unavailable, so retry with a specific year.",
 }
@@ -790,12 +796,41 @@ def _contains_lone_surrogate(value) -> bool:
     return False
 
 
+def _render_direction_tags(raw: str, language: str = "") -> str:
+    """把 prompt 的 `tags` 字符串渲染成提示词里的一段（空串则整段不出现）。
+
+    校验刻意复用 `playlist_tags.normalize_tags`：标签在这里和 `am_tag_directions`
+    里必须是**同一套**规则（轴、侧重、上限、去重），否则两处会各自漂移。
+    第一版把 `tags` 公开出去却从不读取，调用方以为方向生效了、实际歌单不受影响——
+    所以这一段必须真的进提示词。
+    """
+    items = [p.strip() for p in re.split(r"[,;\n、]+", raw or "") if p.strip()]
+    if not items:
+        return ""
+    tags, problems = tags_mod.normalize_tags(items)
+    if not tags:
+        return ""
+    lines = ["Direction tags the caller supplied — a steering surface, "
+             "NOT a replacement for the brief:"]
+    for t in tags:
+        lines.append(f"  · {t['label']}  [axis={t['axis']}  emphasis={t['emphasis']}]")
+    lines.append(f"  Display line: {tags_mod.render_tags(tags, language or 'en')}")
+    if problems:
+        lines.append("  Validation notes (report these to the user):")
+        lines.extend(f"    ! {p}" for p in problems)
+    lines.append(
+        "How to use them: the brief above and your curation contract stay authoritative, and the "
+        "brief wins any conflict. Emphasis is a direction hint only — never a selection criterion "
+        "and never a score. A context tag must be backed by real listening evidence.")
+    return "\n".join(lines) + "\n"
+
+
 def _render_playlist_prompt(arguments: dict) -> str:
     description = arguments["description"].strip()
     name = arguments.get("name", "").strip() or "Propose a concise name that fits the brief"
     track_count = arguments.get("track_count", "").strip() or "25"
     language = arguments.get("language", "").strip() or "the user's language"
-    return f"""Create an Apple Music playlist from this brief:
+    rendered = f"""Create an Apple Music playlist from this brief:
 
 {description}
 
@@ -803,6 +838,7 @@ Requested name: {name}
 Requested size: {track_count} tracks
 Response language: {language}
 
+{_render_direction_tags(arguments.get("tags", "").strip(), language)}
 Use the Apple Music MCP tools to complete the task, not merely to suggest a list:
 1. Interpret the brief. Make reasonable assumptions instead of asking many questions; ask only if a missing choice would materially change the result.
 2. Call am_status before any write. If the user asks for personalization, use am_recently_played or am_top_played as supporting taste signals.
@@ -814,7 +850,11 @@ Use the Apple Music MCP tools to complete the task, not merely to suggest a list
 8. Once the preview is sound, create the playlist with dry_run=false. If the user explicitly asked only for a plan or preview, stop before this write.
 9. Report the playlist name, ID, track count, unmatched tracks, and the most important curation choices briefly.
 
-The language model in the MCP client performs the curation. This MCP server does not call or require a separate LLM provider."""
+The language model in the MCP client performs the curation. This MCP server does not call or require a separate LLM provider.
+
+Direction tags are how the user steers the result after the fact: offer about five of them with am_tag_directions — sonic tags for the music's own character, and context tags for why these tracks are here (a context tag must be backed by real listening evidence) — and show the user the returned display line. If the user replies with something like "more funk" or "less disco", call am_tag_directions again with those adjustments and treat the returned direction note as a supplement to the brief. The brief and your curation contract stay authoritative, emphasis is a direction hint and never a selection criterion, and the brief wins any conflict."""
+    # 没有方向标签时会留下多余空行；提示词是要被人读的，收一下。
+    return re.sub(r"\n{3,}", "\n\n", rendered)
 
 
 def _validate_prompt_arguments(arguments) -> str | None:

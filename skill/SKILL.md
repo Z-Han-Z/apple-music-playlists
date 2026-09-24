@@ -58,15 +58,17 @@ am_audit_playlist    元数据层体检
 am_analyze_flow      听感体检（BPM/调性/响度/能量/情绪 + 相邻衔接 + 弧线形状）
 am_optimize_order    排序：算出更好的曲序（可指定叙事弧；blocks 保留段落顺序）。只读
 am_tag_directions    方向标签：约 5 个（sonic 音乐属性 + context 行为来源），
-                     按 more X / less Y 记账权重，返回展示行与可回填 brief 的方向说明。只读且离线
+                     按 more X / less Y 改侧重档（定性三档，无数值），保留用户原话；
+                     返回展示行与可回填 brief 的方向说明。只读且离线
 am_recently_played   最近播放（曲目 / 歌单 / 电台 / 最近入库）
 am_top_played        播放次数排行（songs / albums / artists × 年份或 all-time）
 ```
 
-**方向标签是操纵面，不是 brief。** 策展完成后写约 5 个标签（两个轴：
+**方向标签是操纵面，不是 brief，也不是选曲依据。** 策展完成后写约 5 个标签（两个轴：
 `sonic` 音乐属性、`context` 为什么在这里），用 `am_tag_directions` 展示给用户，
 用户回 `more X` / `less Y` 就带 `adjustments` 再调一次，把返回的方向说明**作为补充**
 并入下一轮 brief——原始需求与策展契约始终优先，冲突时以 brief 为准。
+侧重只有 `soften` / `neutral` / `boost` 三档定性状态，**没有数值权重**（小数会让人以为有精度）。
 `context` 标签必须有真实收听证据；找不到的标签会报 `unknown` 而不是静默无效。
 细节见 `docs/playlist-tag-directions.md`。
 

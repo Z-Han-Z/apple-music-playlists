@@ -2,13 +2,17 @@
 # -*- coding: utf-8 -*-
 """方向标签（playlist_tags）的离线单元测试。
 
-这些测试盯住三件事：
+这些测试盯住四件事：
 
 1. `tag_key` 必须保留所有文字系统——用 `[^0-9a-z\\u4e00-\\u9fff]` 会把日文假名和
    韩文整个抹掉，这个仓库在别处踩过一次。
 2. 调整是**记账**，必须确定、可解释、且对找不到的标签出声——用户说 more funk
    而方向里没有 funk 时，静默无效果是最坏的结果。
-3. 方向标签不得被表述成 brief 的替代品：`direction_note` 里必须写明边界。
+3. **没有数值权重。** 侧重只有 soften/neutral/boost 三档定性状态，渲染结果里
+   不该出现任何数字：数字会被读成精度，而这里没有精度。
+4. 方向标签不得被表述成 brief 的替代品，也不得成为选曲依据。
+
+`TestReviewerRegressions` 专门钉住第一轮 review 报出的三个可复现缺陷。
 
 跑：
     python -m unittest discover -s tests -v
@@ -49,6 +53,7 @@ class TestNormalizeTags(unittest.TestCase):
         tags, problems = pt.normalize_tags(["synthwave", "night", "dark"])
         self.assertEqual([t["label"] for t in tags], ["synthwave", "night", "dark"])
         self.assertTrue(all(t["axis"] == pt.UNSPECIFIED for t in tags))
+        self.assertTrue(all(t["emphasis"] == pt.NEUTRAL for t in tags))
         self.assertEqual(len(problems), 3)          # 每个都缺轴
         self.assertTrue(all("没写轴" in p for p in problems))
 
@@ -59,18 +64,31 @@ class TestNormalizeTags(unittest.TestCase):
         self.assertEqual(tags[1]["label"], "recent-heavy-rotation")
         self.assertEqual(problems, [])
 
-    def test_dict_form_with_weight(self):
+    def test_dict_form_with_emphasis(self):
         tags, problems = pt.normalize_tags([
-            {"label": "funk", "axis": "sonic", "weight": 1.5},
-            {"label": "disco", "axis": "sonic", "weight": 0.5},
+            {"label": "funk", "axis": "sonic", "emphasis": "boost"},
+            {"label": "disco", "axis": "sonic", "emphasis": "soften"},
         ])
-        self.assertEqual([t["weight"] for t in tags], [1.5, 0.5])
+        self.assertEqual([t["emphasis"] for t in tags], [pt.BOOST, pt.SOFTEN])
         self.assertEqual(problems, [])
 
-    def test_duplicates_merge_and_are_reported(self):
-        tags, problems = pt.normalize_tags(["funk", {"label": "FUNK", "weight": 1.5}])
+    def test_unknown_emphasis_is_reported_and_neutralized(self):
+        tags, problems = pt.normalize_tags([{"label": "funk", "emphasis": "very much"}])
+        self.assertEqual(tags[0]["emphasis"], pt.NEUTRAL)
+        self.assertTrue(any("看不懂" in p for p in problems))
+
+    def test_legacy_numeric_weight_is_rejected_with_a_reason(self):
+        """第一版用 0.0–2.0 小数权重；评审指出那是假精度。传 weight 要说清原因。"""
+        tags, problems = pt.normalize_tags([{"label": "funk", "weight": 1.5}])
+        self.assertEqual(tags[0]["emphasis"], pt.NEUTRAL)
+        self.assertTrue(any("weight 已废弃" in p for p in problems))
+        self.assertTrue(any("假精度" in p or "有精度" in p for p in problems))
+
+    def test_duplicates_keep_the_first_and_report(self):
+        tags, problems = pt.normalize_tags(
+            ["funk", {"label": "FUNK", "emphasis": "boost"}])
         self.assertEqual(len(tags), 1)
-        self.assertEqual(tags[0]["weight"], 1.5)    # 取较大权重
+        self.assertEqual(tags[0]["emphasis"], pt.NEUTRAL)   # 保留先出现的那条
         self.assertTrue(any("重复" in p for p in problems))
 
     def test_conflicting_axes_keep_the_first_and_report(self):
@@ -78,16 +96,6 @@ class TestNormalizeTags(unittest.TestCase):
             [{"label": "night", "axis": "sonic"}, {"label": "night", "axis": "context"}])
         self.assertEqual(tags[0]["axis"], pt.SONIC)
         self.assertTrue(any("两种轴" in p for p in problems))
-
-    def test_weight_is_clamped(self):
-        tags, _ = pt.normalize_tags(
-            [{"label": "a", "weight": 99}, {"label": "b", "weight": -5}])
-        self.assertEqual(tags[0]["weight"], pt.MAX_WEIGHT)
-        self.assertEqual(tags[1]["weight"], pt.MIN_WEIGHT)
-
-    def test_bad_weight_falls_back_to_base(self):
-        tags, _ = pt.normalize_tags([{"label": "a", "weight": "loud"}])
-        self.assertEqual(tags[0]["weight"], pt.BASE_WEIGHT)
 
     def test_over_the_cap_keeps_the_first_and_names_the_rest(self):
         items = [f"tag{i}" for i in range(pt.MAX_TAGS + 2)]
@@ -131,18 +139,58 @@ class TestParseAdjustment(unittest.TestCase):
         self.assertEqual(pt.parse_adjustment("more heavy rotation")["label"],
                          "heavy rotation")
 
-    def test_explicit_amount(self):
-        adj = pt.parse_adjustment("more funk 0.25")
-        self.assertEqual(adj["label"], "funk")
-        self.assertEqual(adj["amount"], 0.25)
-
     def test_dict_form(self):
-        adj = pt.parse_adjustment({"op": "more", "label": "funk", "amount": 0.25})
-        self.assertEqual(adj, {"op": "more", "label": "funk", "amount": 0.25})
+        adj = pt.parse_adjustment({"op": "more", "label": "funk"})
+        self.assertEqual(adj, {"op": "more", "label": "funk"})
 
     def test_unparseable_returns_none(self):
         for bad in ("", "   ", None, "funk", "more", {"op": "more"}, 42):
             self.assertIsNone(pt.parse_adjustment(bad), bad)
+
+
+class TestReviewerRegressions(unittest.TestCase):
+    """第一轮 review 报出的三个可复现缺陷，钉死。"""
+
+    # --- [P1] 操作词匹配缺少词边界 -------------------------------------
+
+    def test_operator_words_need_a_word_boundary(self):
+        """`startswith()` 会把普通句子篡改成操作 + 一段残词。"""
+        for text in ("nothing but jazz", "downbeat", "morello"):
+            self.assertIsNone(pt.parse_adjustment(text), text)
+
+    def test_boundary_only_blocks_glued_letters(self):
+        """加了边界之后，正常写法必须照旧可用。"""
+        self.assertEqual(pt.parse_adjustment("no disco")["op"], "drop")
+        self.assertEqual(pt.parse_adjustment("no disco")["label"], "disco")
+        self.assertEqual(pt.parse_adjustment("up tempo")["op"], "more")
+        self.assertEqual(pt.parse_adjustment("more funk!")["label"], "funk!")
+
+    def test_the_shadowed_comment_is_now_true(self):
+        """注释里写着「no 不会抢走 nothing」，第一版并没有实现，现在是事实。"""
+        self.assertIsNone(pt.parse_adjustment("nothing"))
+        self.assertEqual(pt.parse_adjustment("no thing")["label"], "thing")
+
+    # --- [P2] add 绕过规范化边界 ---------------------------------------
+
+    def test_add_with_no_usable_characters_is_rejected(self):
+        tags, _ = pt.normalize_tags(["sonic:funk"])
+        out, report = pt.apply_adjustments(tags, ["add !!!"])
+        self.assertEqual(len(out), 1)
+        self.assertEqual(report[0]["status"], "rejected")
+        self.assertTrue(all(t["key"] for t in out))      # 没有空 key 混进来
+
+    def test_add_strips_the_axis_prefix(self):
+        tags, _ = pt.normalize_tags(["sonic:funk"])
+        out, report = pt.apply_adjustments(tags, ["add context:recent-heavy-rotation"])
+        added = [t for t in out if t["label"] == "recent-heavy-rotation"][0]
+        self.assertEqual(added["axis"], pt.CONTEXT)
+        self.assertEqual(report[0]["status"], "added")
+
+    def test_add_dedupes_against_the_normalized_key(self):
+        tags, _ = pt.normalize_tags(["sonic:funk"])
+        out, report = pt.apply_adjustments(tags, ["add FUNK"])
+        self.assertEqual(len(out), 1)
+        self.assertEqual(report[0]["status"], "already-present")
 
 
 class TestApplyAdjustments(unittest.TestCase):
@@ -150,15 +198,35 @@ class TestApplyAdjustments(unittest.TestCase):
     def _tags():
         return pt.normalize_tags(["sonic:funk", "sonic:disco", "context:night"])[0]
 
-    def test_more_and_less_move_weights(self):
+    def test_more_and_less_shift_one_qualitative_level(self):
         tags, report = pt.apply_adjustments(self._tags(), ["more funk", "less disco"])
-        got = {t["label"]: t["weight"] for t in tags}
-        self.assertEqual(got["funk"], 1.5)
-        self.assertEqual(got["disco"], 0.5)
-        self.assertEqual(got["night"], 1.0)         # 没提到的不动
+        got = {t["label"]: t["emphasis"] for t in tags}
+        self.assertEqual(got["funk"], pt.BOOST)
+        self.assertEqual(got["disco"], pt.SOFTEN)
+        self.assertEqual(got["night"], pt.NEUTRAL)          # 没提到的不动
         self.assertTrue(all(r["status"] == "applied" for r in report))
 
-    def test_less_that_reaches_zero_drops_the_tag(self):
+    def test_more_is_idempotent_at_the_top(self):
+        """只有三档，所以重复 more 到 boost 就该停住并说明。"""
+        tags, report = pt.apply_adjustments(self._tags(), ["more funk", "more funk"])
+        got = {t["label"]: t["emphasis"] for t in tags}
+        self.assertEqual(got["funk"], pt.BOOST)
+        self.assertEqual(report[-1]["status"], "at-max")
+
+    def test_more_twice_from_soften_reaches_neutral_then_boost(self):
+        tags = pt.normalize_tags([{"label": "funk", "emphasis": "soften"}])[0]
+        tags, _ = pt.apply_adjustments(tags, ["more funk"])
+        self.assertEqual(tags[0]["emphasis"], pt.NEUTRAL)
+        tags, _ = pt.apply_adjustments(tags, ["more funk"])
+        self.assertEqual(tags[0]["emphasis"], pt.BOOST)
+
+    def test_less_from_soften_drops_the_tag(self):
+        tags = pt.normalize_tags([{"label": "funk", "emphasis": "soften"}])[0]
+        out, report = pt.apply_adjustments(tags, ["less funk"])
+        self.assertEqual(out, [])
+        self.assertEqual(report[0]["status"], "dropped")
+
+    def test_less_twice_from_neutral_drops_the_tag(self):
         tags, report = pt.apply_adjustments(
             self._tags(), ["less disco", "less disco"])
         self.assertNotIn("disco", [t["label"] for t in tags])
@@ -167,11 +235,6 @@ class TestApplyAdjustments(unittest.TestCase):
     def test_drop_removes(self):
         tags, _ = pt.apply_adjustments(self._tags(), ["drop disco"])
         self.assertNotIn("disco", [t["label"] for t in tags])
-
-    def test_add_appends(self):
-        tags, report = pt.apply_adjustments(self._tags(), ["add ambient"])
-        self.assertIn("ambient", [t["label"] for t in tags])
-        self.assertEqual(report[0]["status"], "added")
 
     def test_add_beyond_the_cap_is_rejected_not_silently_dropped(self):
         items = [f"tag{i}" for i in range(pt.MAX_TAGS)]
@@ -191,16 +254,16 @@ class TestApplyAdjustments(unittest.TestCase):
         _, report = pt.apply_adjustments(self._tags(), ["请让它更好听"])
         self.assertEqual(report[0]["status"], "unparsed")
 
-    def test_more_clamps_at_the_ceiling(self):
-        tags, _ = pt.apply_adjustments(pt.normalize_tags(
-            [{"label": "funk", "weight": 1.9}])[0], ["more funk", "more funk"])
-        self.assertEqual(tags[0]["weight"], pt.MAX_WEIGHT)
+    def test_report_keeps_the_users_own_wording(self):
+        """修订记录要留原话，否则用户看不出自己说过什么。"""
+        _, report = pt.apply_adjustments(self._tags(), ["多一点 funk", "less disco"])
+        self.assertEqual([r["input"] for r in report], ["多一点 funk", "less disco"])
 
     def test_distinct_labels_commute(self):
         a, _ = pt.apply_adjustments(self._tags(), ["more funk", "less disco"])
         b, _ = pt.apply_adjustments(self._tags(), ["less disco", "more funk"])
-        self.assertEqual([(t["label"], t["weight"]) for t in a],
-                         [(t["label"], t["weight"]) for t in b])
+        self.assertEqual([(t["label"], t["emphasis"]) for t in a],
+                         [(t["label"], t["emphasis"]) for t in b])
 
     def test_no_adjustments_changes_nothing(self):
         tags, report = pt.apply_adjustments(self._tags(), [])
@@ -211,19 +274,30 @@ class TestApplyAdjustments(unittest.TestCase):
         tags, _ = pt.apply_adjustments(self._tags(), ["more night"])
         by = {t["label"]: t for t in tags}
         self.assertEqual(by["night"]["axis"], pt.CONTEXT)
-        self.assertEqual(by["night"]["weight"], 1.5)
+        self.assertEqual(by["night"]["emphasis"], pt.BOOST)
 
 
 class TestPresentation(unittest.TestCase):
-    def test_render_marks_emphasis(self):
-        tags, _ = pt.normalize_tags([{"label": "funk", "axis": "sonic", "weight": 1.5},
-                                     {"label": "disco", "axis": "sonic", "weight": 0.5},
-                                     {"label": "night", "axis": "context"}])
-        out = pt.render_tags(tags)
-        self.assertIn("funk ↑1.5", out)
-        self.assertIn("disco ↓0.5", out)
+    @staticmethod
+    def _tags():
+        return pt.normalize_tags([{"label": "funk", "axis": "sonic", "emphasis": "boost"},
+                                  {"label": "disco", "axis": "sonic", "emphasis": "soften"},
+                                  {"label": "night", "axis": "context"}])[0]
+
+    def test_render_uses_words_not_numbers(self):
+        out = pt.render_tags(self._tags(), "zh")
+        self.assertIn("funk（强调）", out)
+        self.assertIn("disco（弱化）", out)
         self.assertIn("night", out)
-        self.assertIn("context", out)
+        self.assertIn("行为", out)
+        self.assertFalse(any(ch.isdigit() for ch in out),
+                         f"展示串里不该出现数字（会被读成精度）：{out}")
+
+    def test_direction_note_has_no_decimal_precision(self):
+        """「约 5 个」这种计数可以有；小数不行——小数会被读成权重精度。"""
+        import re
+        note = pt.direction_note(self._tags(), "zh")
+        self.assertIsNone(re.search(r"\d+\.\d+", note), note)
 
     def test_render_empty(self):
         self.assertEqual(pt.render_tags([]), "")
@@ -233,19 +307,25 @@ class TestPresentation(unittest.TestCase):
         self.assertEqual(pt.axis_summary(tags),
                          {pt.SONIC: 1, pt.CONTEXT: 1, pt.UNSPECIFIED: 1})
 
-    def test_direction_note_keeps_the_boundary(self):
-        """方向说明必须自带「不是 brief」的边界，否则宿主模型会拿它当需求。"""
-        tags, _ = pt.normalize_tags(["sonic:funk", "context:night"])
-        zh = pt.direction_note(tags, "zh")
+    def test_direction_note_keeps_both_boundaries(self):
+        """「不是 brief」和「侧重不是选曲依据」都必须写进输出本身。"""
+        zh = pt.direction_note(self._tags(), "zh")
         self.assertIn("不是 brief", zh)
         self.assertIn("以 brief 为准", zh)
-        en = pt.direction_note(tags, "en")
+        self.assertIn("不构成选曲依据", zh)
+        en = pt.direction_note(self._tags(), "en")
         self.assertIn("not the brief", en)
+        self.assertIn("not a selection criterion", en)
+
+    def test_direction_note_names_what_to_lean_toward(self):
+        zh = pt.direction_note(self._tags(), "zh")
+        self.assertIn("funk", zh)
+        self.assertIn("disco", zh)
 
     def test_direction_note_empty_for_no_tags(self):
         self.assertEqual(pt.direction_note([]), "")
 
-    def test_summary_reports_problems_and_adjustments(self):
+    def test_summary_reports_problems_and_the_revision_record(self):
         tags, problems = pt.normalize_tags(["funk", "disco"])
         tags, report = pt.apply_adjustments(tags, ["more funk", "more techno"])
         text = pt.summary(tags, problems, report)
@@ -253,6 +333,79 @@ class TestPresentation(unittest.TestCase):
         self.assertIn("[unknown]", text)
         self.assertIn("没写轴", text)
         self.assertIn("不是 brief", text)
+        self.assertIn("修订记录", text)
+        self.assertIn("侧重=", text)
+        self.assertNotIn("权重", text)
+
+
+class TestPromptRendering(unittest.TestCase):
+    """[P1] prompt 里公开了 tags 却从不读取 —— 用 review 当时复现的原例钉死。
+
+    review 原话：『实测传入 `sonic:nocturnal` 后，渲染结果完全不包含它。
+    调用方会以为方向已经生效，实际歌单不受影响。』
+    """
+
+    def setUp(self):
+        import am_mcp_server as srv
+        self.srv = srv
+
+    def _render(self, **extra):
+        args = {"description": "a late-night drive", "name": "n",
+                "track_count": "20", "language": "zh"}
+        args.update(extra)
+        return self.srv._render_playlist_prompt(args)
+
+    def test_tags_argument_reaches_the_rendered_prompt(self):
+        text = self._render(tags="sonic:nocturnal")
+        self.assertIn("nocturnal", text)
+        self.assertIn("sonic", text)
+
+    def test_tags_argument_is_rendered_with_axis_and_emphasis(self):
+        text = self._render(tags="sonic:night, context:in-library")
+        self.assertIn("night", text)
+        self.assertIn("in-library", text)
+        self.assertIn("axis=", text)
+        self.assertIn("emphasis=", text)
+
+    def test_prompt_names_the_tool_and_the_priority(self):
+        text = self._render(tags="sonic:night")
+        self.assertIn("am_tag_directions", text)
+        self.assertIn("never a selection criterion", text)
+        self.assertIn("wins any conflict", text)
+
+    def test_prompt_states_the_steering_step_even_without_tags(self):
+        """没传 tags 时也要有第 10 步——否则模型不会主动给方向。"""
+        text = self._render()
+        self.assertIn("am_tag_directions", text)
+        self.assertNotIn("Direction tags the caller supplied", text)
+
+    def test_prompt_never_renders_a_numeric_weight(self):
+        """要断言的是「没有数值权重模型」，不是「文本里没有 weight 这个词」——
+        策展契约本身会正当地写下「不要把 brief 压成……数值权重」这样的禁令，
+        用子串匹配会把那句禁令也判成违规。所以只查渲染出来的方向段。"""
+        import re
+        text = self._render(tags="sonic:night")
+        block = text[text.index("Direction tags the caller supplied"):
+                     text.index("Use the Apple Music MCP tools")]
+        self.assertNotIn("weight=", block)
+        self.assertIsNone(re.search(r"\d+\.\d+", block), block)
+        self.assertIn("emphasis=", block)
+
+    def test_prompt_reports_validation_problems(self):
+        """没写轴的标签要连问题一起渲染，让宿主能告诉用户。"""
+        text = self._render(tags="night")
+        self.assertIn("Validation notes", text)
+        self.assertIn("没写轴", text)
+
+    def test_prompt_validation_accepts_a_string_tags_argument(self):
+        err = self.srv._validate_prompt_arguments(
+            {"description": "x", "tags": "sonic:night"})
+        self.assertIsNone(err)
+
+    def test_prompt_validation_rejects_unknown_arguments(self):
+        err = self.srv._validate_prompt_arguments(
+            {"description": "x", "nope": "y"})
+        self.assertIn("unknown prompt argument", err or "")
 
 
 if __name__ == "__main__":
