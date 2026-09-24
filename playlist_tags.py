@@ -435,9 +435,20 @@ def direction_note(tags, language: str = "zh") -> str:
             f"context tags must be backed by real listening evidence.")
 
 
-def summary(tags, problems=None, report=None, language: str = "zh") -> str:
-    """给 MCP 工具用的紧凑文本报告。"""
+def summary(tags, problems=None, report=None, language: str = "zh",
+            brief: str = "") -> str:
+    """给 MCP 工具用的紧凑文本报告。
+
+    `brief` 传入时会被**原样回显**在最前面。评审要求「原始 brief 仍应始终可见且优先」：
+    提示词路径里 brief 本来就在标签之上，但**调整路径**上不是——用户隔一轮只说
+    「more funk」时，模型手上只剩方向说明，原始需求可能已被挤出上下文。回显它，
+    这条路径也满足「始终可见」。
+    """
     lines = []
+    if brief and brief.strip():
+        lines.append("原始 brief（**始终优先**；下面的方向标签只是补充）：")
+        lines.append(f"  {brief.strip()}")
+        lines.append("")
     if not tags:
         lines.append("方向标签：空。")
     else:

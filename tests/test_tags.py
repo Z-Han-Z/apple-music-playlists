@@ -337,6 +337,31 @@ class TestPresentation(unittest.TestCase):
         self.assertIn("侧重=", text)
         self.assertNotIn("权重", text)
 
+    def test_summary_echoes_the_brief_verbatim_and_first(self):
+        """评审要求「原始 brief 仍应始终可见且优先」。
+
+        提示词路径里 brief 本来就在标签之上；这里管的是**调整路径**——用户隔一轮
+        只说 more X 时，模型手上不该只剩方向说明。
+        """
+        tags, _ = pt.normalize_tags(["sonic:funk"])
+        brief = "深夜开车听的那种，霓虹感，偏冷。不要 Any Artist 的任何东西。"
+        text = pt.summary(tags, None, None, "zh", brief)
+        self.assertIn(brief, text)                     # 原样，一字不改
+        self.assertLess(text.index(brief), text.index("方向标签（1 个"))  # 出现在标签之前
+        self.assertIn("始终优先", text)
+        self.assertIn("不是 brief", text)               # 方向说明的边界仍在
+
+    def test_summary_without_brief_has_no_brief_block(self):
+        tags, _ = pt.normalize_tags(["sonic:funk"])
+        text = pt.summary(tags, None, None, "zh", "")
+        self.assertNotIn("原始 brief", text)
+        self.assertNotIn("始终优先", text)
+
+    def test_summary_brief_blank_string_is_ignored(self):
+        tags, _ = pt.normalize_tags(["sonic:funk"])
+        text = pt.summary(tags, None, None, "zh", "   \n  ")
+        self.assertNotIn("原始 brief", text)
+
 
 class TestPromptRendering(unittest.TestCase):
     """[P1] prompt 里公开了 tags 却从不读取 —— 用 review 当时复现的原例钉死。

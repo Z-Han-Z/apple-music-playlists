@@ -313,6 +313,10 @@ TOOLS = [
                                                "add ambient（也认「多一点/少一点」与 +funk/-disco）"},
                 "language": {"type": "string",
                              "description": "方向说明所用语言，zh 或 en，默认 zh"},
+                "brief": {"type": "string",
+                          "description": "原始歌单需求（可选）。传了就原样回显在最前面，"
+                                         "确保「brief 始终可见且优先」在**调整路径**上也成立——"
+                                         "用户隔一轮只说 more X 时，模型手上不该只剩方向说明"},
             },
             "required": ["tags"],
             "additionalProperties": False,
@@ -734,7 +738,8 @@ def t_tag_directions(args: dict) -> str:
     if not isinstance(adjustments, list):
         return "adjustments 必须是字符串数组。"
     tags, report = tags_mod.apply_adjustments(tags, adjustments)
-    return tags_mod.summary(tags, problems, report, args.get("language") or "zh")
+    return tags_mod.summary(tags, problems, report, args.get("language") or "zh",
+                            args.get("brief") or "")
 
 
 def t_recent(args: dict) -> str:
