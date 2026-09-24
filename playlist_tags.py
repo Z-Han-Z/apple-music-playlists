@@ -76,12 +76,16 @@
 `sonic` 标签带 evidence 会提示多余——音乐属性不需要收听证据。
 """
 
+import re
 import unicodedata
 
 # ---------------------------------------------------------------- 契约参数
 
 TARGET_TAG_COUNT = 5     # 用户要的「约 5 个」
 MAX_TAGS = 8             # 超过就不是操纵面，是清单了
+# 标签要能一眼读完。限长同时收窄了一个真实的注入面：标签会被**原样插进 MCP 提示词**，
+# 长到能塞进一段指令的「标签」已经不是标签了。
+MAX_LABEL_LEN = 64
 
 SONIC = "sonic"
 CONTEXT = "context"
@@ -161,6 +165,23 @@ _SEPARATORS = " \t:：,，、;；"
 
 # ---------------------------------------------------------------- 基础工具
 
+def _clean_label(text) -> tuple:
+    """清洗标签文本，返回 (clean, note)。
+
+    标签会被**原样插进 MCP 提示词**（见 `_render_direction_tags`），所以换行和控制字符
+    不只是显示问题：一个含换行的「标签」能凭空多出一行，读起来像指令。这里收掉它，
+    并且**把改动报出来**——静默改用户看到的东西同样是这个仓库拒绝的做法。
+    """
+    raw = str(text or "")
+    flat = re.sub(r"\s+", " ", re.sub(r"[\x00-\x1f\x7f]", " ", raw)).strip()
+    if len(flat) > MAX_LABEL_LEN:
+        return flat[:MAX_LABEL_LEN], (f"标签过长（{len(flat)} 字符），已截到 {MAX_LABEL_LEN}："
+                                      f"「{flat[:MAX_LABEL_LEN]}…」")
+    if flat != raw:
+        return flat, f"标签里的控制字符/多余空白已收拢为「{flat}」"
+    return flat, None
+
+
 def tag_key(label: str) -> str:
     """标签的匹配键：NFKC + casefold + 只留字母数字。
 
@@ -204,6 +225,13 @@ def _coerce(raw) -> tuple:
         axis = str(raw.get("axis") or "").strip().casefold()
         if axis not in (SONIC, CONTEXT):
             axis = UNSPECIFIED
+        # 标签文本自带 `context:` / `sonic:` 前缀时也要拆轴：否则
+        # `{"label": "context:x"}` 与 `"context:x"` 两种写法行为不一致
+        # （前者会把前缀留在标签里、轴却成了未指定）。显式 axis 优先。
+        text, prefixed = _axis_of(str(label))
+        label = text
+        if axis == UNSPECIFIED and prefixed != UNSPECIFIED:
+            axis = prefixed
         if "weight" in raw:
             notes.append("weight 已废弃：数值权重会把审美判断伪装成有精度的数值，"
                          "改用 emphasis: soften/neutral/boost")
@@ -212,9 +240,15 @@ def _coerce(raw) -> tuple:
             notes.append(note)
         evidence, ev_notes = _evidence_of(raw.get("evidence"))
         notes.extend(ev_notes)
-        return str(label).strip(), axis, emphasis, evidence, notes
+        clean, cnote = _clean_label(label)
+        if cnote:
+            notes.append(cnote)
+        return clean, axis, emphasis, evidence, notes
     label, axis = _axis_of(str(raw or ""))
-    return label, axis, NEUTRAL, None, notes
+    clean, cnote = _clean_label(label)
+    if cnote:
+        notes.append(cnote)
+    return clean, axis, NEUTRAL, None, notes
 
 
 def _evidence_of(value):
@@ -309,6 +343,11 @@ def normalize_tags(items) -> tuple:
     而不是静默改完继续。
     """
     by_key, order, problems = {}, [], []
+    # 防御性：传进来一个字符串时，`for raw in items` 会把它**逐字符**拆成多个标签。
+    # 字符串唯一合理的解释是「一个标签」，所以按一个处理，并把这次纠正报出来。
+    if isinstance(items, str):
+        problems.append("items 收到的是字符串，已按**单个标签**处理；多个标签请传数组")
+        items = [items]
     for raw in items or []:
         label, axis, emphasis, evidence, notes = _coerce(raw)
         problems.extend(notes)
@@ -391,7 +430,13 @@ def parse_adjustment(text) -> dict:
         label = str(text.get("label") or text.get("tag") or "").strip()
         if op not in ("more", "less", "drop", "add") or not label:
             return None
-        return {"op": op, "label": label}
+        out = {"op": op, "label": label}
+        # 结构化调用方可能顺手带上 evidence / axis。第一版**直接丢掉**了它们，
+        # 而且报告里也不提——那正是这个仓库拒绝的「静默丢数据」。
+        for key in ("evidence", "axis"):
+            if text.get(key):
+                out[key] = text[key]
+        return out
 
     raw = str(text or "").strip()
     if not raw:
@@ -455,11 +500,15 @@ def apply_adjustments(tags, adjustments) -> tuple:
             continue
         op, label = adj["op"], adj["label"]
         shown = label
+        if op != "add" and (adj.get("evidence") or adj.get("axis")):
+            entry(orig, "note", "evidence / axis 只对 add 有意义，这次已忽略")
 
         if op == "add":
             # 新增项必须走同一套规范化：否则 `add !!!` 会塞进一个空 key，
             # 带 `context:` 前缀的新增项也不会被拆轴。
-            new_label, axis, emphasis, evidence, _ = _coerce(label)
+            # dict 形式顺手带来的 evidence / axis 也一并走这里，不再被丢掉。
+            extra = {k: adj[k] for k in ("evidence", "axis") if k in adj}
+            new_label, axis, emphasis, evidence, _ = _coerce(dict({"label": label}, **extra))
             key = tag_key(new_label)
             if not key:
                 entry(orig, "rejected",
@@ -477,12 +526,19 @@ def apply_adjustments(tags, adjustments) -> tuple:
                    "emphasis": emphasis, "evidence": evidence}
             current.append(new)
             by_key[key] = new
-            missing = _evidence_problem(new) if axis == CONTEXT else (
-                [f"「{new_label}」是 sonic，不需要收听证据"] if evidence else [])
+            notes = []
+            if axis == CONTEXT:
+                notes = _evidence_problem(new)
+            elif evidence and axis == SONIC:
+                notes = [f"「{new_label}」标为 sonic（音乐属性），不需要收听证据——"
+                         f"带 evidence 的通常是行为断言，应当标 context 轴"]
+            elif evidence and axis == UNSPECIFIED:
+                notes = [f"「{new_label}」带了 evidence 却没写轴：evidence 支撑的是**行为**断言，"
+                         f"请写成 add context:{new_label}（或显式给 axis）"]
             entry(orig, "added",
                   f"新增「{new_label}」，侧重 {emphasis}"
                   f"（轴 {'未指定' if axis == UNSPECIFIED else axis}）"
-                  + ("；" + "；".join(missing) if missing else ""))
+                  + ("；" + "；".join(notes) if notes else ""))
             continue
 
         key = tag_key(label)

@@ -36,6 +36,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `brief` is **required** and echoed verbatim, so "the original request stays visible" holds on the
   adjustment path too instead of depending on the caller volunteering an optional argument.
 
+  Tag input is sanitized rather than trusted: control characters and newlines are collapsed and
+  reported (a label is interpolated into the MCP prompt verbatim, so a newline in one would add a
+  line that reads like an instruction), over-long labels are truncated and reported, a bare string
+  passed where a list is expected is treated as one label instead of being split into characters,
+  and `evidence`/`axis` supplied on a structured adjustment are carried through instead of being
+  dropped silently. A dict label carrying a `context:` prefix now splits the same way the string
+  form does.
+
   `docs/evaluation-signals.md` explains why collapsing requirements into tags or weights loses
   scoped negation, reference semantics, and narrative beats; this feature does not reopen that. The
   tags supplement the brief rather than replacing it, and `direction_note()` states all three

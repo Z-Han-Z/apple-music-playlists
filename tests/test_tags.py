@@ -573,6 +573,72 @@ class TestContextEvidence(unittest.TestCase):
         self.assertIsNone(added["evidence"])
 
 
+class TestInputHygiene(unittest.TestCase):
+    """自查发现的一类问题：**静默丢数据 / 静默改写**。
+
+    这个仓库拒绝「看起来生效了、其实没有」的行为，所以下面每一条都既要**修**，
+    也要**报**——修而不报同样会让人误判。
+    """
+
+    def test_a_bare_string_is_one_label_not_characters(self):
+        """`for raw in items` 会把字符串**逐字符**拆成多个标签。"""
+        tags, problems = pt.normalize_tags("funk")
+        self.assertEqual([t["label"] for t in tags], ["funk"])
+        self.assertTrue(any("strings" in p or "字符串" in p for p in problems))
+
+    def test_control_characters_and_newlines_are_collapsed_and_reported(self):
+        """标签会被原样插进 MCP 提示词，含换行的标签能凭空多出一行。"""
+        tags, problems = pt.normalize_tags(["sonic:a\nb", {"label": "x\u0000y",
+                                                          "axis": "sonic"}])
+        self.assertEqual([t["label"] for t in tags], ["a b", "x y"])
+        self.assertTrue(any("控制字符" in p for p in problems))
+        self.assertNotIn("\n", pt.render_tags(tags, "zh"))
+
+    def test_overlong_labels_are_truncated_and_reported(self):
+        tags, problems = pt.normalize_tags([{"label": "z" * 5000, "axis": "sonic"}])
+        self.assertEqual(len(tags[0]["label"]), pt.MAX_LABEL_LEN)
+        self.assertTrue(any("过长" in p for p in problems))
+
+    def test_dict_label_with_axis_prefix_is_split_like_the_string_form(self):
+        """两种写法必须一致：`{"label": "context:x"}` 不能把前缀留在标签里。"""
+        as_dict, _ = pt.normalize_tags([{"label": "context:in-library"}])
+        as_str, _ = pt.normalize_tags(["context:in-library"])
+        self.assertEqual(as_dict[0]["label"], as_str[0]["label"])
+        self.assertEqual(as_dict[0]["axis"], pt.CONTEXT)
+
+    def test_explicit_axis_wins_over_the_label_prefix(self):
+        tags, _ = pt.normalize_tags([{"label": "context:x", "axis": "sonic"}])
+        self.assertEqual(tags[0]["label"], "x")
+        self.assertEqual(tags[0]["axis"], pt.SONIC)
+
+    def test_dict_adjustment_carries_evidence_instead_of_dropping_it(self):
+        """上一版把 dict 形式带的 evidence **直接丢掉**，报告也不提。"""
+        tags, _ = pt.normalize_tags([{"label": "funk", "axis": "sonic"}])
+        out, report = pt.apply_adjustments(tags, [
+            {"op": "add", "label": "in-library", "axis": "context",
+             "evidence": {"basis": "playlist-membership", "call": "am_show_playlist",
+                          "ref": "p.x"}}])
+        added = [t for t in out if t["label"] == "in-library"][0]
+        self.assertEqual(added["evidence"]["kind"], "structured")
+        self.assertIn("am_show_playlist", added["evidence"]["call"])
+
+    def test_evidence_without_an_axis_is_flagged(self):
+        """带 evidence 却没写轴 → 必须提示，而不是含混地当成 sonic。"""
+        tags, _ = pt.normalize_tags([{"label": "funk", "axis": "sonic"}])
+        _, report = pt.apply_adjustments(tags, [
+            {"op": "add", "label": "in-library",
+             "evidence": {"basis": "playlist-membership", "call": "am_show_playlist",
+                          "ref": "p.x"}}])
+        self.assertIn("没写轴", report[0]["detail"])
+
+    def test_evidence_on_a_non_add_adjustment_is_reported_not_ignored(self):
+        tags, _ = pt.normalize_tags(["context:in-library"])
+        _, report = pt.apply_adjustments(tags, [
+            {"op": "more", "label": "in-library", "evidence": "x"}])
+        self.assertTrue(any(r["status"] == "note" and "只对 add 有意义" in r["detail"]
+                            for r in report), report)
+
+
 class TestPromptRendering(unittest.TestCase):
     """[P1] prompt 里公开了 tags 却从不读取 —— 用 review 当时复现的原例钉死。
 
