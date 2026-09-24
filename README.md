@@ -21,6 +21,10 @@ English | [简体中文](README_ZH_CN.md) | [繁體中文](README_ZH_TW.md) |
 your agent turns it into a catalog-grounded selection whose versions, pacing, and transitions hold
 together as a listening experience.**
 
+[See the 12-track curation demo](#a-real-curation-demo-a-machine-dreams-it-is-human): 22 grounded
+candidates become a three-act story, including a case where the numerically cheaper order damaged
+the narrative.
+
 Pure Python standard library — no `pip install` required to run, and **no Apple Developer Program
 membership needed**. Requires Python 3.10+ and works on Windows / macOS / Linux.
 
