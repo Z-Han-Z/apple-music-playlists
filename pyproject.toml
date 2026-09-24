@@ -36,7 +36,7 @@ Homepage = "https://github.com/Z-Han-Z/apple-music-playlists"
 Documentation = "https://github.com/Z-Han-Z/apple-music-playlists/blob/main/docs/client-setup.md"
 Changelog = "https://github.com/Z-Han-Z/apple-music-playlists/blob/main/CHANGELOG.md"
 Issues = "https://github.com/Z-Han-Z/apple-music-playlists/issues"
-MCP-Directory = "https://glama.ai/mcp/servers/Z-Han-Z/apple-music-playlists"
+Glama = "https://glama.ai/mcp/servers/Z-Han-Z/apple-music-playlists"
 MCP-Registry = "https://registry.modelcontextprotocol.io/v0.1/servers?search=io.github.Z-Han-Z%2Fapple-music-playlists"
 PyPI = "https://pypi.org/project/apple-music-playlists/"
 

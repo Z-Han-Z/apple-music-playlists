@@ -468,6 +468,18 @@ class TestStableReleaseAssets(unittest.TestCase):
         self.assertIn('"narrative-playlists"', metadata)
         self.assertNotIn('"playlist-generator"', metadata)
 
+    def test_package_directory_links_are_labelled_honestly(self):
+        metadata = (self.ROOT / "pyproject.toml").read_text(encoding="utf-8")
+        self.assertIn(
+            'Glama = "https://glama.ai/mcp/servers/Z-Han-Z/apple-music-playlists"',
+            metadata,
+        )
+        self.assertNotIn('MCP-Directory = "https://glama.ai/', metadata)
+        self.assertIn(
+            'MCP-Registry = "https://registry.modelcontextprotocol.io/',
+            metadata,
+        )
+
     def test_llms_index_preserves_the_curation_boundary(self):
         text = (self.ROOT / "llms.txt").read_text(encoding="utf-8")
         self.assertTrue(text.startswith("# Apple Music MCP Curator\n\n> "))
