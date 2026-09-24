@@ -18,7 +18,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The evaluation guide now defines a reproducible one-shot baseline, result template, blind-listening
   protocol, interpretation boundaries, and privacy-safe sharing rules.
 - A primary-source research note connects broad music intent, preference-bearing references,
-  scrutable language profiles, and intent hallucination to a testable curation workflow.
+  query-scoped personalization, catalog-grounding limits, scrutable language profiles, and intent
+  hallucination to a testable curation workflow.
 
 ### Changed
 

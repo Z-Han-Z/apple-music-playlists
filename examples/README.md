@@ -62,6 +62,8 @@ Keep facts and judgments separate:
 ## Curation trace
 - Opening / development / turn / release / landing roles:
 - One natural-language reason for every retained track:
+- Retained claims supported only by model inference and still needing listening or lyric verification:
+- Set-level coherence: which individually plausible track, if any, weakens the brief's promise:
 - Rejected candidates and reasons:
 
 ## Blind listening
@@ -72,9 +74,11 @@ Keep facts and judgments separate:
 
 Do not collapse those sections into a single number. A perfect dry-run cannot prove the story is
 good; a low ordering cost cannot prove the songs belong; human preference does not excuse a wrong
-recording. Curation-contract coverage detects forgotten requirements but does not prove musical
-quality. Audio-feature coverage must appear beside any flow result because unmeasured positions were
-not evaluated.
+recording. A successful catalog resolution proves identity and availability, not the model's claim
+about lyrics, atmosphere, influence, or narrative role. An individually plausible track can still
+make the collection less coherent. Curation-contract coverage detects forgotten requirements but
+does not prove musical quality. Audio-feature coverage must appear beside any flow result because
+unmeasured positions were not evaluated.
 
 ## Privacy and sharing
 

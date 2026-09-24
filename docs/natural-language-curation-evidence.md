@@ -14,6 +14,8 @@ both linguistic reasoning and deterministic grounding.
 | Evidence | Result relevant to this project | What it does **not** prove |
 |---|---|---|
 | Deezer, *Text2Playlist* (ECIR 2025) | A production system separates broad intent from ordinary lookup, uses an LLM for query interpretation and final refinement, and grounds retrieval in catalog tags plus personalization. Generated playlists were listened to later in 45% of observed cases versus 27% for manually created playlists. | The report is an industry deployment analysis, not a randomized proof that LLM curation is musically better. Deezer also has expert tags, audio models, collaborative-filtering embeddings, and usage data that this project does not have. |
+| Spotify, *Text2Tracks* (2025) | Generating artist and track names with an off-the-shelf LLM creates an entity-resolution boundary: titles are ambiguous, versions differ, and names are poor descriptions of sound. A fine-tuned generative retriever performed better when its track identifiers encoded collaborative relationships instead of literal names. | The evaluation used offline relevance labels and Spotify-specific training data. It does not show that resolving a generated title proves semantic fit, or that a generic host LLM can reproduce a catalog-trained retriever. |
+| Spotify, *Hypothesis-Driven Shelf Generation* (RecSys 2026) | A production pipeline separates a natural-language concept from catalog fulfilment, then runs a distinct set-level alignment stage. Its authors report that plausible individual items can still form an incoherent collection or break the promise made by its title. | The system generates Spotify Home shelves rather than user-authored playlists. Its offline judges were not validated against human agreement, and mixed early online results do not establish a general quality advantage. |
 | Baranes et al., *MusicRecoIntent* (NLP4MusA 2026) | In 2,291 real music requests, 3,935 descriptors were annotated as desired, rejected, or referential. Named artists and works were usually references: 1,613 of 1,870 named-entity annotations were referential. | Extracting a genre, mood, or entity does not determine how the user meant it. A named artist is not automatically a must-include. |
 | Hausberger et al., *Read Between the Tracks* (NLP4MusA 2026) | Five LLMs ranked candidates containing user-relevant, intent-relevant, both-relevant, and irrelevant tracks. The larger models ranked the joint user-and-intent set above distractors; examples from the listener's intent-specific history were more useful than an intent label alone. | Results were modest and preliminary. A model ranking a provided 40-track set is not evidence that it can invent a correct catalog entry or produce a satisfying sequence unaided. |
 | Buzaev et al., *Learning When to Personalize* (NLP4MusA 2026) | A production system classified 5,000 real requests by whether they called for strong personalization, then varied the contribution of listening-history signals. In a blind study, query-aware personalization beat both always-personalized and non-personalized variants. | The study had 20 users and 254 pairwise judgments, used Russian-language queries and proprietary embeddings, and tested retrieval quality rather than narrative sequencing. It does not supply a universal personalization formula for this project. |
@@ -43,6 +45,13 @@ always-personalized variant and 37 for the non-personalized retriever, with 19 t
 small and platform-specific to copy its scoring formula, but the failure boundary is useful: history
 can make an explicitly personal request less generic, and can also pull a self-contained brief away
 from what it actually asks for.
+
+Fourth, catalog fulfilment and collection-level fit are separate decisions. Spotify's 2026
+hypothesis-driven shelf work plans a narrow concept in language, retrieves real catalog items, and
+then checks whether the items cohere as a set and keep the promise made by the displayed title. The
+reported alignment gains use non-overlapping cohorts and unvalidated LLM judges, so they are not a
+causal estimate of listener preference. The architectural boundary is still useful here: a track can
+be individually plausible and correctly resolved while making the playlist as a whole less legible.
 
 ## Design consequence: keep a curation contract beside the original brief
 
@@ -84,6 +93,7 @@ original brief + readable curation contract
     → LLM proposes a deliberately oversized pool
     → am_resolve_candidates grounds exact Apple Music recordings
     → LLM compares candidates inside narrative roles
+    → LLM checks set-level coherence against the brief's promise
     → dry-run exposes catalog and version mistakes
     → optional local flow checks stay inside semantic boundaries
 ```
@@ -99,6 +109,14 @@ reason should make its epistemic status visible:
 
 This separation prevents a fluent explanation from masquerading as verified metadata.
 
+*Text2Tracks* sharpens the catalog boundary. A successfully resolved `Title - Artist` string proves
+that a recording exists in the chosen storefront; it does **not** prove that the title describes its
+sound, that the model remembered the song correctly, or that the selected edition carries the
+claimed lyrical or cultural role. The resolver should therefore expose exact metadata and version
+markers, while the curation trace records which retained reasons still rest only on model inference.
+Unresolved candidates return to the language comparison as evidence gaps; they are not silently
+replaced by the first search result.
+
 ## Validation protocol
 
 The implementation and evaluation suite test the following hypotheses:
@@ -108,7 +126,9 @@ The implementation and evaluation suite test the following hypotheses:
 3. Negative clauses remain attached to the rejected object instead of spreading to the whole mood.
 4. The contract explicitly decides whether personalization is required, optional, or out of scope.
 5. Candidate reasons distinguish catalog facts, listening evidence, and model inference.
-6. Evaluation reports coverage and unresolved ambiguity rather than one synthetic score.
+6. Evaluation reports retained claims that still depend only on unverified model inference.
+7. Evaluation asks whether individually plausible tracks cohere as a set and fulfil the brief's promise.
+8. Evaluation reports coverage and unresolved ambiguity rather than one synthetic score.
 
 The multilingual evaluation suite includes a reference-heavy brief with explicit exclusions. It has
 no golden track list. A valid comparison keeps the model, storefront, and brief fixed, then records
@@ -125,12 +145,16 @@ listening judgments.
   one small platform study; that supports an explicit decision, not a universal setting.
 - “Constraint coverage proves the playlist is good” — it proves only that stated requirements were
   not silently lost.
+- “A resolved catalog record proves semantic fit” — it proves identity and availability; atmosphere,
+  lyrics, influence, and narrative role may still be model inference.
 - “A lower flow cost proves a better story” — acoustic adjacency and semantic narrative remain
   separate judgments.
 
 ## Primary sources
 
 - [Delcluze et al. (2025), *Text2Playlist: Generating Personalized Playlists from Text on Deezer*](https://arxiv.org/abs/2501.05894), industry paper accepted at ECIR 2025; [official Deezer research repository](https://github.com/deezer/text2playlist-ecir2025).
+- [Palumbo et al. (2025), *Text2Tracks: Prompt-based Music Recommendation via Generative Retrieval*](https://arxiv.org/abs/2503.24193); [Spotify Research overview](https://research.atspotify.com/2025/4/text2tracks-improving-prompt-based-music-recommendations-with-generative-retrieval/).
+- [Petrov et al. (2026), *Hypothesis-Driven Shelf Generation for Personalised Recommendation*](https://research.atspotify.com/2026/9/hypothesis-driven-shelf-generation-for-personalised-recommendation), RecSys 2026.
 - [Baranes, Hennequin & Epure (2026), *Beyond Musical Descriptors: Extracting Preference-Bearing Intent in Music Queries*](https://aclanthology.org/2026.nlp4musa-1.4/), NLP4MusA; [dataset repository](https://github.com/deezer/MusicRecoIntent-NLP4MusA26).
 - [Hausberger, Jósár & Schedl (2026), *Read Between the Tracks: Exploring LLM-driven Intent-based Music Recommendations*](https://aclanthology.org/2026.nlp4musa-1.7/), NLP4MusA.
 - [Buzaev et al. (2026), *Learning When to Personalize: LLM Based Playlist Generation via Query Taxonomy and Classification*](https://aclanthology.org/2026.nlp4musa-1.8/), NLP4MusA.

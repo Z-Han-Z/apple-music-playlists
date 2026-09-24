@@ -494,7 +494,8 @@ class TestStableReleaseAssets(unittest.TestCase):
         text = (self.ROOT / "docs" / "natural-language-curation-evidence.md").read_text(
             encoding="utf-8")
         for required in (
-            "MusicRecoIntent", "Text2Playlist", "Read Between the Tracks",
+            "MusicRecoIntent", "Text2Playlist", "Text2Tracks", "Hypothesis-Driven Shelf Generation",
+            "Read Between the Tracks",
             "Learning When to Personalize",
             "intent hallucination", "Must", "Avoid", "References", "Soft context",
             "Personalization", "Narrative", "Unknown", "catalog fact", "listening evidence",
@@ -504,6 +505,9 @@ class TestStableReleaseAssets(unittest.TestCase):
             self.assertIn(required, text)
         self.assertIn("reference, not an automatic request", text)
         self.assertIn("original brief must remain", text)
+        self.assertIn("successfully resolved", text)
+        self.assertIn("does **not** prove", text)
+        self.assertIn("set-level coherence", text)
         self.assertIn("no golden track list", text)
 
     def test_curation_evals_are_multilingual_tasks_not_golden_lists(self):
@@ -530,6 +534,9 @@ class TestStableReleaseAssets(unittest.TestCase):
 
         serialized = json.dumps(payload, ensure_ascii=False).lower()
         self.assertNotIn("theme_fit", serialized)
+        self.assertIn("unverified model inference", serialized)
+        self.assertIn("resolved catalog record", serialized)
+        self.assertIn("individually plausible track", serialized)
         reference_case = next(case for case in payload["cases"]
                               if case["id"] == "reference-is-not-inclusion")
         self.assertIn("only as reference points", reference_case["brief"])
@@ -544,7 +551,9 @@ class TestStableReleaseAssets(unittest.TestCase):
         text = (self.ROOT / "examples" / "README.md").read_text(encoding="utf-8")
         for required in ("Baseline", "Curation workflow", "curation contract", "reference-only",
                          "dry_run=true", "Listen blind", "Catalog funnel", "Intent coverage",
-                         "Audio-feature coverage", "Privacy and sharing",
+                         "Audio-feature coverage", "supported only by model inference",
+                         "Set-level coherence", "individually plausible track",
+                         "Privacy and sharing",
                          "Never commit Apple Music tokens", "Do not build a permanent leaderboard"):
             self.assertIn(required, text)
         self.assertIn("curation-evals.json", text)
