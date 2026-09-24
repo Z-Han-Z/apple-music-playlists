@@ -187,7 +187,7 @@ normal `initialize` → `notifications/initialized` → `tools/list` sequence.
 
 ### Cordis / DSH agent harness
 
-The ready-to-copy preset in [`preset/`](../preset/) mounts the stdio server, exposes all 13 tools,
+The ready-to-copy preset in [`preset/`](../preset/) mounts the stdio server, exposes all 14 tools,
 loads the companion skill, and sets a two-minute tool timeout for slower feature analysis. Follow
 [`preset/README.md`](../preset/README.md).
 

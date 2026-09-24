@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Direction tags**, so a user can steer a finished curation stylistically instead of restating
+  the brief. After curating, the host model authors about five tags across two axes: `sonic` for
+  the music's own character and `context` for why these tracks are here (recent, high rotation,
+  already in the library, drawn from a reference). The new read-only, offline `am_tag_directions`
+  tool validates that set, applies replies such as `more funk` or `less disco` as explicit weight
+  bookkeeping, and returns both a display line and a direction note for the next round.
+  `playlist_tags.py` holds the contract; `docs/playlist-tag-directions.md` documents it.
+
+  The tags are a **steering surface, not the brief**. `docs/evaluation-signals.md`
+  explains why collapsing requirements into tags or weights loses scoped negation, reference
+  semantics, and narrative beats; this feature does not reopen that. The original request and the
+  curation contract stay authoritative, `direction_note()` says so in its own output, and an
+  adjustment that names a tag the direction does not contain is reported as `unknown` with the
+  labels that do exist rather than silently doing nothing.
 - `am_resolve_candidates` now returns each grounded recording's Apple Music URL so users can
   audition and verify the exact catalog version before a playlist is written.
 - A root `llms.txt` gives agents and directory crawlers a concise, spec-shaped map of the project's

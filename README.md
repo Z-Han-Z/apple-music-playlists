@@ -203,7 +203,7 @@ constraints, not predetermined “correct” songs.
 | File | Purpose |
 |---|---|
 | `am_playlist.py` | Core: token management, catalog search, create / edit / delete playlists, track resolution |
-| `am_mcp_server.py` | Primary MCP stdio service: one description-to-playlist prompt plus **13 tools** |
+| `am_mcp_server.py` | Primary MCP stdio service: one description-to-playlist prompt plus **14 tools** |
 | `playlist_audit.py` | **Metadata audit**: length, artist concentration, genres, eras, durations, duplicates, interludes |
 | `playlist_flow.py` | **Audio-feature audit**: BPM / key / loudness / energy / valence, adjacency checks, arc shape |
 | `playlist_optimize.py` | Simulated-annealing **track ordering** against the measured rules |

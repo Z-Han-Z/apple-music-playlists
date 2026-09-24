@@ -25,6 +25,7 @@ import playlist_audit as audit_mod  # noqa: E402
 import playlist_flow as flow_mod  # noqa: E402
 import listening_stats as listening  # noqa: E402
 import playlist_optimize as opt_mod  # noqa: E402
+import playlist_tags as tags_mod  # noqa: E402
 from am_meta import catalog_meta  # noqa: E402
 from playlist_core import SHAPE_ALIASES  # noqa: E402
 
@@ -58,8 +59,9 @@ PROMPTS = [
         "description": (
             "Curate, validate, preview, and create an Apple Music playlist from a natural-language "
             "brief. The MCP host's model chooses and compares candidates; Apple Music catalog "
-            "grounding verifies them. / "
-            "根据自然语言需求策划、校验、预演并创建 Apple Music 歌单。"
+            "grounding verifies them. It also surfaces about five direction tags so the user can "
+            "steer the result stylistically. / "
+            "根据自然语言需求策划、校验、预演并创建 Apple Music 歌单，并给出约 5 个方向标签供用户调整。"
         ),
         "arguments": [
             {
@@ -83,6 +85,19 @@ PROMPTS = [
             {
                 "name": "language",
                 "description": "Language for the plan and final report. / 计划与结果所用语言。",
+                "required": False,
+            },
+            {
+                "name": "tags",
+                "description": (
+                    "Optional direction tags to show the user before or after curation: about five "
+                    "labels mixing musical character (sonic) with listening provenance (context, such "
+                    "as recent, high-rotation, or already in the library). The user may reply with "
+                    "adjustments like 'more funk' or 'less disco'; apply them with am_tag_directions. "
+                    "Tags steer the result but never replace the brief. / "
+                    "可选的方向标签，约 5 个（音乐属性 + 用户行为来源）；用户可用 "
+                    "more X / less Y 调整，用 am_tag_directions 记账。"
+                ),
                 "required": False,
             },
         ],
@@ -260,6 +275,44 @@ TOOLS = [
         },
     },
     {
+        "name": "am_tag_directions",
+        "description": "把一次策展的**方向**表达成约 5 个可操纵的标签，并按用户的回复调整侧重。"
+                       "标签由你（宿主模型）写：既包括音乐本身的属性（流派/年代/织体/氛围），"
+                       "也包括**用户行为来源**（最近在听、高播放、集中循环、本就在库里、来自某个参照曲）。"
+                       "两个轴要分清——sonic 是音乐属性，context 是这些歌为什么在这里；"
+                       "context 标签必须有真实收听证据（am_recently_played / am_top_played / 音乐库）支持。"
+                       "把方向展示给用户后，用户可以回 `more funk` / `less disco` / `drop dark` / `add ambient`，"
+                       "本工具把它做成**显式记账**（权重加减）：找不到的标签会报 unknown，"
+                       "不会静默无效果。**只读且离线**，不碰 Apple Music。"
+                       "标签是给用户的操纵面，**不是 brief**——原始需求与策展契约仍然优先，"
+                       "冲突时以 brief 为准。",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "tags": {"type": "array", "minItems": 1,
+                         "items": {"anyOf": [
+                             {"type": "string"},
+                             {"type": "object",
+                              "properties": {
+                                  "label": {"type": "string"},
+                                  "axis": {"type": "string", "enum": ["sonic", "context"]},
+                                  "weight": {"type": "number"},
+                              },
+                              "required": ["label"], "additionalProperties": False},
+                         ]},
+                         "description": "方向标签，约 5 个。字符串可用 `context:recent-heavy-rotation` "
+                                        "给轴加前缀；也可给对象 {label, axis, weight}"},
+                "adjustments": {"type": "array", "items": {"type": "string"},
+                                "description": "用户对方向的调整，如 more funk / less disco / drop dark / "
+                                               "add ambient（也认「多一点/少一点」与 +funk/-disco）"},
+                "language": {"type": "string",
+                             "description": "方向说明所用语言，zh 或 en，默认 zh"},
+            },
+            "required": ["tags"],
+            "additionalProperties": False,
+        },
+    },
+    {
         "name": "am_recently_played",
         "description": "查最近播放。kind=tracks 是最近播放的曲目；played 是最近播放的歌单/专辑；"
                        "stations 是最近听的电台；added 是最近加入音乐库的内容。"
@@ -308,6 +361,7 @@ _ENGLISH_TOOL_DESCRIPTIONS = {
     "am_audit_playlist": "Read-only metadata audit of playlist length, artist concentration, genres, eras, duplicates, and possible interludes. For BPM, key, energy, and transitions, use am_analyze_flow.",
     "am_analyze_flow": "Read-only diagnosis of BPM, key, loudness, energy, mood, adjacent transitions, and overall arc. It may fetch and cache remote feature data; use am_optimize_order only when a proposed replacement order is wanted.",
     "am_optimize_order": "Compute a proposed order after the LLM has selected the songs and narrative blocks. It balances adjacent audio transitions with a chosen qualitative arc, returns an order without writing, and may fetch cached remote features; it must not choose songs or judge theme fit.",
+    "am_tag_directions": "Present and steer the playlist's direction tags: about five labels the host model authors, covering both musical character (sonic) and listening provenance (context, such as recent, high-rotation, or already in the library). It validates the set, applies user replies like 'more funk' or 'less disco' as explicit weight bookkeeping, and returns a rendered line plus a direction note for the next curation round. Read-only and offline: it touches nothing in Apple Music, and the tags are a steering surface that never replaces the brief.",
     "am_recently_played": "Read recent listening or recently added Apple Music content when recency matters. This API does not provide play counts; use am_top_played for Replay rankings.",
     "am_top_played": "Read Apple Music Replay play-count rankings by song, album, or artist when frequency matters. Use am_recently_played for latest listening; all-time data may be unavailable, so retry with a specific year.",
 }
@@ -323,12 +377,13 @@ _TOOL_TITLES = {
     "am_audit_playlist": "Audit Playlist Metadata",
     "am_analyze_flow": "Analyze Playlist Flow",
     "am_optimize_order": "Optimize Track Order",
+    "am_tag_directions": "Steer Playlist Direction Tags",
     "am_recently_played": "Get Recent Listening",
     "am_top_played": "Get Replay Rankings",
 }
 _READ_ONLY_TOOLS = {
     "am_status", "am_search_songs", "am_resolve_candidates", "am_list_playlists", "am_show_playlist",
-    "am_audit_playlist", "am_analyze_flow", "am_optimize_order",
+    "am_audit_playlist", "am_analyze_flow", "am_optimize_order", "am_tag_directions",
     "am_recently_played", "am_top_played",
 }
 for _tool in TOOLS:
@@ -659,6 +714,23 @@ def t_optimize(args: dict) -> str:
     return "\n".join(lines)
 
 
+def t_tag_directions(args: dict) -> str:
+    """方向标签：校验 + 按用户回复记账 + 渲染成可回填 brief 的说明。
+
+    刻意不碰 Apple Music：这条路径不需要登录、不联网，因此随时可调用，
+    也就能在真正的策展开始前先把方向谈清楚。
+    """
+    raw_tags = args.get("tags") or []
+    if not isinstance(raw_tags, list):
+        return "tags 必须是数组。"
+    tags, problems = tags_mod.normalize_tags(raw_tags)
+    adjustments = args.get("adjustments") or []
+    if not isinstance(adjustments, list):
+        return "adjustments 必须是字符串数组。"
+    tags, report = tags_mod.apply_adjustments(tags, adjustments)
+    return tags_mod.summary(tags, problems, report, args.get("language") or "zh")
+
+
 def t_recent(args: dict) -> str:
     return listening.recent_report(args.get("kind", "tracks"), int(args.get("limit", 30)))
 
@@ -682,6 +754,7 @@ HANDLERS = {
     "am_audit_playlist": t_audit,
     "am_analyze_flow": t_flow,
     "am_optimize_order": t_optimize,
+    "am_tag_directions": t_tag_directions,
     "am_recently_played": t_recent,
     "am_top_played": t_top,
 }

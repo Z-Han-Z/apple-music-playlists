@@ -113,7 +113,7 @@ python listening_stats.py top --kind songs --year 2026
 }
 ```
 
-服务提供 `create_playlist_from_description` 标准 Prompt 和 13 个工具：状态、搜索、
+服务提供 `create_playlist_from_description` 标准 Prompt 和 14 个工具：状态、搜索、
 `am_resolve_candidates` 候选池校验、列出/查看歌单、创建、追加、删除、元数据体检、
 听感分析、曲序优化、最近播放和播放次数排行。候选校验只返回 Apple Music 真实元数据、
 重复与版本标记，不代替 LLM 评分主题；LLM 应直接对照用户的文字比较候选并说明理由。
