@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "about": "Reusable difficult briefs for comparing playlist-curation workflows. These are tasks and auditable criteria, not golden track lists. Run each brief unchanged, keep the model and storefront constant within a comparison, and judge the resulting listening experience blind.",
   "protocol": {
     "compare": [
@@ -37,6 +37,11 @@
         "the increasing humanity is supported by voice, perspective, or lyrical role rather than release date alone",
         "the landing resolves earlier tension and is not simply the lowest-energy track"
       ],
+      "intent_risks": [
+        "quiet and earned must not collapse into lowest measured energy",
+        "progressively more human must not be inferred from release date alone",
+        "request, answer, return, and dawn are ordered beats rather than interchangeable mood tags"
+      ],
       "blind_questions": [
         "Can a listener describe the three acts without seeing the curator's notes?",
         "Which transition changes the protagonist most convincingly?",
@@ -59,6 +64,11 @@
         "recent and older tracks form interpretable pairs or conversations throughout the sequence",
         "the central conflict is musically or lyrically meaningful rather than a random BPM jump",
         "the ending reframes earlier material instead of merely lowering energy"
+      ],
+      "intent_risks": [
+        "recent and historical listening records are evidence, not two top-N source lists",
+        "high play count is not equivalent to present relevance",
+        "older and recent tracks must converse rather than become two chronological blocks"
       ],
       "blind_questions": [
         "Does the playlist reveal a connection in the listener's history that a top-played list would miss?",
@@ -83,6 +93,11 @@
         "genre crossings feel like a lineage or conversation rather than a category checklist",
         "the Tokyo setting is conveyed without relying on tourist clichés"
       ],
+      "intent_risks": [
+        "not only city-pop nostalgia does not mean city pop is categorically forbidden",
+        "Tokyo is a setting and perspective, not a request for songs with place names",
+        "one moment of human closeness must not become a general romantic mood"
+      ],
       "blind_questions": [
         "Does the city feel inhabited rather than branded?",
         "Is the single moment of closeness perceptible without breaking the night atmosphere?",
@@ -105,6 +120,11 @@
         "the opening offers presence without prematurely explaining or fixing grief",
         "changes in space and breath are achieved through arrangement and perspective, not only tempo",
         "the ending permits endurance without claiming resolution or happiness"
+      ],
+      "intent_risks": [
+        "creating breathing room is not the same as making the sequence cheerful",
+        "comfort must not become advice, uplift, or emotional pressure",
+        "mixing the requested musical languages must not reduce them to a genre quota"
       ],
       "blind_questions": [
         "Does any track turn companionship into advice or emotional pressure?",
@@ -129,10 +149,46 @@
         "genre and geography are treated as living relationships rather than stereotypes",
         "the open ending creates a credible loop back to the first track"
       ],
+      "intent_risks": [
+        "countries and coasts are relational context, not instructions to create geographic blocks",
+        "a responding song transforms a question rather than answering its lyric literally",
+        "representation alone is not a reason for a track to survive"
+      ],
       "blind_questions": [
         "Which two songs form the strongest correspondence, and why?",
         "Does any selection function only as geographic representation?",
         "After the final track, does replaying the opener reveal a new meaning?"
+      ]
+    },
+    {
+      "id": "reference-is-not-inclusion",
+      "locale": "en",
+      "target_tracks": 15,
+      "data": "public_catalog",
+      "brief": "Use Talk Talk's Spirit of Eden and Rosalía's El Mal Querer only as reference points for patience, dramatic commitment, and the feeling that a record invents its own weather. Do not include either artist, any cover of their songs, or obvious sound-alikes. Build a 15-track nocturnal sequence across at least three decades and three languages that begins close and airless, acquires rhythmic nerve without becoming a dance playlist, and ends exposed but unresolved. 'Not comforting' does not mean relentlessly bleak; keep moments of warmth that never erase the tension. Use one track per artist and studio recordings only.",
+      "hard_checks": [
+        "exactly 15 resolved studio recordings",
+        "contains neither Talk Talk nor Rosalía and no cover of either reference work",
+        "one track per primary artist",
+        "the catalog dates span at least three decades"
+      ],
+      "semantic_checks": [
+        "the two named works influence patience and dramatic form without producing obvious imitation",
+        "the sequence gains rhythmic nerve but never turns into a dance-floor progression",
+        "warmth appears without erasing tension, and the ending remains genuinely unresolved",
+        "at least three sung languages are present and serve the sequence rather than a quota"
+      ],
+      "intent_risks": [
+        "both named works are referential anchors, not inclusion requests",
+        "the exclusions apply to the artists, covers, and obvious sound-alikes rather than to patience or dramatic commitment",
+        "not comforting must not be misread as uniformly bleak",
+        "rhythmic nerve must not be simplified to rising BPM or danceability"
+      ],
+      "blind_questions": [
+        "Can the listener feel the references' formal influence without hearing either artist or a clone?",
+        "Where does warmth enter, and does it preserve the unresolved tension?",
+        "Does the rhythmic development feel structural rather than optimized for dancing?",
+        "Did any explicit exclusion or reference role silently change during selection?"
       ]
     }
   ]

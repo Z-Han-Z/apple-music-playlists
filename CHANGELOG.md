@@ -13,10 +13,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   audition and verify the exact catalog version before a playlist is written.
 - A root `llms.txt` gives agents and directory crawlers a concise, spec-shaped map of the project's
   curation boundary, setup, research, and implementation documentation.
-- A reusable multilingual curation evaluation set provides five difficult briefs with auditable
+- A reusable multilingual curation evaluation set provides six difficult briefs with auditable
   constraints and blind-listening questions, without freezing any model's selections as truth.
 - The evaluation guide now defines a reproducible one-shot baseline, result template, blind-listening
   protocol, interpretation boundaries, and privacy-safe sharing rules.
+- A primary-source research note connects broad music intent, preference-bearing references,
+  scrutable language profiles, and intent hallucination to a testable curation workflow.
 
 ### Changed
 
@@ -24,6 +26,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   playlist sequencing instead of a generic playlist generator.
 - All localized READMEs and both client guides now document the official MCP Registry's `uvx`
   launch path for running the PyPI package without a permanent install.
+- The description-to-playlist prompt now preserves the original brief beside a readable curation
+  contract, distinguishes reference-only anchors from inclusion requests, scopes negation, and
+  reports unresolved intent coverage without inventing a quality score.
 
 ## [1.4.0] - 2026-09-23
 

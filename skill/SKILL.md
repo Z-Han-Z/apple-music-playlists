@@ -12,13 +12,17 @@ description: Use when creating, curating, auditing, or reordering Apple Music pl
 另接一个 LLM。支持 MCP Prompt 的宿主可调用 `create_playlist_from_description`；不支持 Prompt
 UI 时遵循同一流程：
 
-1. 理解描述，只在缺失信息会实质改变结果时提问；否则做合理假设。
+1. 保留用户原文，并写一份可读的策展契约：必须、排除、仅作参照、软语境/推断、叙事节点、未知。
+   “像 X、但不要 X”里的 X 是参照兼排除，不是必选项；否定只约束用户实际排除的对象。只有未知项会
+   实质改变结果时才提问，否则说明合理假设。不要把描述压成流派/情绪标签或权重表。
 2. 调用 `am_status`；需要个性化时再参考 `am_recently_played` / `am_top_played`。
-3. 先策划目标数量 1.5–2 倍的候选池；用自然语言记录必须项、偏好、排除项与叙事角色，不生成任意的 0–1 主题分。
+3. 同时保留原始 brief 与策展契约，先策划目标数量 1.5–2 倍的候选池；不生成任意的 0–1 主题分。
 4. 用 `am_resolve_candidates` 一次校验候选池；`am_search_songs` 只用于单曲歧义或探索性搜索。不臆造 catalog ID，也不把 `has_lyrics=false` 当作纯音乐证据。
-5. 直接对照用户的原话比较候选，用 `essential / strong / bridge / optional / reject` 和开场、发展、高潮、释放、落地等角色说明取舍。
+5. 直接对照用户的原话比较候选，用 `essential / strong / bridge / optional / reject` 和开场、发展、
+   高潮、释放、落地等角色说明取舍。每个保留理由要区分 catalog 事实、收听证据与模型推断。
 6. 先定最终曲目和叙事分段；`am_optimize_order` 只可选地优化段内衔接，不负责判断主题契合度。
-7. 调用 `am_create_playlist(dry_run=true)`，处理遗漏或可疑匹配后，再正式创建并简要报告结果。
+7. 调用 `am_create_playlist(dry_run=true)`，处理遗漏或可疑匹配后，再正式创建并简要报告结果；逐项报告
+   必须、排除、参照和叙事覆盖以及仍未知之处，不合并成一个“质量分”。
 
 若用户明确只要建议或预览，则停在写入之前。CLI 主要用于登录、诊断、脚本、体检和高级维护。
 本项目不含固定艺人清单或主题，内容来自用户描述和 Agent 策划。
@@ -111,7 +115,8 @@ python -m unittest discover -s tests         # 测试（全部离线）
 选定后的**可选衔接器**：适合在不改叙事分段的前提下减少明显的 BPM/能量突变，不能用它替代 LLM 判断主题、语义和文化语境。
 `playlist_optimize.py` 是同一算法的离线/脚本化入口，两者共用 `playlist_core`，不会分叉。
 
-完整依据见仓库 `docs/how-to-build-a-good-playlist.md`（含 PLOS ONE 2025 的实证数据表）。
+完整排序依据见仓库 `docs/how-to-build-a-good-playlist.md`（含 PLOS ONE 2025 的实证数据表）；
+自然语言意图、参照误读和验证边界见 `docs/natural-language-curation-evidence.md`。
 
 ### 3.1 先选一个形状
 
