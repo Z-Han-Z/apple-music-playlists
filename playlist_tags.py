@@ -88,13 +88,21 @@ CONTEXT = "context"
 UNSPECIFIED = "unspecified"
 AXES = (SONIC, CONTEXT, UNSPECIFIED)
 
-# `context` 标签是「用户在听什么」的断言，只有两类东西撑得住它：
-#   am_recently_played       最近播放（有序，无次数）
-#   am_top_played            Replay 的 playCount / firstPlayed / lastPlayed
-#   am_list_playlists + am_show_playlist   歌单成员关系
-# 没有来源的 context 标签不是"待补充"，而是**把模型推断当作用户事实呈现**，
-# 所以它会被接受但一定报出来，并在展示串里标成「证据缺失」。
-EVIDENCE_HINT = ("am_recently_played / am_top_played / am_list_playlists / am_show_playlist")
+# `context` 标签是「用户在听什么」的断言，只有下面这几种**来源**撑得住它。
+# 光有「非空字符串」不算证据：`in-library` 配 `am_top_played` 依然通过，
+# 而 am_top_played 根本证明不了歌单成员关系——那正是本功能要防的假事实。
+# 所以来源要**结构化**，并**按断言校验**：basis 决定允许哪些 call。
+BASES = {
+    "recent": ("am_recently_played",),                      # 最近播放（有序，无次数）
+    "play-count": ("am_top_played",),                       # Replay 的 playCount 排名
+    "playlist-membership": ("am_list_playlists",            # 歌单成员关系
+                            "am_show_playlist"),
+    "derived": ("am_top_played",),                          # 由原始字段**推出来**的结论
+}
+EVIDENCE_CALLS = tuple(sorted({c for calls in BASES.values() for c in calls}))
+EVIDENCE_HINT = " / ".join(EVIDENCE_CALLS)
+# 结构化 provenance 的形状，报告里要反复提到它。
+EVIDENCE_SHAPE = "{basis, call, ref}"
 
 # 侧重：三档定性状态，没有数值，也不做算术。
 SOFTEN = "soften"
@@ -181,25 +189,64 @@ def _coerce(raw) -> tuple:
         emphasis, note = _emphasis_of(raw.get("emphasis"))
         if note:
             notes.append(note)
-        evidence = str(raw.get("evidence") or "").strip()
+        evidence, ev_notes = _evidence_of(raw.get("evidence"))
+        notes.extend(ev_notes)
         return str(label).strip(), axis, emphasis, evidence, notes
     label, axis = _axis_of(str(raw or ""))
-    return label, axis, NEUTRAL, "", notes
+    return label, axis, NEUTRAL, None, notes
 
 
-def _evidence_notes(label: str, axis: str, evidence: str) -> list:
-    """`context` 轴必须能说出证据来源，否则就是拿模型推断冒充用户事实。
+def _evidence_of(value):
+    """把 evidence 解析成结构化 provenance，返回 (evidence or None, notes)。
 
-    这不是格式洁癖，是仓库那条三分法（catalog 事实 / 收听证据 / 模型推断）的落点：
-    `context` 标签描述的是**用户在听什么**，只有前两类撑得住。**不阻断**——
-    只出一条说明，因为调用方可能把证据放在别处（例如整份报告的说明里）。
+    **这里只解析、不判定对错。** 校验一律推迟到去重之后、对**最终记录**做
+    （见 `_evidence_problem`）：否则「先出现无证据、后来的重复项补了证据」会留下
+    一条过期的「没写 evidence」，同一条标签同时显示有效证据和缺证据警告。
     """
-    if axis == CONTEXT and not evidence:
-        return [f"context 标签「{label}」没写 evidence：行为类方向要有真实收听证据"
-                f"（{EVIDENCE_HINT} 之一），否则等于把模型推断当作用户事实呈现"]
-    if axis == SONIC and evidence:
-        return [f"标签「{label}」是 sonic（音乐自身属性），不需要收听证据；"
-                f"evidence 已保留，但它在这里不起支撑作用"]
+    if value is None or value == "":
+        return None, []
+    if isinstance(value, dict):
+        call = str(value.get("call") or "").strip()
+        basis = str(value.get("basis") or "").strip().casefold()
+        ref = str(value.get("ref") or "").strip()
+        return {"kind": "structured", "basis": basis, "call": call, "ref": ref}, []
+    text = str(value).strip()
+    if not text:
+        return None, []
+    return {"kind": "claim", "raw": text}, []
+
+
+def _evidence_problem(tag: dict) -> list:
+    """对**最终记录**做证据校验，返回要报告的说明（空列表=干净）。
+
+    三种状态，刻意在展示上也分得开：
+
+    * 结构化且与断言相符 → 当证据用；
+    * 结构化但来源撑不住这条断言 → **报出来**（`in-library` 配 `am_top_played` 是评审举的例子）；
+    * 自由文本 → 接受，但标成**未经校验的来源自述**，不当作已核实的证据。
+    """
+    label = tag.get("label", "")
+    evidence = tag.get("evidence")
+    if not evidence:
+        return [f"context 标签「{label}」没写 evidence：行为类方向要有可核对的来源"
+                f"（{EVIDENCE_HINT}），否则等于把模型推断当作用户事实呈现"]
+    if evidence.get("kind") == "claim":
+        return [f"context 标签「{label}」的 evidence 是自由文本「{evidence.get('raw')}」，"
+                f"无法核对。它只会被当作**未经校验的来源自述**展示；"
+                f"要能被当作证据，请写成 {EVIDENCE_SHAPE} 结构，"
+                f"其中 basis ∈ {sorted(BASES)}"]
+    basis, call = evidence.get("basis", ""), evidence.get("call", "")
+    if basis not in BASES:
+        return [f"context 标签「{label}」的 evidence.basis「{basis}」不认识；"
+                f"只认 {sorted(BASES)}"]
+    if call not in BASES[basis]:
+        return [f"context 标签「{label}」的断言是 basis={basis}，但给的来源是「{call}」——"
+                f"它撑不住这条断言（{basis} 需要 {' / '.join(BASES[basis])}）。"
+                f"这正是「非空字符串不算证据」要防的情况"]
+    if basis == "derived":
+        return [f"context 标签「{label}」标为 derived：它是从原始字段**推出来**的结论"
+                f"（例如「集中播放」由 firstPlayed/lastPlayed × playCount 推导），"
+                f"不是任何接口的现成字段，展示与转述时都要如实说明"]
     return []
 
 
@@ -235,7 +282,11 @@ def normalize_tags(items) -> tuple:
             elif axis != UNSPECIFIED and axis != kept["axis"]:
                 problems.append(f"标签「{label}」给了两种轴（{kept['axis']} / {axis}），"
                                 f"保留先出现的 {kept['axis']}")
+            # 结构化的 provenance 比自由文本更可核对，所以合并时优先保留它。
             if evidence and not kept.get("evidence"):
+                kept["evidence"] = evidence
+            elif (evidence and evidence.get("kind") == "structured"
+                  and (kept.get("evidence") or {}).get("kind") == "claim"):
                 kept["evidence"] = evidence
             problems.append(f"标签「{label}」重复出现，保留先出现的那条"
                             f"（侧重 {kept['emphasis']}）")
@@ -243,7 +294,6 @@ def normalize_tags(items) -> tuple:
         if axis == UNSPECIFIED:
             problems.append(f"标签「{label}」没写轴；写 sonic: 或 context: 才能区分"
                             f"音乐属性与行为来源")
-        problems.extend(_evidence_notes(label, axis, evidence))
         by_key[key] = {"key": key, "label": label, "axis": axis,
                        "emphasis": emphasis, "evidence": evidence}
         order.append(key)
@@ -254,6 +304,16 @@ def normalize_tags(items) -> tuple:
                         f"保留前 {MAX_TAGS} 个，其余请先合并再传"
                         f"（超出：{'、'.join(t['label'] for t in tags[MAX_TAGS:])}）")
         tags = tags[:MAX_TAGS]
+
+    # 证据诊断一律放在**去重之后**、对最终记录做。放在逐项循环里会留下过期警告：
+    # 第一条没写证据、后来的重复项补上了，那条「没写 evidence」就再也没人撤掉，
+    # 于是同一条标签同时显示有效证据和缺证据警告。
+    for t in tags:
+        if t["axis"] == CONTEXT:
+            problems.extend(_evidence_problem(t))
+        elif t["axis"] == SONIC and t.get("evidence"):
+            problems.append(f"标签「{t['label']}」是 sonic（音乐自身属性），不需要收听证据；"
+                            f"evidence 已保留，但它在这里不起支撑作用")
     return tags, problems
 
 
@@ -373,7 +433,8 @@ def apply_adjustments(tags, adjustments) -> tuple:
                    "emphasis": emphasis, "evidence": evidence}
             current.append(new)
             by_key[key] = new
-            missing = _evidence_notes(new_label, axis, evidence)
+            missing = _evidence_problem(new) if axis == CONTEXT else (
+                [f"「{new_label}」是 sonic，不需要收听证据"] if evidence else [])
             entry(orig, "added",
                   f"新增「{new_label}」，侧重 {emphasis}"
                   f"（轴 {'未指定' if axis == UNSPECIFIED else axis}）"
@@ -436,9 +497,15 @@ def _mark(tag) -> str:
     elif tag["emphasis"] == SOFTEN:
         bits.append("弱化")
     if tag.get("axis") == CONTEXT:
-        # 行为类标签的证据要**露出来**：用户有权知道哪个「你在听什么」的说法有依据。
-        ev = tag.get("evidence") or ""
-        bits.append(f"证据：{ev}" if ev else "证据缺失")
+        # 行为类标签的来源要**露出来**，而且要让用户分得清「已核对」与「自述」。
+        ev = tag.get("evidence")
+        if not ev:
+            bits.append("证据缺失")
+        elif ev.get("kind") == "claim":
+            bits.append(f"来源自述：{ev.get('raw')}（未校验）")
+        else:
+            ref = f" {ev['ref']}" if ev.get("ref") else ""
+            bits.append(f"证据：{ev.get('basis')} via {ev.get('call')}{ref}")
     return f"{tag['label']}（{' · '.join(bits)}）" if bits else tag["label"]
 
 
@@ -460,6 +527,22 @@ def render_tags(tags, language: str = "en") -> str:
     return "  ‖  ".join(parts)
 
 
+def _evidence_short(tag) -> str:
+    """方向说明里的紧凑来源描述。
+
+    「已核对的结构化来源」「未经校验的自述」「空缺」三态刻意用不同的词，
+    否则一条自述会被读成已经核实过的证据。
+    """
+    ev = tag.get("evidence")
+    if not ev:
+        return "证据缺失"
+    if ev.get("kind") == "claim":
+        return f"来源自述（未校验）：{ev.get('raw')}"
+    ref = f" {ev['ref']}" if ev.get("ref") else ""
+    kind = "（派生）" if ev.get("basis") == "derived" else ""
+    return f"证据：{ev.get('basis')}{kind} via {ev.get('call')}{ref}"
+
+
 def direction_note(tags, language: str = "zh") -> str:
     """把方向写成一句能塞回 brief 的说明。
 
@@ -471,8 +554,16 @@ def direction_note(tags, language: str = "zh") -> str:
     zh = str(language or "").lower().startswith("zh")
     focus = [t["label"] for t in tags if t["emphasis"] == BOOST]
     soften = [t["label"] for t in tags if t["emphasis"] == SOFTEN]
+    # 「没有来源」与「来源只是自述」都不能当证据用，但两者要分得开：
+    # 前者是空缺，后者是**声称**，混在一起会让用户以为自述已经核对过。
     no_evidence = [t["label"] for t in tags
                    if t.get("axis") == CONTEXT and not t.get("evidence")]
+    unverified = [t["label"] for t in tags
+                  if t.get("axis") == CONTEXT
+                  and (t.get("evidence") or {}).get("kind") == "claim"]
+    derived = [t["label"] for t in tags
+               if t.get("axis") == CONTEXT
+               and (t.get("evidence") or {}).get("basis") == "derived"]
     if zh:
         def one(t):
             bits = ["音乐" if t["axis"] == SONIC else
@@ -482,7 +573,7 @@ def direction_note(tags, language: str = "zh") -> str:
             elif t["emphasis"] == SOFTEN:
                 bits.append("弱化")
             if t.get("axis") == CONTEXT:
-                bits.append(f"证据：{t['evidence']}" if t.get("evidence") else "证据缺失")
+                bits.append(_evidence_short(t))
             return f"{t['label']}（{'，'.join(bits)}）"
         body = "；".join(one(t) for t in tags)
         tail = ""
@@ -493,6 +584,11 @@ def direction_note(tags, language: str = "zh") -> str:
         if no_evidence:
             tail += (f"注意「{'、'.join(no_evidence)}」没有证据来源，"
                      f"只能当作待确认的推测，不要说成用户事实。")
+        if unverified:
+            tail += (f"「{'、'.join(unverified)}」的来源是自由文本、**未经校验**，"
+                     f"转述时要说成自述而不是已核实的证据。")
+        if derived:
+            tail += f"「{'、'.join(derived)}」是从原始字段推导出来的结论，不是现成字段。"
         return (f"方向标签（约 {TARGET_TAG_COUNT} 个）：{body}。{tail}"
                 f"这些标签是原始 brief 的**定性补充**：它们**参与下一轮候选比较**，"
                 f"但**不是数值评分**，也不能推翻 brief 里的明确约束（必须 / 排除 / 参照）；"
@@ -505,7 +601,14 @@ def direction_note(tags, language: str = "zh") -> str:
         elif t["emphasis"] == SOFTEN:
             bits.append("soften")
         if t.get("axis") == CONTEXT:
-            bits.append(f"evidence: {t['evidence']}" if t.get("evidence") else "no evidence")
+            ev = t.get("evidence")
+            if not ev:
+                bits.append("no evidence")
+            elif ev.get("kind") == "claim":
+                bits.append(f"unverified provenance claim: {ev.get('raw')}")
+            else:
+                ref = f" {ev['ref']}" if ev.get("ref") else ""
+                bits.append(f"evidence: {ev.get('basis')} via {ev.get('call')}{ref}")
         return f"{t['label']} ({', '.join(bits)})"
     body = " / ".join(one_en(t) for t in tags)
     tail = ""
@@ -516,6 +619,12 @@ def direction_note(tags, language: str = "zh") -> str:
     if no_evidence:
         tail += (f" Note that {', '.join(no_evidence)} carry no evidence source, so treat them "
                  f"as unconfirmed inference rather than as facts about the user.")
+    if unverified:
+        tail += (f" {', '.join(unverified)} cite free-text provenance that was never checked; "
+                 f"describe it as a claim, not as verified evidence.")
+    if derived:
+        tail += (f" {', '.join(derived)} are derived conclusions, not fields any endpoint "
+                 f"returns.")
     return (f"Direction tags (~{TARGET_TAG_COUNT}): {body}.{tail} "
             f"These tags are a **qualitative supplement** to the brief: they **take part in the "
             f"next round of candidate comparison**, but they are **not a numeric score** and "
@@ -548,16 +657,22 @@ def summary(tags, problems=None, report=None, language: str = "zh",
         for t in tags:
             row = f"  · {t['label']}  [轴={t['axis']}  侧重={t['emphasis']}"
             if t.get("axis") == CONTEXT:
-                row += f"  证据={t.get('evidence') or '（缺）'}"
+                row += f"  {_evidence_short(t)}"
             lines.append(row + "]")
         counts = axis_summary(tags)
         lines.append(f"  轴分布：音乐 {counts[SONIC]} / 行为 {counts[CONTEXT]} / "
                      f"未标 {counts[UNSPECIFIED]}")
         missing = [t["label"] for t in tags
                    if t.get("axis") == CONTEXT and not t.get("evidence")]
+        claims = [t["label"] for t in tags
+                  if t.get("axis") == CONTEXT
+                  and (t.get("evidence") or {}).get("kind") == "claim"]
         if missing:
             lines.append(f"  ⚠ 无证据的行为标签：{'、'.join(missing)}"
                          f"（只能当成待确认的推测，不要说成用户事实）")
+        if claims:
+            lines.append(f"  ⚠ 来源为自由文本、未经校验：{'、'.join(claims)}"
+                         f"（要当证据用就写成 {EVIDENCE_SHAPE}）")
         lines.append(f"  展示：{render_tags(tags, language)}")
     if problems:
         lines.append("校验说明：")

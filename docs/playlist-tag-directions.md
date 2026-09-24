@@ -86,38 +86,43 @@
 轴必须**显式写**。本模块不猜轴——猜轴需要一份流派与行为词库，那等于把
 「这个模块不认识音乐」这句话作废。没写轴的标签会被接受但**报出来**，请补上。
 
-### `context` 必须带 `evidence`
+### `context` 必须带可核对的 `evidence`
 
-`context` 标签是「**用户在听什么**」的断言，所以它不能是印象。要写清**是哪一次调用**
-支撑它。可用的证据来源就这几个，各自的边界也一并列出：
+`context` 标签是「**用户在听什么**」的断言，所以它不能是印象。**光有非空字符串不算证据**——
+第二轮评审的原话是 *A non-empty string is not evidence*：`in-library` 配
+`evidence: "am_top_played"` 照样能过，而那个调用根本证明不了歌单成员关系。
 
-| 行为类方向 | 支撑它的调用 | 实际能看到 | 必须注意 |
+所以来源要**结构化**，并**按断言校验**：`basis` 决定允许哪些 `call`。
+
+| `basis` | 允许的 `call` | 能证明什么 | 必须注意 |
 |---|---|---|---|
-| **近期** | `am_recently_played` | 最近**播放**的有序列表 | 没有播放次数，只有顺序 |
-| **高播放** | `am_top_played` | Replay 的 `playCount` 排名 | 按**周期**；`all-time` 不一定存在，须退到具体年份 |
-| **集中播放** | `am_top_played` | `firstPlayed` / `lastPlayed` + `playCount` | **没有现成字段**，要自己算「窄时间窗 × 高次数」——是**派生**结论 |
-| **在用户歌单中** | `am_list_playlists` + `am_show_playlist` | 歌单成员关系 | 直接、准确 |
+| `recent` | `am_recently_played` | 最近**播放**的有序列表 | 没有播放次数，只有顺序 |
+| `play-count` | `am_top_played` | Replay 的 `playCount` 排名 | 按**周期**；`all-time` 不一定存在，须退到具体年份 |
+| `playlist-membership` | `am_list_playlists` / `am_show_playlist` | 歌单成员关系 | 直接、准确 |
+| `derived` | `am_top_played` | 由原始字段**推出来**的结论 | 例如「集中播放」由 `firstPlayed` / `lastPlayed` × `playCount` 推导，**不是现成字段** |
 
 ```json
-{"label": "recent-heavy-rotation", "axis": "context", "evidence": "am_top_played year-2026"}
+{"label": "in-library", "axis": "context",
+ "evidence": {"basis": "playlist-membership", "call": "am_list_playlists", "ref": "library"}}
 ```
 
-**没有 `evidence` 的 `context` 标签会被接受，但一定报出来**，并在展示串与方向说明里
-标成「证据缺失」：
+三种状态在展示上刻意分得开，因为它们的可信度不同：
 
-```text
-行为 — in-library（证据缺失）
-⚠ 无证据的行为标签：in-library（只能当成待确认的推测，不要说成用户事实）
-```
+| 状态 | 展示 | 含义 |
+|---|---|---|
+| 结构化且与断言相符 | `in-library（证据：playlist-membership via am_list_playlists）` | 当证据用 |
+| 结构化但撑不住断言 | `⚠ …撑不住这条断言（playlist-membership 需要 am_list_playlists / am_show_playlist）` | **报出来**，不当作证据 |
+| 自由文本 | `recent（来源自述（未校验）：trust me）` | 只算**未经校验的自述**，不算证据 |
+| 空缺 | `in-library（证据缺失）` | 只能当成待确认的推测 |
 
-这是刻意的：用户有权分辨哪个行为说法是有依据的，哪个是模型的猜测。藏起来才是问题。
+**证据诊断在去重之后、对最终记录做。** 这一点是评审指出的 P2：诊断若放在逐项循环里，
+「先出现无证据、后来的重复项补上了证据」会留下一条过期的「没写 evidence」，
+同一条标签同时显示有效证据和缺证据警告。
 
 两个尤其容易搞错的地方：
 
 - `am_recently_played(kind=added)` 是「最近**入库**」，**不等于**「最近在听」；
-  混用就是把入库当成收听。
-- 「集中播放」**不是任何接口的现成字段**。它只能由 `firstPlayed` / `lastPlayed`
-  与 `playCount` 推出来，所以它天生是**派生**结论，必须如实标注。
+- 「集中播放」**不是任何接口的现成字段**，必须用 `basis: "derived"` 如实标注。
 
 `sonic` 标签带 `evidence` 会提示多余——音乐属性不需要收听证据。
 

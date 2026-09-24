@@ -41,14 +41,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   tags supplement the brief rather than replacing it, and `direction_note()` states all three
   boundary layers inside its own output rather than relying on external docs.
 
-  A `context` tag describes **what the user has been listening to**, so it now carries an
-  `evidence` field naming the call that backs it. A context tag without one is accepted but always
-  reported, and is marked "no evidence" in the display line and the direction note: a listener has
-  the right to tell a grounded claim from a guess. Two traps are called out explicitly in the
-  contract, because both turn inference into a false fact about the user:
-  `am_recently_played(kind=added)` means recently **added**, not recently **played**; and
-  "concentrated listening" is not a field any endpoint returns — it can only be derived from
-  `firstPlayed` / `lastPlayed` together with `playCount`.
+  A `context` tag describes **what the user has been listening to**, so it carries structured
+  provenance. A non-empty string is not evidence: `in-library` backed by `am_top_played` passes any
+  string check while proving nothing, so `evidence` is `{basis, call, ref}` and the source is
+  validated against the claim (`playlist-membership` accepts only `am_list_playlists` /
+  `am_show_playlist`, and concentrated listening must be declared `basis: "derived"` because no
+  endpoint returns it). Free text is still accepted but is shown as an **unverified claim**, never
+  as evidence, and a tag with nothing is marked as missing evidence — a listener has the right to
+  tell a grounded claim from a guess. Evidence diagnostics run **after** duplicate merging, so a
+  duplicate that later supplies provenance cannot leave a stale "no evidence" warning behind.
+
+  One trap is called out explicitly, because it turns inference into a false fact about the user:
+  `am_recently_played(kind=added)` means recently **added**, not recently **played**.
 - `am_resolve_candidates` now returns each grounded recording's Apple Music URL so users can
   audition and verify the exact catalog version before a playlist is written.
 - A root `llms.txt` gives agents and directory crawlers a concise, spec-shaped map of the project's

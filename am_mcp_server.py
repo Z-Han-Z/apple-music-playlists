@@ -95,16 +95,17 @@ PROMPTS = [
                     "the grounded preview and before the final write, so an adjustment can still "
                     "change the result. About five labels mixing musical character (sonic) with "
                     "listening provenance (context, such as recent, high-rotation, or already in the "
-                    "library). A context tag should name the call that backs it; one reported as "
-                    "missing evidence is inference, not a fact about the user. They are rendered "
-                    "into the prompt with their boundary stated: a qualitative supplement that takes "
-                    "part in the next round of comparison, is not a numeric score, and cannot "
-                    "override an explicit constraint in the brief. The user may reply with "
+                    "library). A context tag needs checkable provenance: give {basis, call, ref}, "
+                    "because a non-empty string is not evidence (in-library backed by am_top_played "
+                    "does not hold) and free text only counts as an unverified claim. They are "
+                    "rendered into the prompt with their boundary stated: a qualitative supplement "
+                    "that takes part in the next round of comparison, is not a numeric score, and "
+                    "cannot override an explicit constraint in the brief. The user may reply with "
                     "adjustments like 'more funk' or 'less disco', which you apply with "
                     "am_tag_directions (always passing their original description as `brief`). / "
-                    "可选的方向标签，约 5 个（音乐属性 + 用户行为来源）；context 标签应写出支撑它的调用。"
-                    "它出现在「已预演、尚未写入」之间，用户可用 more X / less Y 调整，"
-                    "用 am_tag_directions 记账（始终带上原始需求作为 brief）；侧重是定性的，不是数值。"
+                    "可选的方向标签，约 5 个（音乐属性 + 用户行为来源）；context 标签要给出可核对的"
+                    "provenance {basis, call, ref}——非空字符串不算证据，自由文本只算未经校验的自述。"
+                    "用户可用 more X / less Y 调整，用 am_tag_directions 记账（始终带上原始需求作为 brief）。"
                 ),
                 "required": False,
             },
@@ -288,12 +289,14 @@ TOOLS = [
                        "标签由你（宿主模型）写：既包括音乐本身的属性（流派/年代/织体/氛围），"
                        "也包括**用户行为来源**（最近在听、高播放、集中循环、本就在库里、来自某个参照曲）。"
                        "两个轴要分清——sonic 是音乐属性，context 是这些歌为什么在这里；"
-                       "context 标签必须有真实收听证据（am_recently_played / am_top_played / 音乐库）支持，"
-                       "并在 evidence 里写出**是哪一次调用**支撑它——没有证据的行为标签会被接受但报出来、"
-                       "并在展示串里标成「证据缺失」，用户有权分辨哪句有依据、哪句是模型的猜测。"
+                       "context 标签必须有**可核对的**来源，写成 evidence {basis, call, ref}——"
+                       "**光有非空字符串不算证据**：`in-library` 配 `am_top_played` 撑不住那条断言，"
+                       "会被报出来；自由文本只当作**未经校验的来源自述**展示，不当作证据。"
+                       "没有来源的行为标签会被接受但报出来、并在展示串里标成「证据缺失」，"
+                       "用户有权分辨哪句有依据、哪句是模型的猜测。"
                        "注意 am_recently_played(kind=added) 是「最近入库」而不是「最近在听」；"
-                       "「集中播放」也不是任何接口的现成字段，只能由 firstPlayed/lastPlayed 与 "
-                       "playCount 推出来。"
+                       "「集中播放」要用 basis=derived，并说明它由 firstPlayed/lastPlayed 与 "
+                       "playCount 推出来，不是现成字段。"
                        "把方向展示给用户后，用户可以回 `more funk` / `less disco` / `drop dark` / `add ambient`，"
                        "本工具把它做成**定性记账**：侧重只有 soften / neutral / boost 三档，"
                        "全程没有数值权重（小数会让人误以为有精度），并保留用户原话作为修订记录。"
@@ -314,10 +317,31 @@ TOOLS = [
                                   "axis": {"type": "string", "enum": ["sonic", "context"]},
                                   "emphasis": {"type": "string",
                                                "enum": ["soften", "neutral", "boost"]},
-                                  "evidence": {"type": "string",
-                                               "description": "支撑该 context 标签的调用，"
-                                                              "如 am_top_played year-2026 / "
-                                                              "am_recently_played / am_list_playlists"},
+                                  "evidence": {"anyOf": [
+                                      {"type": "string",
+                                       "description": "自由文本来源。会被接受，但只当作"
+                                                      "**未经校验的来源自述**，不当作证据"},
+                                      {"type": "object",
+                                       "properties": {
+                                           "basis": {"type": "string",
+                                                     "enum": ["recent", "play-count",
+                                                              "playlist-membership", "derived"]},
+                                           "call": {"type": "string",
+                                                    "enum": ["am_recently_played", "am_top_played",
+                                                             "am_list_playlists",
+                                                             "am_show_playlist"]},
+                                           "ref": {"type": "string",
+                                                   "description": "具体是哪一次调用的结果，"
+                                                                  "如 year-2026"},
+                                       },
+                                       "required": ["basis", "call"],
+                                       "additionalProperties": False},
+                                  ],
+                                      "description": "支撑该 context 标签的 provenance。"
+                                                     "写成 {basis, call, ref} 才会被**按断言校验**"
+                                                     "（如 in-library 必须是 playlist-membership + "
+                                                     "am_list_playlists，给 am_top_played 会被拒）；"
+                                                     "只给字符串则只算未经校验的自述"},
                               },
                               "required": ["label"], "additionalProperties": False},
                          ]},
@@ -389,7 +413,7 @@ _ENGLISH_TOOL_DESCRIPTIONS = {
     "am_audit_playlist": "Read-only metadata audit of playlist length, artist concentration, genres, eras, duplicates, and possible interludes. For BPM, key, energy, and transitions, use am_analyze_flow.",
     "am_analyze_flow": "Read-only diagnosis of BPM, key, loudness, energy, mood, adjacent transitions, and overall arc. It may fetch and cache remote feature data; use am_optimize_order only when a proposed replacement order is wanted.",
     "am_optimize_order": "Compute a proposed order after the LLM has selected the songs and narrative blocks. It balances adjacent audio transitions with a chosen qualitative arc, returns an order without writing, and may fetch cached remote features; it must not choose songs or judge theme fit.",
-    "am_tag_directions": "Present and steer the playlist's direction tags: about five labels the host model authors, covering both musical character (sonic) and listening provenance (context, such as recent, high-rotation, or already in the library). A context tag must name the call that backs it (am_recently_played, am_top_played, am_list_playlists); one reported as missing evidence is model inference and must not be presented as a fact about the user. The `brief` argument is required and is echoed verbatim so the original request stays visible. The tool validates the set, applies user replies like 'more funk' or 'less disco' as explicit qualitative bookkeeping over three emphasis levels (soften/neutral/boost) with the user's own wording kept as a revision record, and returns a rendered line plus a direction note for the next curation round. Use it before the final write: the tags are a qualitative supplement that takes part in the next round of candidate comparison, is not a numeric score, and cannot override an explicit constraint in the brief. Read-only and offline: it touches nothing in Apple Music.",
+    "am_tag_directions": "Present and steer the playlist's direction tags: about five labels the host model authors, covering both musical character (sonic) and listening provenance (context, such as recent, high-rotation, or already in the library). A context tag needs checkable provenance, given structurally as {basis, call, ref}; a non-empty string is not evidence, so a claim such as in-library backed by am_top_played is reported as unsupported and free text is shown only as an unverified provenance claim. The `brief` argument is required and is echoed verbatim so the original request stays visible. The tool validates the set, applies user replies like 'more funk' or 'less disco' as explicit qualitative bookkeeping over three emphasis levels (soften/neutral/boost) with the user's own wording kept as a revision record, and returns a rendered line plus a direction note for the next curation round. Use it before the final write: the tags are a qualitative supplement that takes part in the next round of candidate comparison, is not a numeric score, and cannot override an explicit constraint in the brief. Read-only and offline: it touches nothing in Apple Music.",
     "am_recently_played": "Read recent listening or recently added Apple Music content when recency matters. This API does not provide play counts; use am_top_played for Replay rankings.",
     "am_top_played": "Read Apple Music Replay play-count rankings by song, album, or artist when frequency matters. Use am_recently_played for latest listening; all-time data may be unavailable, so retry with a specific year.",
 }
@@ -851,8 +875,9 @@ def _render_direction_tags(raw: str, language: str = "") -> str:
         "How to use them: they are a qualitative supplement to the brief above — they take part "
         "in the next round of candidate comparison, they are not a numeric score, and they cannot "
         "override an explicit constraint in the brief (must-have, avoidance, or reference); the "
-        "brief wins any conflict. A context tag must name the call that backs it, and one reported "
-        "as missing evidence is inference, not a fact about the user.")
+        "brief wins any conflict. A context tag needs checkable provenance — a non-empty string is "
+        "not evidence, so give {basis, call, ref}; one reported as missing evidence is inference, "
+        "not a fact about the user, and free text is only an unverified claim.")
     return "\n".join(lines) + "\n"
 
 
