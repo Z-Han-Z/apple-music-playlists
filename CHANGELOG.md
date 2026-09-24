@@ -15,6 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   curation boundary, setup, research, and implementation documentation.
 - A reusable multilingual curation evaluation set provides five difficult briefs with auditable
   constraints and blind-listening questions, without freezing any model's selections as truth.
+- The evaluation guide now defines a reproducible one-shot baseline, result template, blind-listening
+  protocol, interpretation boundaries, and privacy-safe sharing rules.
 
 ### Changed
 

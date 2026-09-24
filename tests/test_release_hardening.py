@@ -502,6 +502,15 @@ class TestStableReleaseAssets(unittest.TestCase):
         serialized = json.dumps(payload, ensure_ascii=False).lower()
         self.assertNotIn("theme_fit", serialized)
 
+    def test_curation_eval_guide_is_reproducible_and_privacy_safe(self):
+        text = (self.ROOT / "examples" / "README.md").read_text(encoding="utf-8")
+        for required in ("Baseline", "Curation workflow", "dry_run=true", "Listen blind",
+                         "Catalog funnel", "Audio-feature coverage", "Privacy and sharing",
+                         "Never commit Apple Music tokens", "Do not build a permanent leaderboard"):
+            self.assertIn(required, text)
+        self.assertIn("curation-evals.json", text)
+        self.assertNotIn("theme_fit", text)
+
 
 class TestCommunityHealth(unittest.TestCase):
     ROOT = Path(__file__).resolve().parent.parent
