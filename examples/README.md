@@ -76,9 +76,11 @@ Do not collapse those sections into a single number. A perfect dry-run cannot pr
 good; a low ordering cost cannot prove the songs belong; human preference does not excuse a wrong
 recording. A successful catalog resolution proves identity and availability, not the model's claim
 about lyrics, atmosphere, influence, or narrative role. An individually plausible track can still
-make the collection less coherent. Curation-contract coverage detects forgotten requirements but
-does not prove musical quality. Audio-feature coverage must appear beside any flow result because
-unmeasured positions were not evaluated.
+make the collection less coherent. A fluent, well-grounded curation explanation makes a decision
+easier to audit; it does not prove that the selection is better or that the playlist sounds good.
+Curation-contract coverage detects forgotten requirements but does not prove musical quality.
+Audio-feature coverage must appear beside any flow result because unmeasured positions were not
+evaluated.
 
 ## Privacy and sharing
 

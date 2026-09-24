@@ -495,7 +495,7 @@ class TestStableReleaseAssets(unittest.TestCase):
             encoding="utf-8")
         for required in (
             "MusicRecoIntent", "Text2Playlist", "Text2Tracks", "Hypothesis-Driven Shelf Generation",
-            "Read Between the Tracks",
+            "descriptive reasoning traces", "Read Between the Tracks",
             "Learning When to Personalize",
             "intent hallucination", "Must", "Avoid", "References", "Soft context",
             "Personalization", "Narrative", "Unknown", "catalog fact", "listening evidence",
@@ -508,6 +508,7 @@ class TestStableReleaseAssets(unittest.TestCase):
         self.assertIn("successfully resolved", text)
         self.assertIn("does **not** prove", text)
         self.assertIn("set-level coherence", text)
+        self.assertIn("explanation quality is not a proxy", text)
         self.assertIn("no golden track list", text)
 
     def test_curation_evals_are_multilingual_tasks_not_golden_lists(self):
@@ -537,6 +538,7 @@ class TestStableReleaseAssets(unittest.TestCase):
         self.assertIn("unverified model inference", serialized)
         self.assertIn("resolved catalog record", serialized)
         self.assertIn("individually plausible track", serialized)
+        self.assertIn("curation explanation", serialized)
         reference_case = next(case for case in payload["cases"]
                               if case["id"] == "reference-is-not-inclusion")
         self.assertIn("only as reference points", reference_case["brief"])
@@ -553,6 +555,7 @@ class TestStableReleaseAssets(unittest.TestCase):
                          "dry_run=true", "Listen blind", "Catalog funnel", "Intent coverage",
                          "Audio-feature coverage", "supported only by model inference",
                          "Set-level coherence", "individually plausible track",
+                         "well-grounded curation explanation",
                          "Privacy and sharing",
                          "Never commit Apple Music tokens", "Do not build a permanent leaderboard"):
             self.assertIn(required, text)

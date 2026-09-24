@@ -19,6 +19,7 @@
       "publish one model run as a permanent golden track list",
       "apply listening-history personalization to every brief by default",
       "treat a successfully resolved catalog record as proof of semantic fit",
+      "treat a fluent or well-grounded curation explanation as proof of better selection",
       "reduce theme fit or musical understanding to an uncalibrated scalar",
       "treat a lower optimizer cost as proof that the selection or story is better",
       "let ordering optimization cross semantic beat boundaries"

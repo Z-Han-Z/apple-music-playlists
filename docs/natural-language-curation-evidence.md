@@ -16,6 +16,7 @@ both linguistic reasoning and deterministic grounding.
 | Deezer, *Text2Playlist* (ECIR 2025) | A production system separates broad intent from ordinary lookup, uses an LLM for query interpretation and final refinement, and grounds retrieval in catalog tags plus personalization. Generated playlists were listened to later in 45% of observed cases versus 27% for manually created playlists. | The report is an industry deployment analysis, not a randomized proof that LLM curation is musically better. Deezer also has expert tags, audio models, collaborative-filtering embeddings, and usage data that this project does not have. |
 | Spotify, *Text2Tracks* (2025) | Generating artist and track names with an off-the-shelf LLM creates an entity-resolution boundary: titles are ambiguous, versions differ, and names are poor descriptions of sound. A fine-tuned generative retriever performed better when its track identifiers encoded collaborative relationships instead of literal names. | The evaluation used offline relevance labels and Spotify-specific training data. It does not show that resolving a generated title proves semantic fit, or that a generic host LLM can reproduce a catalog-trained retriever. |
 | Spotify, *Hypothesis-Driven Shelf Generation* (RecSys 2026) | A production pipeline separates a natural-language concept from catalog fulfilment, then runs a distinct set-level alignment stage. Its authors report that plausible individual items can still form an incoherent collection or break the promise made by its title. | The system generates Spotify Home shelves rather than user-authored playlists. Its offline judges were not validated against human agreement, and mixed early online results do not establish a general quality advantage. |
+| Penha et al., descriptive reasoning traces (RecSys 2026 workshop) | In a controlled 2 × 2 study, more grounded and interpretable natural-language reasoning traces did not consistently improve conventional offline recommendation effectiveness; adding explicit traces reduced effectiveness under the tested standard SFT and RL setups. | The study used three Amazon product domains and a Qwen3-1.7B backbone, not music or human listening tests. It does not show that explanations are useless; it shows that explanation quality is not a proxy for recommendation quality. |
 | Baranes et al., *MusicRecoIntent* (NLP4MusA 2026) | In 2,291 real music requests, 3,935 descriptors were annotated as desired, rejected, or referential. Named artists and works were usually references: 1,613 of 1,870 named-entity annotations were referential. | Extracting a genre, mood, or entity does not determine how the user meant it. A named artist is not automatically a must-include. |
 | Hausberger et al., *Read Between the Tracks* (NLP4MusA 2026) | Five LLMs ranked candidates containing user-relevant, intent-relevant, both-relevant, and irrelevant tracks. The larger models ranked the joint user-and-intent set above distractors; examples from the listener's intent-specific history were more useful than an intent label alone. | Results were modest and preliminary. A model ranking a provided 40-track set is not evidence that it can invent a correct catalog entry or produce a satisfying sequence unaided. |
 | Buzaev et al., *Learning When to Personalize* (NLP4MusA 2026) | A production system classified 5,000 real requests by whether they called for strong personalization, then varied the contribution of listening-history signals. In a blind study, query-aware personalization beat both always-personalized and non-personalized variants. | The study had 20 users and 254 pairwise judgments, used Russian-language queries and proprietary embeddings, and tested retrieval quality rather than narrative sequencing. It does not supply a universal personalization formula for this project. |
@@ -117,6 +118,13 @@ markers, while the curation trace records which retained reasons still rest only
 Unresolved candidates return to the language comparison as evidence gaps; they are not silently
 replaced by the first search result.
 
+Natural-language reasons remain useful because a listener can inspect and challenge them. They are
+not a quality metric. Penha et al. found a disconnect between more grounded, interpretable reasoning
+traces and conventional offline recommendation effectiveness in the product domains they tested.
+Accordingly, this workflow records reasons to expose omissions, unsupported claims, and narrative
+decisions; it never treats fluency, detail, or explanation-grounding scores as proof that the songs
+belong or that the playlist will sound good.
+
 ## Validation protocol
 
 The implementation and evaluation suite test the following hypotheses:
@@ -128,7 +136,8 @@ The implementation and evaluation suite test the following hypotheses:
 5. Candidate reasons distinguish catalog facts, listening evidence, and model inference.
 6. Evaluation reports retained claims that still depend only on unverified model inference.
 7. Evaluation asks whether individually plausible tracks cohere as a set and fulfil the brief's promise.
-8. Evaluation reports coverage and unresolved ambiguity rather than one synthetic score.
+8. Evaluation keeps explanation auditability separate from selection and listening quality.
+9. Evaluation reports coverage and unresolved ambiguity rather than one synthetic score.
 
 The multilingual evaluation suite includes a reference-heavy brief with explicit exclusions. It has
 no golden track list. A valid comparison keeps the model, storefront, and brief fixed, then records
@@ -145,6 +154,8 @@ listening judgments.
   one small platform study; that supports an explicit decision, not a universal setting.
 - “Constraint coverage proves the playlist is good” — it proves only that stated requirements were
   not silently lost.
+- “A convincing curation trace proves the recommendations are better” — explanations make decisions
+  inspectable, but their fluency or grounding is not a proxy for recommendation or listening quality.
 - “A resolved catalog record proves semantic fit” — it proves identity and availability; atmosphere,
   lyrics, influence, and narrative role may still be model inference.
 - “A lower flow cost proves a better story” — acoustic adjacency and semantic narrative remain
@@ -155,6 +166,7 @@ listening judgments.
 - [Delcluze et al. (2025), *Text2Playlist: Generating Personalized Playlists from Text on Deezer*](https://arxiv.org/abs/2501.05894), industry paper accepted at ECIR 2025; [official Deezer research repository](https://github.com/deezer/text2playlist-ecir2025).
 - [Palumbo et al. (2025), *Text2Tracks: Prompt-based Music Recommendation via Generative Retrieval*](https://arxiv.org/abs/2503.24193); [Spotify Research overview](https://research.atspotify.com/2025/4/text2tracks-improving-prompt-based-music-recommendations-with-generative-retrieval/).
 - [Petrov et al. (2026), *Hypothesis-Driven Shelf Generation for Personalised Recommendation*](https://research.atspotify.com/2026/9/hypothesis-driven-shelf-generation-for-personalised-recommendation), RecSys 2026.
+- [Penha et al. (2026), *The Disconnect Between Better Descriptive Reasoning Trace Quality and Recommendation Effectiveness*](https://arxiv.org/abs/2608.23154), RecSys 2026 GenAIECommerce workshop; [Spotify Research publication](https://research.atspotify.com/publications/the-disconnect-between-better-descriptive-reasoning-trace-quality-and-recommendation-effectiveness).
 - [Baranes, Hennequin & Epure (2026), *Beyond Musical Descriptors: Extracting Preference-Bearing Intent in Music Queries*](https://aclanthology.org/2026.nlp4musa-1.4/), NLP4MusA; [dataset repository](https://github.com/deezer/MusicRecoIntent-NLP4MusA26).
 - [Hausberger, Jósár & Schedl (2026), *Read Between the Tracks: Exploring LLM-driven Intent-based Music Recommendations*](https://aclanthology.org/2026.nlp4musa-1.7/), NLP4MusA.
 - [Buzaev et al. (2026), *Learning When to Personalize: LLM Based Playlist Generation via Query Taxonomy and Classification*](https://aclanthology.org/2026.nlp4musa-1.8/), NLP4MusA.
