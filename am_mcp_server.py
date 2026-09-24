@@ -731,15 +731,15 @@ Requested size: {track_count} tracks
 Response language: {language}
 
 Use the Apple Music MCP tools to complete the task, not merely to suggest a list:
-1. Interpret the brief. Make reasonable assumptions instead of asking many questions; ask only if a missing choice would materially change the result.
-2. Call am_status before any write. If the user asks for personalization, use am_recently_played or am_top_played as supporting taste signals.
-3. Curate a candidate pool about 1.5–2 times the requested size. Use your direct understanding of the user's words, musical context, and relationships between songs. Do not turn theme fit into arbitrary 0–1 scores.
+1. Preserve the original brief, then write a compact curation contract in natural language: must-haves, avoidances, reference points, soft context or inferences, personalization scope, narrative beats, and unresolved ambiguities. A named song or artist used as "like X" is a reference, not an automatic request to include X; keep negation scoped to what the user rejected. Do not flatten the brief into mood/genre tags or numeric weights. Make reasonable assumptions instead of asking many questions; ask only if an ambiguity would materially change the result.
+2. Call am_status before any write. Decide from the user's words whether personalization is required, optional, or out of scope. Use am_recently_played or am_top_played only as supporting evidence when the request calls for personalization; do not silently bend a self-contained brief toward listening history.
+3. Curate a candidate pool about 1.5–2 times the requested size. Keep both the original brief and the curation contract visible. Use your direct understanding of the user's words, musical context, and relationships between songs. Do not turn theme fit into arbitrary 0–1 scores.
 4. Call am_resolve_candidates on that pool. Apple catalog data is the source of truth for availability and versions; do not invent catalog IDs. Treat has_lyrics=false as unknown, never as proof that a track is instrumental.
-5. Compare candidates directly within the role they could play: opening, development, peak, release, or landing. Prefer explicit natural-language reasons (essential / strong / bridge / optional / reject) over point scores. Unless the brief says otherwise, prefer original studio versions, avoid duplicates, and normally keep no more than two tracks per artist.
+5. Compare candidates directly within the role they could play: opening, development, peak, release, or landing. For each retained track, connect the reason to the user's words or listening evidence and distinguish catalog facts from model inference. Prefer explicit natural-language reasons (essential / strong / bridge / optional / reject) over point scores. Unless the brief says otherwise, prefer original studio versions, avoid duplicates, and normally keep no more than two tracks per artist.
 6. Select the final set and arrange those narrative roles into ordered blocks. am_optimize_order is optional and may refine transitions inside blocks; it must not decide which songs fit the theme.
 7. Call am_create_playlist with dry_run=true using "Title - Artist" strings. Review misses and suspicious matches, revise candidates, and dry-run again when needed.
 8. Once the preview is sound, create the playlist with dry_run=false. If the user explicitly asked only for a plan or preview, stop before this write.
-9. Report the playlist name, ID, track count, unmatched tracks, and the most important curation choices briefly.
+9. Report the playlist name, ID, track count, unmatched tracks, the most important curation choices, and any must-have, avoidance, reference, or narrative requirement that remains uncertain. Do not collapse this coverage into one quality score.
 
 The language model in the MCP client performs the curation. This MCP server does not call or require a separate LLM provider."""
 

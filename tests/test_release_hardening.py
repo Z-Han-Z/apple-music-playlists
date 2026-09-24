@@ -155,6 +155,14 @@ class TestMcpCompatibility(unittest.TestCase):
         for tool in ("am_status", "am_resolve_candidates", "am_create_playlist"):
             self.assertIn(tool, text)
         self.assertIn("Do not turn theme fit into arbitrary 0–1 scores", text)
+        self.assertIn("curation contract in natural language", text)
+        self.assertIn("personalization scope", text)
+        self.assertIn("required, optional, or out of scope", text)
+        self.assertIn("reference, not an automatic request to include", text)
+        self.assertIn("keep negation scoped", text)
+        self.assertIn("Keep both the original brief and the curation contract visible", text)
+        self.assertIn("distinguish catalog facts from model inference", text)
+        self.assertIn("Do not collapse this coverage into one quality score", text)
         self.assertIn("has_lyrics=false as unknown", text)
         self.assertIn("dry_run=true", text)
 
@@ -488,14 +496,37 @@ class TestStableReleaseAssets(unittest.TestCase):
             self.assertIn(heading, text)
         for required in ("host LLM chooses", "grounds exact catalog recordings",
                          "without deciding what fits", "uvx --from apple-music-playlists am-mcp",
-                         "docs/evaluation-signals.md", "docs/algorithm-review.md", "server.json"):
+                         "docs/evaluation-signals.md",
+                         "docs/natural-language-curation-evidence.md",
+                         "docs/algorithm-review.md", "server.json"):
             self.assertIn(required, text)
         self.assertNotIn("playlist generator", text.lower())
+
+    def test_natural_language_curation_evidence_has_claim_boundaries(self):
+        text = (self.ROOT / "docs" / "natural-language-curation-evidence.md").read_text(
+            encoding="utf-8")
+        for required in (
+            "MusicRecoIntent", "Text2Playlist", "Text2Tracks", "Hypothesis-Driven Shelf Generation",
+            "descriptive reasoning traces", "Read Between the Tracks",
+            "Learning When to Personalize",
+            "intent hallucination", "Must", "Avoid", "References", "Soft context",
+            "Personalization", "Narrative", "Unknown", "catalog fact", "listening evidence",
+            "model inference",
+            "What it does **not** prove", "Claims this project should not make",
+        ):
+            self.assertIn(required, text)
+        self.assertIn("reference, not an automatic request", text)
+        self.assertIn("original brief must remain", text)
+        self.assertIn("successfully resolved", text)
+        self.assertIn("does **not** prove", text)
+        self.assertIn("set-level coherence", text)
+        self.assertIn("explanation quality is not a proxy", text)
+        self.assertIn("no golden track list", text)
 
     def test_curation_evals_are_multilingual_tasks_not_golden_lists(self):
         path = self.ROOT / "examples" / "curation-evals.json"
         payload = json.loads(path.read_text(encoding="utf-8"))
-        self.assertEqual(payload["schema_version"], 1)
+        self.assertEqual(payload["schema_version"], 2)
         self.assertEqual(
             {case["locale"] for case in payload["cases"]},
             {"en", "zh-CN", "ja", "ko", "es"},
@@ -503,21 +534,41 @@ class TestStableReleaseAssets(unittest.TestCase):
         self.assertGreaterEqual(len(payload["cases"]), 5)
         for case in payload["cases"]:
             for required in ("id", "locale", "target_tracks", "brief", "hard_checks",
-                             "semantic_checks", "blind_questions"):
+                             "personalization_scope", "semantic_checks", "intent_risks",
+                             "blind_questions"):
                 self.assertIn(required, case, f"{case.get('id')} is missing {required}")
+            self.assertIn(case["personalization_scope"], {"required", "optional", "out_of_scope"})
             self.assertGreaterEqual(len(case["hard_checks"]), 3)
             self.assertGreaterEqual(len(case["semantic_checks"]), 3)
+            self.assertGreaterEqual(len(case["intent_risks"]), 3)
             self.assertGreaterEqual(len(case["blind_questions"]), 3)
             self.assertNotIn("expected_tracks", case)
             self.assertNotIn("golden_tracks", case)
 
         serialized = json.dumps(payload, ensure_ascii=False).lower()
         self.assertNotIn("theme_fit", serialized)
+        self.assertIn("unverified model inference", serialized)
+        self.assertIn("resolved catalog record", serialized)
+        self.assertIn("individually plausible track", serialized)
+        self.assertIn("curation explanation", serialized)
+        reference_case = next(case for case in payload["cases"]
+                              if case["id"] == "reference-is-not-inclusion")
+        self.assertIn("only as reference points", reference_case["brief"])
+        self.assertIn("Do not include either artist", reference_case["brief"])
+        personalized = next(case for case in payload["cases"]
+                            if case["id"] == "recent-meets-rediscovered")
+        self.assertEqual(personalized["personalization_scope"], "required")
+        self.assertTrue(all(case["personalization_scope"] == "out_of_scope"
+                            for case in payload["cases"] if case["data"] == "public_catalog"))
 
     def test_curation_eval_guide_is_reproducible_and_privacy_safe(self):
         text = (self.ROOT / "examples" / "README.md").read_text(encoding="utf-8")
-        for required in ("Baseline", "Curation workflow", "dry_run=true", "Listen blind",
-                         "Catalog funnel", "Audio-feature coverage", "Privacy and sharing",
+        for required in ("Baseline", "Curation workflow", "curation contract", "reference-only",
+                         "dry_run=true", "Listen blind", "Catalog funnel", "Intent coverage",
+                         "Audio-feature coverage", "supported only by model inference",
+                         "Set-level coherence", "individually plausible track",
+                         "well-grounded curation explanation",
+                         "Privacy and sharing",
                          "Never commit Apple Music tokens", "Do not build a permanent leaderboard"):
             self.assertIn(required, text)
         self.assertIn("curation-evals.json", text)

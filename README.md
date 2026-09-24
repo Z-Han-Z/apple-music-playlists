@@ -21,6 +21,10 @@ English | [简体中文](README_ZH_CN.md) | [繁體中文](README_ZH_TW.md) |
 your agent turns it into a catalog-grounded selection whose versions, pacing, and transitions hold
 together as a listening experience.**
 
+[See the 12-track curation demo](#a-real-curation-demo-a-machine-dreams-it-is-human): 22 grounded
+candidates become a three-act story, including a case where the numerically cheaper order damaged
+the narrative.
+
 Pure Python standard library — no `pip install` required to run, and **no Apple Developer Program
 membership needed**. Requires Python 3.10+ and works on Windows / macOS / Linux.
 
@@ -192,7 +196,7 @@ than it needs; `am_resolve_candidates` grounds them; the model chooses and assig
 `am_optimize_order` optionally checks local flow without crossing semantic boundaries; and
 `am_create_playlist(dry_run=true)` verifies the exact final recordings before the write.
 
-To compare that workflow with a one-shot baseline, use the five difficult multilingual briefs and
+To compare that workflow with a one-shot baseline, use the six difficult multilingual briefs and
 blind-listening protocol in **[examples/](examples/README.md)**. The suite provides auditable
 constraints, not predetermined “correct” songs.
 
@@ -422,7 +426,8 @@ More in [`docs/apple-music-api-notes.md`](docs/apple-music-api-notes.md) and
 | [`docs/how-to-build-a-good-playlist.md`](docs/how-to-build-a-good-playlist.md) | Curation methodology: adjacency physics, arc data, six narrative shapes, the ISO principle |
 | [`docs/playlist-curation-survey.md`](docs/playlist-curation-survey.md) | Survey of published curation guidance (platform rules, DJ methods, academic findings) |
 | [`docs/evaluation-signals.md`](docs/evaluation-signals.md) | LLM-native curation: direct candidate comparison, catalog grounding, readable constraints, and why scalar theme scores stay out of the critical path |
-| [`examples/`](examples/README.md) | Reproducible multilingual curation evaluations: five difficult briefs, a baseline protocol, auditable evidence, privacy rules, and no golden track lists |
+| [`docs/natural-language-curation-evidence.md`](docs/natural-language-curation-evidence.md) | Primary research on broad music intent, reference-vs-request errors, intent hallucination, scrutable language profiles, and the reusable validation protocol |
+| [`examples/`](examples/README.md) | Reproducible multilingual curation evaluations: six difficult briefs, a baseline protocol, auditable evidence, privacy rules, and no golden track lists |
 | [`docs/algorithm-review.md`](docs/algorithm-review.md) | Review boundary for early heuristics: which decisions belong to the LLM and which deterministic algorithms should retain |
 | [`docs/platform-adapters.md`](docs/platform-adapters.md) | The platform-adapter boundary: what is platform-neutral, what an adapter must provide, and what breaks on a service that exposes no ISRC |
 | [`llms.txt`](llms.txt) | Concise agent-readable map of the curation boundary and the most useful project documents |

@@ -1,21 +1,33 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "about": "Reusable difficult briefs for comparing playlist-curation workflows. These are tasks and auditable criteria, not golden track lists. Run each brief unchanged, keep the model and storefront constant within a comparison, and judge the resulting listening experience blind.",
   "protocol": {
     "compare": [
       "baseline: ask the same model for exactly the target count and create immediately",
-      "curation workflow: expand the candidate pool, ground with am_resolve_candidates, compare candidates in language, assign narrative roles, dry-run, then optionally refine local flow"
+      "curation workflow: expand the candidate pool, ground with am_resolve_candidates, compare candidates in language, assign narrative roles, dry-run, then optionally refine local flow",
+      "blind listening: hide workflow labels and curation notes, balance presentation order, and record criterion-specific impressions before overall preference",
+      "optional LLM judge: report separately as a diagnostic, randomize and swap presentation order, and never merge its verdict into a human-preference score"
     ],
     "record": [
       "resolved, unresolved, wrong-version, duplicate, and artist-concentration counts",
+      "the personalization decision and which listening evidence, if any, influenced selection",
+      "whole-playlist variety and local transition/flow observations as separate dimensions",
       "audio-feature coverage and adjacency warnings, reported separately from semantic quality",
       "the natural-language role and reason for every retained track",
-      "blind human preference and the evaluator's reasons"
+      "retained-track claims that still rely only on unverified model inference",
+      "set-level coherence and any individually plausible track that weakens the brief's promise",
+      "blind human preference and criterion-specific reasons",
+      "any LLM-judge output separately from human impressions and deterministic catalog checks"
     ],
     "do_not": [
       "publish one model run as a permanent golden track list",
+      "apply listening-history personalization to every brief by default",
+      "treat a successfully resolved catalog record as proof of semantic fit",
+      "treat a fluent or well-grounded curation explanation as proof of better selection",
+      "treat an LLM judge's pairwise playlist verdict as ground truth or average it into human preference",
       "reduce theme fit or musical understanding to an uncalibrated scalar",
       "treat a lower optimizer cost as proof that the selection or story is better",
+      "treat maximum local smoothness as universally best or let it erase a meaningful narrative turn",
       "let ordering optimization cross semantic beat boundaries"
     ]
   },
@@ -25,6 +37,7 @@
       "locale": "en",
       "target_tracks": 12,
       "data": "public_catalog",
+      "personalization_scope": "out_of_scope",
       "brief": "Build a 12-track, three-act story in which a machine wakes in a city, mistakes attention for intimacy, asks to be touched, becomes vulnerable, and sees dawn. Cross electronic music and art pop from the late 1970s to the present; use one track per artist, studio recordings only, and let the voices become progressively more human. The ending must feel quiet and earned, not merely low-energy.",
       "hard_checks": [
         "exactly 12 resolved recordings",
@@ -37,6 +50,11 @@
         "the increasing humanity is supported by voice, perspective, or lyrical role rather than release date alone",
         "the landing resolves earlier tension and is not simply the lowest-energy track"
       ],
+      "intent_risks": [
+        "quiet and earned must not collapse into lowest measured energy",
+        "progressively more human must not be inferred from release date alone",
+        "request, answer, return, and dawn are ordered beats rather than interchangeable mood tags"
+      ],
       "blind_questions": [
         "Can a listener describe the three acts without seeing the curator's notes?",
         "Which transition changes the protagonist most convincingly?",
@@ -48,6 +66,7 @@
       "locale": "zh-CN",
       "target_tracks": 20,
       "data": "recent_plays_and_multiple_replay_years",
+      "personalization_scope": "required",
       "brief": "做一张 20 首的歌单，让我最近反复听的音乐和三到五年前很喜欢、但最近很少播放的音乐重新对话。不要简单各取播放次数前十，也不要按年份分成上下半场；每首旧歌都应当被一首近期歌曲从音色、歌词视角或情绪上重新照亮。开头要熟悉但不俗套，中段允许一次明显冲突，最后像重新认识了自己的品味。",
       "hard_checks": [
         "uses dated recent-play evidence and at least two historical Replay periods",
@@ -60,6 +79,11 @@
         "the central conflict is musically or lyrically meaningful rather than a random BPM jump",
         "the ending reframes earlier material instead of merely lowering energy"
       ],
+      "intent_risks": [
+        "recent and historical listening records are evidence, not two top-N source lists",
+        "high play count is not equivalent to present relevance",
+        "older and recent tracks must converse rather than become two chronological blocks"
+      ],
       "blind_questions": [
         "Does the playlist reveal a connection in the listener's history that a top-played list would miss?",
         "Can the evaluator identify why each old track returned now?",
@@ -71,6 +95,7 @@
       "locale": "ja",
       "target_tracks": 16,
       "data": "public_catalog",
+      "personalization_scope": "out_of_scope",
       "brief": "雨で終電が止まったあとの東京を歩く 16 曲。シティポップの懐古趣味だけにせず、1970 年代から現在までのジャズ、電子音楽、アンビエント、オルタナティブをつなげる。前半は街の光と距離感、中盤は一度だけ人の気配が近づき、最後は始発を待つ静けさへ。観光案内のような選曲、アニメ主題歌の寄せ集め、ライブ版は避ける。",
       "hard_checks": [
         "exactly 16 resolved studio recordings",
@@ -83,6 +108,11 @@
         "genre crossings feel like a lineage or conversation rather than a category checklist",
         "the Tokyo setting is conveyed without relying on tourist clichés"
       ],
+      "intent_risks": [
+        "not only city-pop nostalgia does not mean city pop is categorically forbidden",
+        "Tokyo is a setting and perspective, not a request for songs with place names",
+        "one moment of human closeness must not become a general romantic mood"
+      ],
       "blind_questions": [
         "Does the city feel inhabited rather than branded?",
         "Is the single moment of closeness perceptible without breaking the night atmosphere?",
@@ -94,6 +124,7 @@
       "locale": "ko",
       "target_tracks": 14,
       "data": "public_catalog",
+      "personalization_scope": "out_of_scope",
       "brief": "상실을 겪은 친구와 새벽에 함께 듣는 14곡. 슬픔을 빨리 극복하라고 재촉하거나 희망적인 문구로 덮지 말고, 처음에는 말없이 곁에 있다가 조금씩 숨을 돌릴 공간을 만들어 주세요. 발라드만 이어 붙이지 말고 포크, 소울, 앰비언트, 조용한 전자음악을 섞되 감정의 무게를 존중하세요. 마지막은 행복한 결말이 아니라 다시 하루를 견딜 수 있다는 느낌이어야 합니다. 라이브 버전과 과장된 보컬 쇼케이스는 제외합니다.",
       "hard_checks": [
         "exactly 14 resolved studio recordings",
@@ -106,6 +137,11 @@
         "changes in space and breath are achieved through arrangement and perspective, not only tempo",
         "the ending permits endurance without claiming resolution or happiness"
       ],
+      "intent_risks": [
+        "creating breathing room is not the same as making the sequence cheerful",
+        "comfort must not become advice, uplift, or emotional pressure",
+        "mixing the requested musical languages must not reduce them to a genre quota"
+      ],
       "blind_questions": [
         "Does any track turn companionship into advice or emotional pressure?",
         "Where does breathing room first appear, and what musical choice creates it?",
@@ -117,6 +153,7 @@
       "locale": "es",
       "target_tracks": 18,
       "data": "public_catalog",
+      "personalization_scope": "out_of_scope",
       "brief": "Construye una playlist de 18 canciones como una correspondencia nocturna entre América Latina y la península ibérica. Debe cruzar bolero, canción de autor, electrónica, jazz y formas contemporáneas sin convertir cada región en un estereotipo ni ordenar las canciones por país. Una voz plantea una pregunta y otra canción, desde otra época o costa, la transforma en lugar de responderla literalmente. Una canción por artista, grabaciones de estudio y un final abierto que invite a volver al principio.",
       "hard_checks": [
         "exactly 18 resolved studio recordings",
@@ -129,10 +166,47 @@
         "genre and geography are treated as living relationships rather than stereotypes",
         "the open ending creates a credible loop back to the first track"
       ],
+      "intent_risks": [
+        "countries and coasts are relational context, not instructions to create geographic blocks",
+        "a responding song transforms a question rather than answering its lyric literally",
+        "representation alone is not a reason for a track to survive"
+      ],
       "blind_questions": [
         "Which two songs form the strongest correspondence, and why?",
         "Does any selection function only as geographic representation?",
         "After the final track, does replaying the opener reveal a new meaning?"
+      ]
+    },
+    {
+      "id": "reference-is-not-inclusion",
+      "locale": "en",
+      "target_tracks": 15,
+      "data": "public_catalog",
+      "personalization_scope": "out_of_scope",
+      "brief": "Use Talk Talk's Spirit of Eden and Rosalía's El Mal Querer only as reference points for patience, dramatic commitment, and the feeling that a record invents its own weather. Do not include either artist, any cover of their songs, or obvious sound-alikes. Build a 15-track nocturnal sequence across at least three decades and three languages that begins close and airless, acquires rhythmic nerve without becoming a dance playlist, and ends exposed but unresolved. 'Not comforting' does not mean relentlessly bleak; keep moments of warmth that never erase the tension. Use one track per artist and studio recordings only.",
+      "hard_checks": [
+        "exactly 15 resolved studio recordings",
+        "contains neither Talk Talk nor Rosalía and no cover of either reference work",
+        "one track per primary artist",
+        "the catalog dates span at least three decades"
+      ],
+      "semantic_checks": [
+        "the two named works influence patience and dramatic form without producing obvious imitation",
+        "the sequence gains rhythmic nerve but never turns into a dance-floor progression",
+        "warmth appears without erasing tension, and the ending remains genuinely unresolved",
+        "at least three sung languages are present and serve the sequence rather than a quota"
+      ],
+      "intent_risks": [
+        "both named works are referential anchors, not inclusion requests",
+        "the exclusions apply to the artists, covers, and obvious sound-alikes rather than to patience or dramatic commitment",
+        "not comforting must not be misread as uniformly bleak",
+        "rhythmic nerve must not be simplified to rising BPM or danceability"
+      ],
+      "blind_questions": [
+        "Can the listener feel the references' formal influence without hearing either artist or a clone?",
+        "Where does warmth enter, and does it preserve the unresolved tension?",
+        "Does the rhythmic development feel structural rather than optimized for dancing?",
+        "Did any explicit exclusion or reference role silently change during selection?"
       ]
     }
   ]
