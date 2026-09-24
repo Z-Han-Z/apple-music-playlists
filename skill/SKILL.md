@@ -64,13 +64,19 @@ am_recently_played   最近播放（曲目 / 歌单 / 电台 / 最近入库）
 am_top_played        播放次数排行（songs / albums / artists × 年份或 all-time）
 ```
 
-**方向标签是操纵面，不是 brief，也不是选曲依据。** 策展完成后写约 5 个标签（两个轴：
-`sonic` 音乐属性、`context` 为什么在这里），用 `am_tag_directions` 展示给用户，
-用户回 `more X` / `less Y` 就带 `adjustments` 再调一次，把返回的方向说明**作为补充**
-并入下一轮 brief——原始需求与策展契约始终优先，冲突时以 brief 为准。
-侧重只有 `soften` / `neutral` / `boost` 三档定性状态，**没有数值权重**（小数会让人以为有精度）。
-`context` 标签必须有真实收听证据；找不到的标签会报 `unknown` 而不是静默无效。
-细节见 `docs/playlist-tag-directions.md`。
+**方向标签是 brief 的定性补充：参与选曲，但不是数值，也不能越权。** 边界三层——它**参与**
+下一轮候选比较；**不是数值评分**（侧重只有 `soften` / `neutral` / `boost` 三档，没有权重，
+小数会让人以为有精度）；**不能推翻** brief 里的必须/排除/参照约束。
+
+窗口在**写入之前**：grounded 预演（`dry_run=true`）之后、`dry_run=false` 之前，写约 5 个标签
+（两个轴：`sonic` 音乐属性、`context` 为什么在这里），用 `am_tag_directions` 展示给用户
+（**`brief` 是必填**，把原始需求原样传回，它会被回显并始终优先）。用户回 `more X` / `less Y`
+就带 `adjustments` 再调一次，然后**重做候选比较与分段排序、再 dry-run 一次**，方向定下来才写入——
+没有这一步，「调整」就只是字符串变化，改变不了任何候选。
+
+`context` 标签要在 `evidence` 里写出支撑它的调用（`am_recently_played` / `am_top_played` /
+`am_list_playlists`）；没有证据的会被接受但报出来、并在展示串里标成「证据缺失」。
+找不到的标签会报 `unknown` 而不是静默无效。细节见 `docs/playlist-tag-directions.md`。
 
 **动手前先 `am_status`。** 未登录时不要反复重试——直接让用户跑一次 `python am_playlist.py login`。
 

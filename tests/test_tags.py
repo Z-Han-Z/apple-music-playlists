@@ -314,15 +314,23 @@ class TestPresentation(unittest.TestCase):
         self.assertEqual(pt.axis_summary(tags),
                          {pt.SONIC: 1, pt.CONTEXT: 1, pt.UNSPECIFIED: 1})
 
-    def test_direction_note_keeps_both_boundaries(self):
-        """「不是 brief」和「侧重不是选曲依据」都必须写进输出本身。"""
+    def test_direction_note_states_the_three_layer_boundary(self):
+        """边界必须是三层，缺一层就会自相矛盾。
+
+        第一版写「永不参与选曲」，评审指出那让 steer 在语义上失效：用户说 more funk
+        也没法改变歌单。所以现在要同时说清「参与 / 不是数值 / 不越权」。
+        """
         zh = pt.direction_note(self._tags(), "zh")
-        self.assertIn("不是 brief", zh)
+        self.assertIn("定性补充", zh)
+        self.assertIn("参与下一轮候选比较", zh)      # 参与
+        self.assertIn("不是数值评分", zh)            # 不是数值
+        self.assertIn("不能推翻", zh)                # 不越权
         self.assertIn("以 brief 为准", zh)
-        self.assertIn("不构成选曲依据", zh)
         en = pt.direction_note(self._tags(), "en")
-        self.assertIn("not the brief", en)
-        self.assertIn("not a selection criterion", en)
+        self.assertIn("qualitative supplement", en)
+        self.assertIn("take part in the", en)
+        self.assertIn("not a numeric score", en)
+        self.assertIn("cannot override", en)
 
     def test_direction_note_names_what_to_lean_toward(self):
         zh = pt.direction_note(self._tags(), "zh")
@@ -339,7 +347,7 @@ class TestPresentation(unittest.TestCase):
         self.assertIn("方向标签", text)
         self.assertIn("[unknown]", text)
         self.assertIn("没写轴", text)
-        self.assertIn("不是 brief", text)
+        self.assertIn("定性补充", text)
         self.assertIn("修订记录", text)
         self.assertIn("侧重=", text)
         self.assertNotIn("权重", text)
@@ -355,19 +363,20 @@ class TestPresentation(unittest.TestCase):
         text = pt.summary(tags, None, None, "zh", brief)
         self.assertIn(brief, text)                     # 原样，一字不改
         self.assertLess(text.index(brief), text.index("方向标签（1 个"))  # 出现在标签之前
-        self.assertIn("始终优先", text)
-        self.assertIn("不是 brief", text)               # 方向说明的边界仍在
+        self.assertIn("始终优先", text)                 # 回显块的抬头
+        self.assertIn("定性补充", text)                 # 方向说明的边界仍在
 
     def test_summary_without_brief_has_no_brief_block(self):
         tags, _ = pt.normalize_tags(["sonic:funk"])
         text = pt.summary(tags, None, None, "zh", "")
-        self.assertNotIn("原始 brief", text)
+        # 用回显块的抬头判断，而不是「原始 brief」子串——方向说明里本来就有这个词。
         self.assertNotIn("始终优先", text)
+        self.assertNotIn("原始 brief（", text)
 
     def test_summary_brief_blank_string_is_ignored(self):
         tags, _ = pt.normalize_tags(["sonic:funk"])
         text = pt.summary(tags, None, None, "zh", "   \n  ")
-        self.assertNotIn("原始 brief", text)
+        self.assertNotIn("始终优先", text)
 
 
 class TestContextEvidence(unittest.TestCase):
@@ -478,14 +487,38 @@ class TestPromptRendering(unittest.TestCase):
         self.assertIn("axis=", text)
         self.assertIn("emphasis=", text)
 
-    def test_prompt_names_the_tool_and_the_priority(self):
+    def test_prompt_states_the_three_layer_boundary(self):
         text = self._render(tags="sonic:night")
         self.assertIn("am_tag_directions", text)
-        self.assertIn("never a selection criterion", text)
-        self.assertIn("wins any conflict", text)
+        self.assertIn("qualitative supplement", text)        # 参与
+        self.assertIn("take part in that next round", text)
+        self.assertIn("not a numeric score", text)           # 不是数值
+        self.assertIn("cannot override", text)               # 不越权
+
+    def test_steering_window_precedes_the_final_write(self):
+        """[P1] 评审：方向窗口原先排在 `dry_run=false` **之后**，用户第一次看到
+        可调方向时歌单已经写入了。所以顺序必须是「预演 → 定方向 → 写入」。"""
+        text = self._render(tags="sonic:night")
+        steering = text.index("Settle the direction with the user BEFORE anything is written")
+        preview = text.index("dry_run=true")
+        write = text.index("dry_run=false")
+        self.assertLess(preview, steering, "方向窗口应在预演之后")
+        self.assertLess(steering, write, "方向窗口必须在最终写入之前")
+
+    def test_prompt_requires_recuration_after_an_adjustment(self):
+        """[P1] 调整之后必须重做比较与排序，否则 more funk 改不了任何东西。"""
+        text = self._render()
+        self.assertIn("redo the candidate comparison", text)
+        self.assertIn("and dry-run again", text)
+        self.assertIn("Continue only once the direction is settled", text)
+
+    def test_prompt_requires_passing_the_original_brief(self):
+        """[P2] brief 必须原样带回，否则「始终可见」只在调用方自愿时成立。"""
+        text = self._render()
+        self.assertIn("always passing `brief` = the user's original description verbatim", text)
 
     def test_prompt_states_the_steering_step_even_without_tags(self):
-        """没传 tags 时也要有第 10 步——否则模型不会主动给方向。"""
+        """没传 tags 时也要有这一段——否则模型不会主动给方向。"""
         text = self._render()
         self.assertIn("am_tag_directions", text)
         self.assertNotIn("Direction tags the caller supplied", text)
@@ -517,6 +550,43 @@ class TestPromptRendering(unittest.TestCase):
         err = self.srv._validate_prompt_arguments(
             {"description": "x", "nope": "y"})
         self.assertIn("unknown prompt argument", err or "")
+
+
+class TestBriefIsRequired(unittest.TestCase):
+    """[P2] 评审：`brief` 可选等于没有保证——不传就回到「原始需求被挤出上下文」。
+
+    所以强制点在**工具契约层**：schema 里 required，handler 再挡一次。
+    而且测试要**走 handler**，不是直接调 `summary()`——评审明确要求这一点。
+    """
+
+    def setUp(self):
+        import am_mcp_server as srv
+        self.srv = srv
+
+    def _tool(self):
+        return next(t for t in self.srv.TOOLS if t["name"] == "am_tag_directions")
+
+    def test_schema_marks_brief_required(self):
+        self.assertIn("brief", self._tool()["inputSchema"]["required"])
+
+    def test_validator_rejects_a_call_without_brief(self):
+        err = self.srv._validate_tool_arguments(
+            "am_tag_directions", {"tags": ["sonic:funk"]})
+        self.assertIn("brief", err or "")
+
+    def test_handler_refuses_a_blank_brief_even_below_the_schema(self):
+        got = self.srv.t_tag_directions({"tags": ["sonic:funk"], "brief": "   "})
+        self.assertIn("缺少必填参数 brief", got)
+
+    def test_handler_echoes_the_brief_through_the_real_call_path(self):
+        brief = "深夜开车听的那种，霓虹感，偏冷。"
+        got = self.srv.t_tag_directions(
+            {"tags": [{"label": "in-library", "axis": "context",
+                       "evidence": "am_list_playlists"}],
+             "adjustments": ["more in-library"], "brief": brief})
+        self.assertIn(brief, got)
+        self.assertIn("始终优先", got)
+        self.assertIn("「more in-library」→ [applied]", got)
 
 
 if __name__ == "__main__":

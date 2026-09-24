@@ -30,14 +30,23 @@
 `more` 在档位上走一格，到 `boost` 为止；`less` 走一格，低于 `soften` 就移除。
 全程没有浮点数，因此不存在「1.5 到底比 1.0 多多少」这种假精度。
 
-**侧重不是选曲依据。** 它是一份给用户看、可编辑的策展摘要，记录「往哪边挪」；
-选哪些歌仍然只由模型对 brief 的理解决定，`direction_note()` 会把这条边界写进输出。
+**侧重不是数值。** 它是一份给用户看、可编辑的策展摘要，记录「往哪边挪」。
 
-## 与 brief 的关系：操纵面，不是替代品
+## 与 brief 的关系：定性补充，参与选曲但不越权
+
+第一版把标签写成「给用户的操纵面，**永不**是选曲依据」。评审指出那是**过度矫正**：
+如果 `more funk` 永远不能参与候选取舍，用户的调整就无法改变歌单，
+工具却承诺这些标签会 steer 结果——承诺与语义自相矛盾。
+
+正确的边界是三层的，`direction_note()` 会把它们写进输出：
+
+1. **参与**：方向标签在**下一轮候选比较**里生效，是 curation contract 的定性修订。
+2. **不是数值**：没有权重、没有分数，因此不存在「1.5 比 1.0 多多少」这种假精度。
+3. **不越权**：它不能推翻 brief 里的明确约束（必须 / 排除 / 参照）；冲突时以 brief 为准。
 
 `docs/evaluation-signals.md` 说明了为什么把需求压成标签或权重表会丢掉否定范围、
-参照语义和叙事节点。本模块不推翻这个结论，而是反过来用：方向标签是**给用户的操纵面**，
-brief 与策展契约始终是唯一权威，冲突时以 brief 为准。
+参照语义和叙事节点。本模块不推翻这个结论：标签是 brief 的**补充**，不是它的替代品，
+而「补充」意味着它确实要在写入之前参与一次比较。
 
 两个轴把「音乐本身」和「用户行为」分开，因为它们的可信度不同：
 
@@ -454,8 +463,8 @@ def render_tags(tags, language: str = "en") -> str:
 def direction_note(tags, language: str = "zh") -> str:
     """把方向写成一句能塞回 brief 的说明。
 
-    刻意把两条边界写进输出本身：宿主模型读到的就是带约束的指令，
-    不靠外部文档提醒——「不是 brief」以及「侧重不是选曲依据」。
+    刻意把三层的边界写进输出本身：宿主模型读到的就是带约束的指令，
+    不靠外部文档提醒——参与比较 / 不是数值 / 不能推翻 brief 的明确约束。
     """
     if not tags:
         return ""
@@ -485,9 +494,9 @@ def direction_note(tags, language: str = "zh") -> str:
             tail += (f"注意「{'、'.join(no_evidence)}」没有证据来源，"
                      f"只能当作待确认的推测，不要说成用户事实。")
         return (f"方向标签（约 {TARGET_TAG_COUNT} 个）：{body}。{tail}"
-                f"这些标签是给用户的操纵面，**不是 brief**：原始需求与策展契约仍然优先，"
-                f"冲突时以 brief 为准；侧重只是方向提示，**不构成选曲依据**。"
-                f"行为类标签必须有真实收听证据支持。")
+                f"这些标签是原始 brief 的**定性补充**：它们**参与下一轮候选比较**，"
+                f"但**不是数值评分**，也不能推翻 brief 里的明确约束（必须 / 排除 / 参照）；"
+                f"冲突时以 brief 为准。行为类标签必须有真实收听证据支持。")
     def one_en(t):
         bits = ["sonic" if t["axis"] == SONIC else
                 "context" if t["axis"] == CONTEXT else "axis unset"]
@@ -508,10 +517,11 @@ def direction_note(tags, language: str = "zh") -> str:
         tail += (f" Note that {', '.join(no_evidence)} carry no evidence source, so treat them "
                  f"as unconfirmed inference rather than as facts about the user.")
     return (f"Direction tags (~{TARGET_TAG_COUNT}): {body}.{tail} "
-            f"These tags are a user-facing steering surface, **not the brief**: the original "
-            f"request and the curation contract stay authoritative, and the brief wins any "
-            f"conflict. Emphasis is a direction hint and is **not a selection criterion**; "
-            f"context tags must be backed by real listening evidence.")
+            f"These tags are a **qualitative supplement** to the brief: they **take part in the "
+            f"next round of candidate comparison**, but they are **not a numeric score** and "
+            f"cannot override an explicit constraint in the brief (must-have, avoidance, or "
+            f"reference). The brief wins any conflict. Context tags must be backed by real "
+            f"listening evidence.")
 
 
 def summary(tags, problems=None, report=None, language: str = "zh",
@@ -520,8 +530,11 @@ def summary(tags, problems=None, report=None, language: str = "zh",
 
     `brief` 传入时会被**原样回显**在最前面。评审要求「原始 brief 仍应始终可见且优先」：
     提示词路径里 brief 本来就在标签之上，但**调整路径**上不是——用户隔一轮只说
-    「more funk」时，模型手上只剩方向说明，原始需求可能已被挤出上下文。回显它，
-    这条路径也满足「始终可见」。
+    「more funk」时，模型手上只剩方向说明，原始需求可能已被挤出上下文。
+
+    第一版把 `brief` 做成可选参数，评审指出那等于没有保证：调用方不传就回到老问题。
+    所以强制点放在**工具契约层**（`am_tag_directions` 的 schema 里 `brief` 是 required，
+    handler 也会拒绝空值）；这个渲染辅助函数本身保持宽容，方便脚本与测试直接用。
     """
     lines = []
     if brief and brief.strip():

@@ -10,26 +10,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - **Direction tags**, so a user can steer a finished curation stylistically instead of restating
-  the brief. After curating, the host model authors about five tags across two axes: `sonic` for
-  the music's own character and `context` for why these tracks are here (recent, high rotation,
-  already in the library, drawn from a reference). The new read-only, offline `am_tag_directions`
-  tool validates that set, applies replies such as `more funk` or `less disco`, and returns both a
-  display line and a direction note for the next round. `playlist_tags.py` holds the contract;
-  `docs/playlist-tag-directions.md` documents it.
+  the brief. After the grounded preview and **before anything is written**, the host model offers
+  about five tags across two axes: `sonic` for the music's own character and `context` for why
+  these tracks are here (recent, high rotation, already in the library, drawn from a reference).
+  The new read-only, offline `am_tag_directions` tool validates that set, applies replies such as
+  `more funk` or `less disco`, and returns both a display line and a direction note for the next
+  round. `playlist_tags.py` holds the contract; `docs/playlist-tag-directions.md` documents it.
+
+  The boundary is three layers, and the first draft got the middle one wrong. Tags **take part** in
+  the next round of candidate comparison — a qualitative revision of the curation contract, not a
+  number — but they **cannot override** an explicit must-have, avoidance, or reference in the brief.
+  An earlier draft called them "never a selection criterion", which is an over-correction: if an
+  adjustment can never change a candidate, then steering means nothing while the tool still claims
+  to steer. The prompt now also settles the direction **before** `dry_run=false`, because a window
+  placed after the write has nothing left to steer.
 
   Emphasis is **qualitative, not numeric**: three levels (`soften` / `neutral` / `boost`), with the
-  user's own wording kept as a revision record. An earlier draft used a `0.0–2.0` weight and a fixed
-  `±0.5` step; review rejected it correctly, because decimals dress an aesthetic judgement up as
-  precision and conflict with the project's rule that the model reads the brief directly instead of
-  compressing theme fit into parametric scores. A `weight` field is now rejected with that reason
-  spelled out. An adjustment naming a tag the direction does not contain is reported as `unknown`
-  along with the labels that do exist, and unparsable input is reported rather than ignored.
+  user's own wording kept as a revision record. A `0.0–2.0` weight with a fixed `±0.5` step was
+  rejected in review, correctly: decimals dress an aesthetic judgement up as precision and conflict
+  with the project's rule that the model reads the brief directly. A `weight` field is now rejected
+  with that reason spelled out. An adjustment naming a tag the direction does not contain is
+  reported as `unknown` along with the labels that do exist, and unparsable input is reported
+  rather than ignored.
 
-  The tags are a **steering surface, not the brief, and never a selection criterion**.
+  `brief` is **required** and echoed verbatim, so "the original request stays visible" holds on the
+  adjustment path too instead of depending on the caller volunteering an optional argument.
+
   `docs/evaluation-signals.md` explains why collapsing requirements into tags or weights loses
   scoped negation, reference semantics, and narrative beats; this feature does not reopen that. The
-  original request and the curation contract stay authoritative, and `direction_note()` states both
-  boundaries inside its own output rather than relying on external docs.
+  tags supplement the brief rather than replacing it, and `direction_note()` states all three
+  boundary layers inside its own output rather than relying on external docs.
 
   A `context` tag describes **what the user has been listening to**, so it now carries an
   `evidence` field naming the call that backs it. A context tag without one is accepted but always
