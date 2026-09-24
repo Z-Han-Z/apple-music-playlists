@@ -11,6 +11,7 @@
     "record": [
       "resolved, unresolved, wrong-version, duplicate, and artist-concentration counts",
       "the personalization decision and which listening evidence, if any, influenced selection",
+      "whole-playlist variety and local transition/flow observations as separate dimensions",
       "audio-feature coverage and adjacency warnings, reported separately from semantic quality",
       "the natural-language role and reason for every retained track",
       "retained-track claims that still rely only on unverified model inference",
@@ -26,6 +27,7 @@
       "treat an LLM judge's pairwise playlist verdict as ground truth or average it into human preference",
       "reduce theme fit or musical understanding to an uncalibrated scalar",
       "treat a lower optimizer cost as proof that the selection or story is better",
+      "treat maximum local smoothness as universally best or let it erase a meaningful narrative turn",
       "let ordering optimization cross semantic beat boundaries"
     ]
   },

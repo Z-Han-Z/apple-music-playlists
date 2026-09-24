@@ -57,6 +57,8 @@ Keep facts and judgments separate:
 - Ambiguities and evidence gaps still unresolved:
 
 ## Flow evidence
+
+- Whole-playlist variety and local transition/flow observations, reported separately:
 - Audio-feature coverage and missing reasons:
 - Adjacency warnings before/after optional local ordering:
 - Narrative boundaries held fixed:
@@ -83,6 +85,8 @@ easier to audit; it does not prove that the selection is better or that the play
 Curation-contract coverage detects forgotten requirements but does not prove musical quality.
 Audio-feature coverage must appear beside any flow result because unmeasured positions were not
 evaluated.
+Do not treat maximum local smoothness as universally best: a sequence can be diverse overall and
+still make its transitions legible, while a locally smooth order can erase a meaningful turn.
 
 An LLM judge can be used as a separate diagnostic for missed constraints or trace consistency, but
 its preference is not a substitute for blind listening. General NLG research finds pairwise LLM

@@ -23,6 +23,7 @@ both linguistic reasoning and deterministic grounding.
 | Ramos et al., natural-language user profiles (ACL 2024) | Editable language profiles can be transparent and scrutable: changing a written preference changes downstream recommendations without rewriting a long interaction history. | The experiments used movies and hotels in a warm-start setting, not music. The paper also warns that inferred profile facts can hallucinate. |
 | Kim et al., intent hallucination (ACL 2025) | Across 20,068 multi-condition prompts, omission and misinterpretation increased with query complexity. Constraint decomposition detected failures better than undifferentiated LLM judging. | Their weighted evaluation score is not a theme-fit score and should not become a song-selection objective. It is evidence for an auditable checklist at evaluation time. |
 | Epure et al., *Music Recommendation with Large Language Models* (2025; revised 2026, accepted at ACM TORS) | The music-recommendation review argues that retrieval accuracy alone does not answer what makes a good generative recommendation, and identifies hallucination, non-determinism, opaque training data, and evaluation validity as risks. | It is a research review, not a listening study demonstrating that a natural-language workflow produces better playlists. |
+| Schweiger et al., playlist coherence in user-curated music playlists (EPJ Data Science 2025) | Analysis of more than 650,000 playlists formalizes coherence as the relation between variation across the whole playlist and variation among nearby tracks. Overall diversity and local transitions are distinct: a playlist can vary across the full arc while moving smoothly between neighbors. | The 11 feature/metadata measures are computational proxies, not direct listener ratings. The authors state that user response to their proposed reordering tools remains to be evaluated; higher measured coherence is not proof of a better listening experience. |
 | Jeong et al., *The Comparative Trap* (BlackboxNLP 2025) | In general NLG evaluation, LLM judges in pairwise comparisons were more vulnerable to superficial cues such as verbosity and authoritative tone than pointwise judgments; the proposed hybrid reduces that bias in their tested benchmarks. | This is not a music-preference experiment. It warns against treating an LLM's A/B verdict as ground truth, not against using pairwise reasoning to compare grounded candidate songs. |
 | Spotify music-search studies (CHI/WWW 2019) | Focused lookup and non-focused exploration are different mindsets. People judge music search by both success and effort, and their behavior changes with the mindset. | A catalog search endpoint that works for a known title is not, by itself, a curation system for an exploratory brief. |
 
@@ -136,6 +137,13 @@ establish that any particular LLM workflow wins. The proposed protocol therefore
 listening comparison as the evidence about musical experience, while deterministic checks establish
 only identity, availability, explicit constraints, duplicates, and measurable flow.
 
+Playlist-coherence research also cautions against equating local smoothness with sameness or quality.
+Its operational definition compares variation across the whole sequence with variation among nearby
+tracks, so broad musical diversity can coexist with locally intelligible transitions. This supports
+reporting whole-playlist variety separately from adjacent-track flow and keeping semantic turns intact.
+The study's computational coherence measures and proposed rearrangement were not validated against
+listener preference; they are diagnostics, not an objective to maximize.
+
 An LLM judge may help flag a missed constraint or make two curator traces easier to inspect, but its
 preference is not a substitute for listening. General NLG research found pairwise LLM judgments can
 overweight superficial presentation cues such as verbosity and confidence. For the listening test,
@@ -194,6 +202,7 @@ listening judgments.
 - [Ramos et al. (2024), *Transparent and Scrutable Recommendations Using Natural Language User Profiles*](https://aclanthology.org/2024.acl-long.753/), ACL.
 - [Kim et al. (2025), *Beyond Facts: Evaluating Intent Hallucination in Large Language Models*](https://aclanthology.org/2025.acl-long.349/), ACL.
 - [Epure et al. (2025; revised 2026), *Music Recommendation with Large Language Models: Challenges, Opportunities, and Evaluation*](https://arxiv.org/abs/2511.16478), accepted at ACM Transactions on Recommender Systems.
+- [Schweiger, Parada-Cabaleiro & Schedl (2025), *The impact of playlist characteristics on coherence in user-curated music playlists*](https://doi.org/10.1140/epjds/s13688-025-00531-3), EPJ Data Science.
 - [Jeong et al. (2025), *The Comparative Trap: Pairwise Comparisons Amplify Biased Preferences of LLM Evaluators*](https://aclanthology.org/2025.blackboxnlp-1.5/), BlackboxNLP; general NLG evaluator study, not a music-listening study.
 - [Hosey et al. (2019), *Just Give Me What I Want: How People Use and Evaluate Music Search*](https://research.atspotify.com/publications/just-give-me-what-i-want-how-people-use-and-evaluate-music-search/), CHI.
 - [Li et al. (2019), *Search Mindsets: Understanding Focused and Non-Focused Information Seeking in Music Search*](https://doi.org/10.1145/3308558.3313627), WWW.
