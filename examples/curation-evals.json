@@ -4,7 +4,9 @@
   "protocol": {
     "compare": [
       "baseline: ask the same model for exactly the target count and create immediately",
-      "curation workflow: expand the candidate pool, ground with am_resolve_candidates, compare candidates in language, assign narrative roles, dry-run, then optionally refine local flow"
+      "curation workflow: expand the candidate pool, ground with am_resolve_candidates, compare candidates in language, assign narrative roles, dry-run, then optionally refine local flow",
+      "blind listening: hide workflow labels and curation notes, balance presentation order, and record criterion-specific impressions before overall preference",
+      "optional LLM judge: report separately as a diagnostic, randomize and swap presentation order, and never merge its verdict into a human-preference score"
     ],
     "record": [
       "resolved, unresolved, wrong-version, duplicate, and artist-concentration counts",
@@ -13,13 +15,15 @@
       "the natural-language role and reason for every retained track",
       "retained-track claims that still rely only on unverified model inference",
       "set-level coherence and any individually plausible track that weakens the brief's promise",
-      "blind human preference and the evaluator's reasons"
+      "blind human preference and criterion-specific reasons",
+      "any LLM-judge output separately from human impressions and deterministic catalog checks"
     ],
     "do_not": [
       "publish one model run as a permanent golden track list",
       "apply listening-history personalization to every brief by default",
       "treat a successfully resolved catalog record as proof of semantic fit",
       "treat a fluent or well-grounded curation explanation as proof of better selection",
+      "treat an LLM judge's pairwise playlist verdict as ground truth or average it into human preference",
       "reduce theme fit or musical understanding to an uncalibrated scalar",
       "treat a lower optimizer cost as proof that the selection or story is better",
       "let ordering optimization cross semantic beat boundaries"

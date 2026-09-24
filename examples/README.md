@@ -16,8 +16,10 @@ winner forever. The cases intentionally contain no expected tracks.
    candidates in natural language, assign narrative roles, and dry-run the final list.
 4. If useful, call `am_analyze_flow`. Use `am_optimize_order` only inside already chosen narrative
    blocks; keep semantic beat boundaries fixed.
-5. Listen blind. Do not reveal which workflow produced which sequence until the evaluator has
-   answered the case's `blind_questions`.
+5. Listen blind. Hide the workflow label and curation notes, balance which playlist is heard first,
+   and record criterion-specific impressions before the listener states an overall preference. Do
+   not reveal which workflow produced which sequence until the evaluator has answered the case's
+   `blind_questions`.
 
 A public-catalog case needs no Apple Music library write. Use `am_create_playlist` with
 `dry_run=true` to verify the final recordings. The personalized Chinese case additionally needs
@@ -81,6 +83,12 @@ easier to audit; it does not prove that the selection is better or that the play
 Curation-contract coverage detects forgotten requirements but does not prove musical quality.
 Audio-feature coverage must appear beside any flow result because unmeasured positions were not
 evaluated.
+
+An LLM judge can be used as a separate diagnostic for missed constraints or trace consistency, but
+its preference is not a substitute for blind listening. General NLG research finds pairwise LLM
+judges vulnerable to presentation cues, so randomize and swap the order if recording such a judgment.
+Keep human impressions, any LLM-judge output, and deterministic catalog checks separate; do not
+average them into a single playlist-quality score.
 
 ## Privacy and sharing
 

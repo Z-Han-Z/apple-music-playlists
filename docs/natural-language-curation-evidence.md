@@ -22,6 +22,8 @@ both linguistic reasoning and deterministic grounding.
 | Buzaev et al., *Learning When to Personalize* (NLP4MusA 2026) | A production system classified 5,000 real requests by whether they called for strong personalization, then varied the contribution of listening-history signals. In a blind study, query-aware personalization beat both always-personalized and non-personalized variants. | The study had 20 users and 254 pairwise judgments, used Russian-language queries and proprietary embeddings, and tested retrieval quality rather than narrative sequencing. It does not supply a universal personalization formula for this project. |
 | Ramos et al., natural-language user profiles (ACL 2024) | Editable language profiles can be transparent and scrutable: changing a written preference changes downstream recommendations without rewriting a long interaction history. | The experiments used movies and hotels in a warm-start setting, not music. The paper also warns that inferred profile facts can hallucinate. |
 | Kim et al., intent hallucination (ACL 2025) | Across 20,068 multi-condition prompts, omission and misinterpretation increased with query complexity. Constraint decomposition detected failures better than undifferentiated LLM judging. | Their weighted evaluation score is not a theme-fit score and should not become a song-selection objective. It is evidence for an auditable checklist at evaluation time. |
+| Epure et al., *Music Recommendation with Large Language Models* (2025; revised 2026, accepted at ACM TORS) | The music-recommendation review argues that retrieval accuracy alone does not answer what makes a good generative recommendation, and identifies hallucination, non-determinism, opaque training data, and evaluation validity as risks. | It is a research review, not a listening study demonstrating that a natural-language workflow produces better playlists. |
+| Jeong et al., *The Comparative Trap* (BlackboxNLP 2025) | In general NLG evaluation, LLM judges in pairwise comparisons were more vulnerable to superficial cues such as verbosity and authoritative tone than pointwise judgments; the proposed hybrid reduces that bias in their tested benchmarks. | This is not a music-preference experiment. It warns against treating an LLM's A/B verdict as ground truth, not against using pairwise reasoning to compare grounded candidate songs. |
 | Spotify music-search studies (CHI/WWW 2019) | Focused lookup and non-focused exploration are different mindsets. People judge music search by both success and effort, and their behavior changes with the mindset. | A catalog search endpoint that works for a known title is not, by itself, a curation system for an exploratory brief. |
 
 Two findings deserve special care.
@@ -125,6 +127,25 @@ Accordingly, this workflow records reasons to expose omissions, unsupported clai
 decisions; it never treats fluency, detail, or explanation-grounding scores as proof that the songs
 belong or that the playlist will sound good.
 
+## Evaluation: let the listener decide whether the playlist works
+
+Music-recommendation evaluation research cautions that retrieval accuracy does not capture the full
+quality of a generative recommendation. That supports keeping catalog correctness, intent coverage,
+discovery, set-level coherence, and listening preference as distinct observations; it does not
+establish that any particular LLM workflow wins. The proposed protocol therefore treats a blind
+listening comparison as the evidence about musical experience, while deterministic checks establish
+only identity, availability, explicit constraints, duplicates, and measurable flow.
+
+An LLM judge may help flag a missed constraint or make two curator traces easier to inspect, but its
+preference is not a substitute for listening. General NLG research found pairwise LLM judgments can
+overweight superficial presentation cues such as verbosity and confidence. For the listening test,
+hide curator notes and workflow labels, balance which playlist is heard first, and ask listeners to
+record criterion-specific impressions before stating an overall preference. If an LLM judge is also
+used, report it separately, randomize and swap presentation order, and do not resolve a human/LLM
+disagreement by averaging into a single quality score. The pairwise-evaluator finding is from NLG,
+not music, so this is a precaution for the measurement method rather than a claim about musical
+judgment.
+
 ## Validation protocol
 
 The implementation and evaluation suite test the following hypotheses:
@@ -172,6 +193,8 @@ listening judgments.
 - [Buzaev et al. (2026), *Learning When to Personalize: LLM Based Playlist Generation via Query Taxonomy and Classification*](https://aclanthology.org/2026.nlp4musa-1.8/), NLP4MusA.
 - [Ramos et al. (2024), *Transparent and Scrutable Recommendations Using Natural Language User Profiles*](https://aclanthology.org/2024.acl-long.753/), ACL.
 - [Kim et al. (2025), *Beyond Facts: Evaluating Intent Hallucination in Large Language Models*](https://aclanthology.org/2025.acl-long.349/), ACL.
+- [Epure et al. (2025; revised 2026), *Music Recommendation with Large Language Models: Challenges, Opportunities, and Evaluation*](https://arxiv.org/abs/2511.16478), accepted at ACM Transactions on Recommender Systems.
+- [Jeong et al. (2025), *The Comparative Trap: Pairwise Comparisons Amplify Biased Preferences of LLM Evaluators*](https://aclanthology.org/2025.blackboxnlp-1.5/), BlackboxNLP; general NLG evaluator study, not a music-listening study.
 - [Hosey et al. (2019), *Just Give Me What I Want: How People Use and Evaluate Music Search*](https://research.atspotify.com/publications/just-give-me-what-i-want-how-people-use-and-evaluate-music-search/), CHI.
 - [Li et al. (2019), *Search Mindsets: Understanding Focused and Non-Focused Information Seeking in Music Search*](https://doi.org/10.1145/3308558.3313627), WWW.
 
