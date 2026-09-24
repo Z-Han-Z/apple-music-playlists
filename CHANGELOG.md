@@ -43,16 +43,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
   A `context` tag describes **what the user has been listening to**, so it carries structured
   provenance. A non-empty string is not evidence: `in-library` backed by `am_top_played` passes any
-  string check while proving nothing, so `evidence` is `{basis, call, ref}` and the source is
-  validated against the claim (`playlist-membership` accepts only `am_list_playlists` /
-  `am_show_playlist`, and concentrated listening must be declared `basis: "derived"` because no
-  endpoint returns it). Free text is still accepted but is shown as an **unverified claim**, never
-  as evidence, and a tag with nothing is marked as missing evidence — a listener has the right to
-  tell a grounded claim from a guess. Evidence diagnostics run **after** duplicate merging, so a
-  duplicate that later supplies provenance cannot leave a stale "no evidence" warning behind.
+  string check while proving nothing, so `evidence` is `{basis, call, ref}` and the chain is
+  validated — `playlist-membership` takes only `am_show_playlist`, because `am_list_playlists` lists
+  playlists and cannot show that a track is in one; `ref` is required so
+  `am_recently_played(kind=added)`, which is recently **added** and not recently played, cannot pass
+  as listening evidence; and concentrated listening must be declared `basis: "derived"` because no
+  endpoint returns it.
 
-  One trap is called out explicitly, because it turns inference into a false fact about the user:
-  `am_recently_played(kind=added)` means recently **added**, not recently **played**.
+  The result is presented as a **declared** source, never as verified evidence. The label is free
+  text, so this module cannot tell whether `in-library` and `basis: "play-count"` contradict each
+  other; validating the chain is all it can honestly do, and every structured source says so. Free
+  text is shown as an unverified claim and a tag with nothing is marked as missing evidence.
+  Evidence diagnostics run **after** duplicate merging, so a duplicate that later supplies
+  provenance cannot leave a stale "no evidence" warning behind.
 - `am_resolve_candidates` now returns each grounded recording's Apple Music URL so users can
   audition and verify the exact catalog version before a playlist is written.
 - A root `llms.txt` gives agents and directory crawlers a concise, spec-shaped map of the project's

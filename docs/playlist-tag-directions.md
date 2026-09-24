@@ -89,40 +89,51 @@
 ### `context` 必须带可核对的 `evidence`
 
 `context` 标签是「**用户在听什么**」的断言，所以它不能是印象。**光有非空字符串不算证据**——
-第二轮评审的原话是 *A non-empty string is not evidence*：`in-library` 配
-`evidence: "am_top_played"` 照样能过，而那个调用根本证明不了歌单成员关系。
+评审原话是 *A non-empty string is not evidence*：`in-library` 配 `evidence: "am_top_played"`
+照样能过，而那个调用根本证明不了歌单成员关系。
 
-所以来源要**结构化**，并**按断言校验**：`basis` 决定允许哪些 `call`。
+来源要**结构化**，并且要记下**调用参数**（`ref`）：不记参数就无法复核。
 
-| `basis` | 允许的 `call` | 能证明什么 | 必须注意 |
-|---|---|---|---|
-| `recent` | `am_recently_played` | 最近**播放**的有序列表 | 没有播放次数，只有顺序 |
-| `play-count` | `am_top_played` | Replay 的 `playCount` 排名 | 按**周期**；`all-time` 不一定存在，须退到具体年份 |
-| `playlist-membership` | `am_list_playlists` / `am_show_playlist` | 歌单成员关系 | 直接、准确 |
-| `derived` | `am_top_played` | 由原始字段**推出来**的结论 | 例如「集中播放」由 `firstPlayed` / `lastPlayed` × `playCount` 推导，**不是现成字段** |
+| `basis` | 允许的 `call` | `ref` 要记什么 |
+|---|---|---|
+| `recent-listening` | `am_recently_played` | `kind=tracks` / `played`——**不能是 `added`**（那是最近入库） |
+| `play-count` | `am_top_played` | 周期，如 `year-2026`（`all-time` 不一定存在） |
+| `playlist-membership` | **`am_show_playlist`** | 被查看的歌单名或 `p.xxxx` |
+| `derived` | `am_top_played` | 由哪些字段推导，如 `firstPlayed/lastPlayed × playCount` |
+
+**成员关系只认 `am_show_playlist`。** `am_list_playlists` 只列歌单名/ID，它自己的契约就写着
+要看曲目必须用 `am_show_playlist`——所以拿它当成员关系证据会被拒。
 
 ```json
 {"label": "in-library", "axis": "context",
- "evidence": {"basis": "playlist-membership", "call": "am_list_playlists", "ref": "library"}}
+ "evidence": {"basis": "playlist-membership", "call": "am_show_playlist", "ref": "歌单「通勤」"}}
 ```
 
-三种状态在展示上刻意分得开，因为它们的可信度不同：
+### 结构化之后仍然叫「声明」，不叫「已核实」
 
-| 状态 | 展示 | 含义 |
-|---|---|---|
-| 结构化且与断言相符 | `in-library（证据：playlist-membership via am_list_playlists）` | 当证据用 |
-| 结构化但撑不住断言 | `⚠ …撑不住这条断言（playlist-membership 需要 am_list_playlists / am_show_playlist）` | **报出来**，不当作证据 |
-| 自由文本 | `recent（来源自述（未校验）：trust me）` | 只算**未经校验的自述**，不算证据 |
-| 空缺 | `in-library（证据缺失）` | 只能当成待确认的推测 |
+这一点是第二轮评审逼出来的：本模块校验的是 **`basis ↔ call ↔ ref` 这条链是否自洽**，
+而**标签是自由文本**——`in-library` 与 `basis: "play-count"` 是否矛盾，它**判断不了**。
 
-**证据诊断在去重之后、对最终记录做。** 这一点是评审指出的 P2：诊断若放在逐项循环里，
-「先出现无证据、后来的重复项补上了证据」会留下一条过期的「没写 evidence」，
-同一条标签同时显示有效证据和缺证据警告。
+评审给的绕过例子正是：
 
-两个尤其容易搞错的地方：
+```json
+{"label": "in-library", "basis": "play-count", "call": "am_top_played", "ref": "year-2026"}
+```
 
-- `am_recently_played(kind=added)` 是「最近**入库**」，**不等于**「最近在听」；
-- 「集中播放」**不是任何接口的现成字段**，必须用 `basis: "derived"` 如实标注。
+上一版这个输入**完全无问题**、还被渲染成「证据」。既然标签无法确定性分类，就不该声称已核实。
+所以四种状态在展示上分得开：
+
+| 状态 | 展示 |
+|---|---|
+| 结构化的链自洽 | `in-library（已声明的来源：playlist-membership via am_show_playlist ref=…（未与标签核对））` |
+| 链不自洽 / 缺 `ref` / 引用了 `added` | `⚠ …撑不住这条断言…` / `⚠ …没记 ref…` / `⚠ …是「最近入库」…` |
+| 自由文本 | `recent（来源自述（未校验）：trust me）` |
+| 空缺 | `in-library（证据缺失）` |
+
+同时每一条结构化来源都会附一句说明：**这是声明，不是已核实，转述时不要说成核对过。**
+
+**证据诊断在去重之后、对最终记录做。** 诊断若放在逐项循环里，「先出现无证据、后来的重复项
+补上了证据」会留下一条过期的「没写 evidence」，同一条标签同时显示有效来源和缺证据警告。
 
 `sonic` 标签带 `evidence` 会提示多余——音乐属性不需要收听证据。
 

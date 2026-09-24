@@ -91,18 +91,39 @@ AXES = (SONIC, CONTEXT, UNSPECIFIED)
 # `context` 标签是「用户在听什么」的断言，只有下面这几种**来源**撑得住它。
 # 光有「非空字符串」不算证据：`in-library` 配 `am_top_played` 依然通过，
 # 而 am_top_played 根本证明不了歌单成员关系——那正是本功能要防的假事实。
-# 所以来源要**结构化**，并**按断言校验**：basis 决定允许哪些 call。
+#
+# 结构化的 `basis` 决定允许哪些 `call`，并要求**记下调用参数**（ref）：不记参数就无法复核，
+# `am_recently_played(kind=added)` 会被当成「最近在听」，而它是「最近入库」。
 BASES = {
-    "recent": ("am_recently_played",),                      # 最近播放（有序，无次数）
-    "play-count": ("am_top_played",),                       # Replay 的 playCount 排名
-    "playlist-membership": ("am_list_playlists",            # 歌单成员关系
-                            "am_show_playlist"),
-    "derived": ("am_top_played",),                          # 由原始字段**推出来**的结论
+    "recent-listening": {
+        "calls": ("am_recently_played",),
+        "ref": "kind=tracks 或 played——**不能是 added**（那是最近入库，不是最近在听）",
+    },
+    "play-count": {
+        "calls": ("am_top_played",),
+        "ref": "周期，如 year-2026（all-time 不一定存在）",
+    },
+    "playlist-membership": {
+        # am_list_playlists 只列歌单名/ID，**证明不了某首歌在不在里面**；
+        # 要看曲目必须 am_show_playlist。所以这里只认后者。
+        "calls": ("am_show_playlist",),
+        "ref": "被查看的歌单名或 p.xxxx id",
+    },
+    "derived": {
+        "calls": ("am_top_played",),
+        "ref": "由哪些字段推导，如 firstPlayed/lastPlayed × playCount",
+    },
 }
-EVIDENCE_CALLS = tuple(sorted({c for calls in BASES.values() for c in calls}))
+EVIDENCE_CALLS = tuple(sorted({c for spec in BASES.values() for c in spec["calls"]}))
 EVIDENCE_HINT = " / ".join(EVIDENCE_CALLS)
 # 结构化 provenance 的形状，报告里要反复提到它。
 EVIDENCE_SHAPE = "{basis, call, ref}"
+
+# 为什么结构化之后**仍然**只叫「声明」而不是「已核实的证据」：
+# 标签是自由文本，`in-library` 与 `basis: play-count` 是否矛盾，本模块无法确定地判断。
+# 所以它只校验「basis ↔ call ↔ ref 这条链自洽」，并把结果如实说成**已声明的来源**，
+# 而不是宣称已经核对过标签本身。
+EVIDENCE_LABEL = "已声明的来源"
 
 # 侧重：三档定性状态，没有数值，也不做算术。
 SOFTEN = "soften"
@@ -219,11 +240,18 @@ def _evidence_of(value):
 def _evidence_problem(tag: dict) -> list:
     """对**最终记录**做证据校验，返回要报告的说明（空列表=干净）。
 
-    三种状态，刻意在展示上也分得开：
+    四种状态，刻意在展示上也分得开：
 
-    * 结构化且与断言相符 → 当证据用；
-    * 结构化但来源撑不住这条断言 → **报出来**（`in-library` 配 `am_top_played` 是评审举的例子）；
-    * 自由文本 → 接受，但标成**未经校验的来源自述**，不当作已核实的证据。
+    * 结构化的 `basis ↔ call ↔ ref` 自洽 → 说成**已声明的来源**（不是「已核实」：
+      标签是自由文本，`in-library` 与 `basis: play-count` 是否矛盾，本模块判断不了）；
+    * 结构化但来源撑不住 basis、或没记参数 → **报出来**；
+    * 自由文本 → 接受，但标成**未经校验的来源自述**；
+    * 空缺 → 报「证据缺失」。
+
+    [P1] 评审指出上一版只校验了 `basis ↔ call` 的内部配对，**从未把标签与 basis 关联**，
+    于是 `{"label": "in-library", "basis": "play-count", "call": "am_top_played"}` 一路通过、
+    还被渲染成「证据」。既然标签无法被确定性地分类，这里就不再声称「已核实」，
+    只声明来源，并把「未与标签核对」写在展示与说明里。
     """
     label = tag.get("label", "")
     evidence = tag.get("evidence")
@@ -233,21 +261,37 @@ def _evidence_problem(tag: dict) -> list:
     if evidence.get("kind") == "claim":
         return [f"context 标签「{label}」的 evidence 是自由文本「{evidence.get('raw')}」，"
                 f"无法核对。它只会被当作**未经校验的来源自述**展示；"
-                f"要能被当作证据，请写成 {EVIDENCE_SHAPE} 结构，"
+                f"要能被当作{ EVIDENCE_LABEL }，请写成 {EVIDENCE_SHAPE} 结构，"
                 f"其中 basis ∈ {sorted(BASES)}"]
-    basis, call = evidence.get("basis", ""), evidence.get("call", "")
+    basis = evidence.get("basis", "")
+    call = evidence.get("call", "")
+    ref = evidence.get("ref", "")
     if basis not in BASES:
         return [f"context 标签「{label}」的 evidence.basis「{basis}」不认识；"
                 f"只认 {sorted(BASES)}"]
-    if call not in BASES[basis]:
-        return [f"context 标签「{label}」的断言是 basis={basis}，但给的来源是「{call}」——"
-                f"它撑不住这条断言（{basis} 需要 {' / '.join(BASES[basis])}）。"
-                f"这正是「非空字符串不算证据」要防的情况"]
+    spec = BASES[basis]
+    if call not in spec["calls"]:
+        extra = ("注意 am_list_playlists 只列歌单名/ID，**证明不了某首歌在不在里面**，"
+                 "要看曲目必须 am_show_playlist。"
+                 if basis == "playlist-membership" and call == "am_list_playlists" else "")
+        return [f"context 标签「{label}」声明的 basis={basis}，但给的来源是「{call}」——"
+                f"它撑不住这条断言（{basis} 只认 {' / '.join(spec['calls'])}）。{extra}"]
+    if not ref:
+        return [f"context 标签「{label}」的 evidence 没记 ref：不记调用参数就无法复核，"
+                f"例如 am_recently_played(kind=added) 会被当成「最近在听」，"
+                f"而它是「最近入库」。这里要写：{spec['ref']}"]
+    if basis == "recent-listening" and "added" in ref.casefold():
+        return [f"context 标签「{label}」的 ref 写的是 added：am_recently_played(kind=added) "
+                f"是「最近**入库**」，不是「最近在听」，不能用来支撑这条断言"]
+    # 说明清楚：这是**声明**，不是「已核实」。标签本身无法被确定性核对。
+    note = [f"context 标签「{label}」的来源是**声明**而非已核实：本模块只校验 "
+            f"basis↔call↔ref 自洽，无法判断「{label}」这个自由文本标签与 "
+            f"basis={basis} 是否相符。转述时不要说成已经核对过。"]
     if basis == "derived":
-        return [f"context 标签「{label}」标为 derived：它是从原始字段**推出来**的结论"
-                f"（例如「集中播放」由 firstPlayed/lastPlayed × playCount 推导），"
-                f"不是任何接口的现成字段，展示与转述时都要如实说明"]
-    return []
+        note.append(f"context 标签「{label}」标为 derived：它是从原始字段**推出来**的结论"
+                    f"（例如「集中播放」由 firstPlayed/lastPlayed × playCount 推导），"
+                    f"不是任何接口的现成字段，展示与转述时都要如实说明")
+    return note
 
 
 # ---------------------------------------------------------------- 校验
@@ -504,8 +548,10 @@ def _mark(tag) -> str:
         elif ev.get("kind") == "claim":
             bits.append(f"来源自述：{ev.get('raw')}（未校验）")
         else:
-            ref = f" {ev['ref']}" if ev.get("ref") else ""
-            bits.append(f"证据：{ev.get('basis')} via {ev.get('call')}{ref}")
+            # 刻意不写「证据」：标签是自由文本，本模块无法核对它与 basis 是否相符，
+            # 所以只能说这是**已声明的来源**。
+            bits.append(f"声明来源：{ev.get('basis')} via {ev.get('call')} "
+                        f"ref={ev.get('ref')}（未与标签核对）")
     return f"{tag['label']}（{' · '.join(bits)}）" if bits else tag["label"]
 
 
@@ -538,9 +584,9 @@ def _evidence_short(tag) -> str:
         return "证据缺失"
     if ev.get("kind") == "claim":
         return f"来源自述（未校验）：{ev.get('raw')}"
-    ref = f" {ev['ref']}" if ev.get("ref") else ""
     kind = "（派生）" if ev.get("basis") == "derived" else ""
-    return f"证据：{ev.get('basis')}{kind} via {ev.get('call')}{ref}"
+    return (f"{EVIDENCE_LABEL}：{ev.get('basis')}{kind} via {ev.get('call')} "
+            f"ref={ev.get('ref')}（未与标签核对）")
 
 
 def direction_note(tags, language: str = "zh") -> str:

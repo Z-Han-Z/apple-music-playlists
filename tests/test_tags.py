@@ -406,11 +406,29 @@ class TestContextEvidence(unittest.TestCase):
 
     # --- 结构化来源：按断言校验 -------------------------------------
 
-    def test_matching_structured_evidence_is_clean(self):
+    def test_matching_structured_evidence_is_declared_not_verified(self):
+        """[P1] 结构化来源也只算**声明**：标签是自由文本，无法核对它与 basis 是否相符。
+
+        评审的绕过例子是 `{"label":"in-library","basis":"play-count"}`——上一版一路通过
+        还被渲染成「证据」。既然标签分类不了，就不能声称「已核实」。
+        """
         tags, problems = pt.normalize_tags(
-            [self._ctx(self._structured("play-count", "am_top_played", "year-2026"))])
+            [self._ctx(self._structured("recent-listening", "am_recently_played",
+                                        "kind=tracks"))])
         self.assertEqual(tags[0]["evidence"]["kind"], "structured")
-        self.assertEqual(problems, [])
+        self.assertEqual(len(problems), 1)
+        self.assertIn("声明", problems[0])
+        self.assertIn("无法判断", problems[0])
+        self.assertIn("不要说成已经核对过", problems[0])
+
+    def test_label_is_never_silently_matched_against_the_basis(self):
+        """评审的绕过：`in-library` + `basis=play-count` 曾经完全无问题、还被当证据。"""
+        tags, problems = pt.normalize_tags(
+            [self._membership(self._structured("play-count", "am_top_played", "year-2026"))])
+        self.assertTrue(problems, "结构化来源必须至少留下「声明而非已核实」的说明")
+        out = pt.render_tags(tags, "zh")
+        self.assertIn("未与标签核对", out)
+        self.assertNotIn("证据：", out)
 
     def test_source_that_cannot_support_the_claim_is_rejected(self):
         """评审举的原例：`in-library` 配 `am_top_played` 撑不住这条断言。"""
@@ -419,20 +437,43 @@ class TestContextEvidence(unittest.TestCase):
         self.assertEqual(len(tags), 1)                      # 接受但报出来
         self.assertTrue(any("撑不住" in p for p in problems), problems)
 
-    def test_playlist_membership_needs_a_membership_call(self):
+    def test_playlist_membership_needs_am_show_playlist(self):
+        """[P1] 评审：am_list_playlists 只列歌单名/ID，证明不了曲目在不在里面。"""
         _, problems = pt.normalize_tags(
-            [self._membership(self._structured("playlist-membership", "am_list_playlists"))])
-        self.assertEqual(problems, [])
+            [self._membership(self._structured("playlist-membership",
+                                               "am_show_playlist", "p.abc123"))])
+        self.assertFalse([p for p in problems if "撑不住" in p], problems)
 
-    def test_unknown_basis_is_reported(self):
+    def test_list_playlists_is_rejected_as_membership_evidence(self):
         _, problems = pt.normalize_tags(
-            [self._ctx(self._structured("vibes", "am_top_played"))])
-        self.assertTrue(any("basis" in p and "不认识" in p for p in problems))
+            [self._membership(self._structured("playlist-membership",
+                                               "am_list_playlists", "p.abc123"))])
+        self.assertTrue(any("撑不住" in p for p in problems), problems)
+        self.assertTrue(any("am_show_playlist" in p for p in problems), problems)
+
+    def test_missing_ref_is_rejected_with_what_to_record(self):
+        """[P1] 不记调用参数就无法复核。"""
+        _, problems = pt.normalize_tags(
+            [self._membership(self._structured("playlist-membership", "am_show_playlist"))])
+        self.assertTrue(any("没记 ref" in p for p in problems), problems)
+
+    def test_recent_listening_may_not_cite_kind_added(self):
+        """[P1] kind=added 是「最近入库」，不能当「最近在听」。"""
+        _, problems = pt.normalize_tags(
+            [self._ctx(self._structured("recent-listening", "am_recently_played",
+                                        "kind=added"))])
+        self.assertTrue(any("入库" in p for p in problems), problems)
 
     def test_derived_basis_is_flagged_as_a_conclusion(self):
         _, problems = pt.normalize_tags(
-            [self._ctx(self._structured("derived", "am_top_played"))])
-        self.assertTrue(any("推出来" in p for p in problems))
+            [self._ctx(self._structured("derived", "am_top_played",
+                                        "firstPlayed/lastPlayed × playCount"))])
+        self.assertTrue(any("推出来" in p for p in problems), problems)
+
+    def test_unknown_basis_is_reported(self):
+        _, problems = pt.normalize_tags(
+            [self._ctx(self._structured("vibes", "am_top_played", "x"))])
+        self.assertTrue(any("basis" in p and "不认识" in p for p in problems), problems)
 
     def test_free_text_is_an_unverified_claim_not_evidence(self):
         tags, problems = pt.normalize_tags([self._ctx("am_top_played year-2026")])
