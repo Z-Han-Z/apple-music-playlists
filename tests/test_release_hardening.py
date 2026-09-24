@@ -156,6 +156,8 @@ class TestMcpCompatibility(unittest.TestCase):
             self.assertIn(tool, text)
         self.assertIn("Do not turn theme fit into arbitrary 0–1 scores", text)
         self.assertIn("curation contract in natural language", text)
+        self.assertIn("personalization scope", text)
+        self.assertIn("required, optional, or out of scope", text)
         self.assertIn("reference, not an automatic request to include", text)
         self.assertIn("keep negation scoped", text)
         self.assertIn("Keep both the original brief and the curation contract visible", text)
@@ -493,8 +495,10 @@ class TestStableReleaseAssets(unittest.TestCase):
             encoding="utf-8")
         for required in (
             "MusicRecoIntent", "Text2Playlist", "Read Between the Tracks",
+            "Learning When to Personalize",
             "intent hallucination", "Must", "Avoid", "References", "Soft context",
-            "Narrative", "Unknown", "catalog fact", "listening evidence", "model inference",
+            "Personalization", "Narrative", "Unknown", "catalog fact", "listening evidence",
+            "model inference",
             "What it does **not** prove", "Claims this project should not make",
         ):
             self.assertIn(required, text)
@@ -513,8 +517,10 @@ class TestStableReleaseAssets(unittest.TestCase):
         self.assertGreaterEqual(len(payload["cases"]), 5)
         for case in payload["cases"]:
             for required in ("id", "locale", "target_tracks", "brief", "hard_checks",
-                             "semantic_checks", "intent_risks", "blind_questions"):
+                             "personalization_scope", "semantic_checks", "intent_risks",
+                             "blind_questions"):
                 self.assertIn(required, case, f"{case.get('id')} is missing {required}")
+            self.assertIn(case["personalization_scope"], {"required", "optional", "out_of_scope"})
             self.assertGreaterEqual(len(case["hard_checks"]), 3)
             self.assertGreaterEqual(len(case["semantic_checks"]), 3)
             self.assertGreaterEqual(len(case["intent_risks"]), 3)
@@ -528,6 +534,11 @@ class TestStableReleaseAssets(unittest.TestCase):
                               if case["id"] == "reference-is-not-inclusion")
         self.assertIn("only as reference points", reference_case["brief"])
         self.assertIn("Do not include either artist", reference_case["brief"])
+        personalized = next(case for case in payload["cases"]
+                            if case["id"] == "recent-meets-rediscovered")
+        self.assertEqual(personalized["personalization_scope"], "required")
+        self.assertTrue(all(case["personalization_scope"] == "out_of_scope"
+                            for case in payload["cases"] if case["data"] == "public_catalog"))
 
     def test_curation_eval_guide_is_reproducible_and_privacy_safe(self):
         text = (self.ROOT / "examples" / "README.md").read_text(encoding="utf-8")

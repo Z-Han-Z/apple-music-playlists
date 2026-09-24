@@ -12,10 +12,11 @@ description: Use when creating, curating, auditing, or reordering Apple Music pl
 另接一个 LLM。支持 MCP Prompt 的宿主可调用 `create_playlist_from_description`；不支持 Prompt
 UI 时遵循同一流程：
 
-1. 保留用户原文，并写一份可读的策展契约：必须、排除、仅作参照、软语境/推断、叙事节点、未知。
+1. 保留用户原文，并写一份可读的策展契约：必须、排除、仅作参照、软语境/推断、个性化范围、叙事节点、未知。
    “像 X、但不要 X”里的 X 是参照兼排除，不是必选项；否定只约束用户实际排除的对象。只有未知项会
    实质改变结果时才提问，否则说明合理假设。不要把描述压成流派/情绪标签或权重表。
-2. 调用 `am_status`；需要个性化时再参考 `am_recently_played` / `am_top_played`。
+2. 调用 `am_status`；根据用户原话明确个性化是必需、可选还是不在范围。只有请求需要时才参考
+   `am_recently_played` / `am_top_played`，不要让收听历史静默改写一个自洽的 brief。
 3. 同时保留原始 brief 与策展契约，先策划目标数量 1.5–2 倍的候选池；不生成任意的 0–1 主题分。
 4. 用 `am_resolve_candidates` 一次校验候选池；`am_search_songs` 只用于单曲歧义或探索性搜索。不臆造 catalog ID，也不把 `has_lyrics=false` 当作纯音乐证据。
 5. 直接对照用户的原话比较候选，用 `essential / strong / bridge / optional / reject` 和开场、发展、

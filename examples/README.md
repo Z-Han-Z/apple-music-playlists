@@ -10,8 +10,9 @@ winner forever. The cases intentionally contain no expected tracks.
 2. **Baseline:** ask the model for exactly the target count, then catalog-resolve and dry-run that
    list without a larger candidate pool.
 3. **Curation workflow:** keep the original brief visible and write a compact curation contract that
-   separates must-haves, avoidances, reference-only anchors, soft context, narrative beats, and
-   unknowns. Then ask for 1.5–2× the target count, call `am_resolve_candidates`, compare the grounded
+   separates must-haves, avoidances, reference-only anchors, soft context, personalization scope,
+   narrative beats, and unknowns. Then ask for 1.5–2× the target count, call
+   `am_resolve_candidates`, compare the grounded
    candidates in natural language, assign narrative roles, and dry-run the final list.
 4. If useful, call `am_analyze_flow`. Use `am_optimize_order` only inside already chosen narrative
    blocks; keep semantic beat boundaries fixed.
@@ -49,6 +50,7 @@ Keep facts and judgments separate:
 - Avoidances respected or violated:
 - Reference-only anchors kept as references:
 - Soft context or model inferences used:
+- Personalization: required | optional | out of scope; evidence actually used:
 - Narrative beats preserved:
 - Ambiguities and evidence gaps still unresolved:
 

@@ -28,7 +28,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   launch path for running the PyPI package without a permanent install.
 - The description-to-playlist prompt now preserves the original brief beside a readable curation
   contract, distinguishes reference-only anchors from inclusion requests, scopes negation, and
-  reports unresolved intent coverage without inventing a quality score.
+  reports unresolved intent coverage without inventing a quality score. The contract also makes
+  personalization scope explicit so listening history supports requests that need it without
+  silently bending self-contained briefs toward old taste.
 
 ## [1.4.0] - 2026-09-23
 
