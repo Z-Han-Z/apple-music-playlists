@@ -45,8 +45,26 @@ brief 与策展契约始终是唯一权威，冲突时以 brief 为准。
     context  这些歌为什么在这里：最近在听、高播放、集中循环、本就在库里、
              来自某个参照曲、新发现但没听过
 
-`context` 轴上的标签必须来自真实证据（`am_recently_played` / `am_top_played` /
-音乐库），不能凭印象写——这是「catalog 事实 / 收听证据 / 模型推断」三分法的延伸。
+## context 必须带 evidence
+
+`context` 标签是「**用户在听什么**」的断言，所以它不能是印象：
+
+| 行为类方向 | 能支撑它的工具调用 | 实际能看到 | 注意 |
+|---|---|---|---|
+| 近期 | `am_recently_played` | 最近**播放**的有序列表 | 没有次数，只有顺序 |
+| 高播放 | `am_top_played` | Replay 的 `playCount` 排名 | 按周期；`all-time` 不一定存在，须退到具体年份 |
+| 集中播放 | `am_top_played` | `firstPlayed` / `lastPlayed` + `playCount` | **没有现成字段**，得自己算「窄时间窗 × 高次数」——是**派生**结论 |
+| 在用户歌单中 | `am_list_playlists` + `am_show_playlist` | 歌单成员关系 | 直接、准确 |
+
+写 `{"label": "...", "axis": "context", "evidence": "am_top_played year-2026"}`。
+**没有 evidence 的 context 标签会被接受，但一定报出来，并在展示串里标成「证据缺失」**——
+用户有权分辨哪个行为说法是有依据的、哪个是模型的猜测。
+
+两个反例值得单独记着：`am_recently_played(kind=added)` 是「最近**入库**」，不等于
+「最近在听」；「集中播放」不是任何接口的现成字段，只能由 `firstPlayed`/`lastPlayed`
+与 `playCount` 推出来。这两处都容易把推断说成事实。
+
+`sonic` 标签带 evidence 会提示多余——音乐属性不需要收听证据。
 """
 
 import unicodedata
@@ -60,6 +78,14 @@ SONIC = "sonic"
 CONTEXT = "context"
 UNSPECIFIED = "unspecified"
 AXES = (SONIC, CONTEXT, UNSPECIFIED)
+
+# `context` 标签是「用户在听什么」的断言，只有两类东西撑得住它：
+#   am_recently_played       最近播放（有序，无次数）
+#   am_top_played            Replay 的 playCount / firstPlayed / lastPlayed
+#   am_list_playlists + am_show_playlist   歌单成员关系
+# 没有来源的 context 标签不是"待补充"，而是**把模型推断当作用户事实呈现**，
+# 所以它会被接受但一定报出来，并在展示串里标成「证据缺失」。
+EVIDENCE_HINT = ("am_recently_played / am_top_played / am_list_playlists / am_show_playlist")
 
 # 侧重：三档定性状态，没有数值，也不做算术。
 SOFTEN = "soften"
@@ -133,7 +159,7 @@ def _emphasis_of(value) -> tuple:
 
 
 def _coerce(raw) -> tuple:
-    """把 str 或 dict 变成 (label, axis, emphasis, notes)。"""
+    """把 str 或 dict 变成 (label, axis, emphasis, evidence, notes)。"""
     notes = []
     if isinstance(raw, dict):
         label = raw.get("label") or raw.get("name") or raw.get("tag") or ""
@@ -146,9 +172,26 @@ def _coerce(raw) -> tuple:
         emphasis, note = _emphasis_of(raw.get("emphasis"))
         if note:
             notes.append(note)
-        return str(label).strip(), axis, emphasis, notes
+        evidence = str(raw.get("evidence") or "").strip()
+        return str(label).strip(), axis, emphasis, evidence, notes
     label, axis = _axis_of(str(raw or ""))
-    return label, axis, NEUTRAL, notes
+    return label, axis, NEUTRAL, "", notes
+
+
+def _evidence_notes(label: str, axis: str, evidence: str) -> list:
+    """`context` 轴必须能说出证据来源，否则就是拿模型推断冒充用户事实。
+
+    这不是格式洁癖，是仓库那条三分法（catalog 事实 / 收听证据 / 模型推断）的落点：
+    `context` 标签描述的是**用户在听什么**，只有前两类撑得住。**不阻断**——
+    只出一条说明，因为调用方可能把证据放在别处（例如整份报告的说明里）。
+    """
+    if axis == CONTEXT and not evidence:
+        return [f"context 标签「{label}」没写 evidence：行为类方向要有真实收听证据"
+                f"（{EVIDENCE_HINT} 之一），否则等于把模型推断当作用户事实呈现"]
+    if axis == SONIC and evidence:
+        return [f"标签「{label}」是 sonic（音乐自身属性），不需要收听证据；"
+                f"evidence 已保留，但它在这里不起支撑作用"]
+    return []
 
 
 # ---------------------------------------------------------------- 校验
@@ -157,14 +200,17 @@ def normalize_tags(items) -> tuple:
     """校验一组标签，返回 (tags, problems)。
 
     `items` 每项可以是 `"night"`、`"context:recent-heavy-rotation"`，或
-    `{"label": ..., "axis": "sonic", "emphasis": "boost"}`。
+    `{"label": ..., "axis": "sonic", "emphasis": "boost", "evidence": "..."}`。
+
+    `context` 轴建议带 `evidence`（支撑它的工具调用）。没有证据的 `context` 标签
+    会被接受但**报出来**：用户有权知道哪个「你在听什么」的说法是有依据的。
 
     problems 是给人看的说明，不是错误码——调用方应当把它们报告给用户，
     而不是静默改完继续。
     """
     by_key, order, problems = {}, [], []
     for raw in items or []:
-        label, axis, emphasis, notes = _coerce(raw)
+        label, axis, emphasis, evidence, notes = _coerce(raw)
         problems.extend(notes)
         if not label:
             problems.append("跳过了一个没有名字的标签")
@@ -180,13 +226,17 @@ def normalize_tags(items) -> tuple:
             elif axis != UNSPECIFIED and axis != kept["axis"]:
                 problems.append(f"标签「{label}」给了两种轴（{kept['axis']} / {axis}），"
                                 f"保留先出现的 {kept['axis']}")
+            if evidence and not kept.get("evidence"):
+                kept["evidence"] = evidence
             problems.append(f"标签「{label}」重复出现，保留先出现的那条"
                             f"（侧重 {kept['emphasis']}）")
             continue
         if axis == UNSPECIFIED:
             problems.append(f"标签「{label}」没写轴；写 sonic: 或 context: 才能区分"
                             f"音乐属性与行为来源")
-        by_key[key] = {"key": key, "label": label, "axis": axis, "emphasis": emphasis}
+        problems.extend(_evidence_notes(label, axis, evidence))
+        by_key[key] = {"key": key, "label": label, "axis": axis,
+                       "emphasis": emphasis, "evidence": evidence}
         order.append(key)
 
     tags = [by_key[k] for k in order]
@@ -296,7 +346,7 @@ def apply_adjustments(tags, adjustments) -> tuple:
         if op == "add":
             # 新增项必须走同一套规范化：否则 `add !!!` 会塞进一个空 key，
             # 带 `context:` 前缀的新增项也不会被拆轴。
-            new_label, axis, emphasis, _ = _coerce(label)
+            new_label, axis, emphasis, evidence, _ = _coerce(label)
             key = tag_key(new_label)
             if not key:
                 entry(orig, "rejected",
@@ -310,12 +360,15 @@ def apply_adjustments(tags, adjustments) -> tuple:
                 entry(orig, "rejected",
                       f"方向已有 {len(current)} 个标签，到上限 {MAX_TAGS}，删掉一个再加")
                 continue
-            new = {"key": key, "label": new_label, "axis": axis, "emphasis": emphasis}
+            new = {"key": key, "label": new_label, "axis": axis,
+                   "emphasis": emphasis, "evidence": evidence}
             current.append(new)
             by_key[key] = new
+            missing = _evidence_notes(new_label, axis, evidence)
             entry(orig, "added",
                   f"新增「{new_label}」，侧重 {emphasis}"
-                  f"（轴 {'未指定' if axis == UNSPECIFIED else axis}）")
+                  f"（轴 {'未指定' if axis == UNSPECIFIED else axis}）"
+                  + ("；" + "；".join(missing) if missing else ""))
             continue
 
         key = tag_key(label)
@@ -368,12 +421,16 @@ def axis_summary(tags) -> dict:
 
 def _mark(tag) -> str:
     """定性标记。刻意不用数字——数字会被读成精度。"""
-    e = tag["emphasis"]
-    if e == BOOST:
-        return f"{tag['label']}（强调）"
-    if e == SOFTEN:
-        return f"{tag['label']}（弱化）"
-    return tag["label"]
+    bits = []
+    if tag["emphasis"] == BOOST:
+        bits.append("强调")
+    elif tag["emphasis"] == SOFTEN:
+        bits.append("弱化")
+    if tag.get("axis") == CONTEXT:
+        # 行为类标签的证据要**露出来**：用户有权知道哪个「你在听什么」的说法有依据。
+        ev = tag.get("evidence") or ""
+        bits.append(f"证据：{ev}" if ev else "证据缺失")
+    return f"{tag['label']}（{' · '.join(bits)}）" if bits else tag["label"]
 
 
 def render_tags(tags, language: str = "en") -> str:
@@ -405,29 +462,51 @@ def direction_note(tags, language: str = "zh") -> str:
     zh = str(language or "").lower().startswith("zh")
     focus = [t["label"] for t in tags if t["emphasis"] == BOOST]
     soften = [t["label"] for t in tags if t["emphasis"] == SOFTEN]
+    no_evidence = [t["label"] for t in tags
+                   if t.get("axis") == CONTEXT and not t.get("evidence")]
     if zh:
-        body = "；".join(
-            f"{t['label']}（{'音乐' if t['axis'] == SONIC else '行为' if t['axis'] == CONTEXT else '未标轴'}"
-            f"{'，强调' if t['emphasis'] == BOOST else '，弱化' if t['emphasis'] == SOFTEN else ''}）"
-            for t in tags)
+        def one(t):
+            bits = ["音乐" if t["axis"] == SONIC else
+                    "行为" if t["axis"] == CONTEXT else "未标轴"]
+            if t["emphasis"] == BOOST:
+                bits.append("强调")
+            elif t["emphasis"] == SOFTEN:
+                bits.append("弱化")
+            if t.get("axis") == CONTEXT:
+                bits.append(f"证据：{t['evidence']}" if t.get("evidence") else "证据缺失")
+            return f"{t['label']}（{'，'.join(bits)}）"
+        body = "；".join(one(t) for t in tags)
         tail = ""
         if focus:
             tail += f"本轮更偏「{'、'.join(focus)}」。"
         if soften:
             tail += f"相应收紧「{'、'.join(soften)}」。"
+        if no_evidence:
+            tail += (f"注意「{'、'.join(no_evidence)}」没有证据来源，"
+                     f"只能当作待确认的推测，不要说成用户事实。")
         return (f"方向标签（约 {TARGET_TAG_COUNT} 个）：{body}。{tail}"
                 f"这些标签是给用户的操纵面，**不是 brief**：原始需求与策展契约仍然优先，"
                 f"冲突时以 brief 为准；侧重只是方向提示，**不构成选曲依据**。"
                 f"行为类标签必须有真实收听证据支持。")
-    body = " / ".join(
-        f"{t['label']} ({'sonic' if t['axis'] == SONIC else 'context' if t['axis'] == CONTEXT else 'axis unset'}"
-        f"{', emphasize' if t['emphasis'] == BOOST else ', soften' if t['emphasis'] == SOFTEN else ''})"
-        for t in tags)
+    def one_en(t):
+        bits = ["sonic" if t["axis"] == SONIC else
+                "context" if t["axis"] == CONTEXT else "axis unset"]
+        if t["emphasis"] == BOOST:
+            bits.append("emphasize")
+        elif t["emphasis"] == SOFTEN:
+            bits.append("soften")
+        if t.get("axis") == CONTEXT:
+            bits.append(f"evidence: {t['evidence']}" if t.get("evidence") else "no evidence")
+        return f"{t['label']} ({', '.join(bits)})"
+    body = " / ".join(one_en(t) for t in tags)
     tail = ""
     if focus:
         tail += f" Lean toward {', '.join(focus)}."
     if soften:
         tail += f" Hold back on {', '.join(soften)}."
+    if no_evidence:
+        tail += (f" Note that {', '.join(no_evidence)} carry no evidence source, so treat them "
+                 f"as unconfirmed inference rather than as facts about the user.")
     return (f"Direction tags (~{TARGET_TAG_COUNT}): {body}.{tail} "
             f"These tags are a user-facing steering surface, **not the brief**: the original "
             f"request and the curation contract stay authoritative, and the brief wins any "
@@ -454,10 +533,18 @@ def summary(tags, problems=None, report=None, language: str = "zh",
     else:
         lines.append(f"方向标签（{len(tags)} 个，目标约 {TARGET_TAG_COUNT} 个）：")
         for t in tags:
-            lines.append(f"  · {t['label']}  [轴={t['axis']}  侧重={t['emphasis']}]")
+            row = f"  · {t['label']}  [轴={t['axis']}  侧重={t['emphasis']}"
+            if t.get("axis") == CONTEXT:
+                row += f"  证据={t.get('evidence') or '（缺）'}"
+            lines.append(row + "]")
         counts = axis_summary(tags)
         lines.append(f"  轴分布：音乐 {counts[SONIC]} / 行为 {counts[CONTEXT]} / "
                      f"未标 {counts[UNSPECIFIED]}")
+        missing = [t["label"] for t in tags
+                   if t.get("axis") == CONTEXT and not t.get("evidence")]
+        if missing:
+            lines.append(f"  ⚠ 无证据的行为标签：{'、'.join(missing)}"
+                         f"（只能当成待确认的推测，不要说成用户事实）")
         lines.append(f"  展示：{render_tags(tags, language)}")
     if problems:
         lines.append("校验说明：")

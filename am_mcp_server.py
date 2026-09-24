@@ -93,13 +93,14 @@ PROMPTS = [
                 "description": (
                     "Optional direction tags to show the user before or after curation: about five "
                     "labels mixing musical character (sonic) with listening provenance (context, such "
-                    "as recent, high-rotation, or already in the library). They are rendered into the "
-                    "prompt with their priority stated. The user may reply with adjustments like "
-                    "'more funk' or 'less disco'; apply them with am_tag_directions. Emphasis is "
-                    "qualitative (soften/neutral/boost), never a number, and tags steer the result but "
-                    "never replace the brief. / "
-                    "可选的方向标签，约 5 个（音乐属性 + 用户行为来源）；用户可用 "
-                    "more X / less Y 调整，用 am_tag_directions 记账。侧重是定性的，不是数值。"
+                    "as recent, high-rotation, or already in the library). A context tag should name "
+                    "the call that backs it; one reported as missing evidence is inference, not a fact "
+                    "about the user. They are rendered into the prompt with their priority stated, and "
+                    "the user may reply with adjustments like 'more funk' or 'less disco', which you "
+                    "apply with am_tag_directions. Emphasis is qualitative (soften/neutral/boost), "
+                    "never a number, and tags steer the result but never replace the brief. / "
+                    "可选的方向标签，约 5 个（音乐属性 + 用户行为来源）；context 标签应写出支撑它的调用。"
+                    "用户可用 more X / less Y 调整，用 am_tag_directions 记账；侧重是定性的，不是数值。"
                 ),
                 "required": False,
             },
@@ -283,7 +284,12 @@ TOOLS = [
                        "标签由你（宿主模型）写：既包括音乐本身的属性（流派/年代/织体/氛围），"
                        "也包括**用户行为来源**（最近在听、高播放、集中循环、本就在库里、来自某个参照曲）。"
                        "两个轴要分清——sonic 是音乐属性，context 是这些歌为什么在这里；"
-                       "context 标签必须有真实收听证据（am_recently_played / am_top_played / 音乐库）支持。"
+                       "context 标签必须有真实收听证据（am_recently_played / am_top_played / 音乐库）支持，"
+                       "并在 evidence 里写出**是哪一次调用**支撑它——没有证据的行为标签会被接受但报出来、"
+                       "并在展示串里标成「证据缺失」，用户有权分辨哪句有依据、哪句是模型的猜测。"
+                       "注意 am_recently_played(kind=added) 是「最近入库」而不是「最近在听」；"
+                       "「集中播放」也不是任何接口的现成字段，只能由 firstPlayed/lastPlayed 与 "
+                       "playCount 推出来。"
                        "把方向展示给用户后，用户可以回 `more funk` / `less disco` / `drop dark` / `add ambient`，"
                        "本工具把它做成**定性记账**：侧重只有 soften / neutral / boost 三档，"
                        "全程没有数值权重（小数会让人误以为有精度），并保留用户原话作为修订记录。"
@@ -302,12 +308,18 @@ TOOLS = [
                                   "axis": {"type": "string", "enum": ["sonic", "context"]},
                                   "emphasis": {"type": "string",
                                                "enum": ["soften", "neutral", "boost"]},
+                                  "evidence": {"type": "string",
+                                               "description": "支撑该 context 标签的调用，"
+                                                              "如 am_top_played year-2026 / "
+                                                              "am_recently_played / am_list_playlists"},
                               },
                               "required": ["label"], "additionalProperties": False},
                          ]},
                          "description": "方向标签，约 5 个。字符串可用 `context:recent-heavy-rotation` "
-                                        "给轴加前缀；也可给对象 {label, axis, emphasis}。"
-                                        "侧重只有 soften/neutral/boost 三档定性状态，没有数值"},
+                                        "给轴加前缀；也可给对象 {label, axis, emphasis, evidence}。"
+                                        "侧重只有 soften/neutral/boost 三档定性状态，没有数值。"
+                                        "context（行为）标签要带 evidence——没有证据的会被接受但报出来，"
+                                        "并在展示串里标成「证据缺失」"},
                 "adjustments": {"type": "array", "items": {"type": "string"},
                                 "description": "用户对方向的调整，如 more funk / less disco / drop dark / "
                                                "add ambient（也认「多一点/少一点」与 +funk/-disco）"},
@@ -371,7 +383,7 @@ _ENGLISH_TOOL_DESCRIPTIONS = {
     "am_audit_playlist": "Read-only metadata audit of playlist length, artist concentration, genres, eras, duplicates, and possible interludes. For BPM, key, energy, and transitions, use am_analyze_flow.",
     "am_analyze_flow": "Read-only diagnosis of BPM, key, loudness, energy, mood, adjacent transitions, and overall arc. It may fetch and cache remote feature data; use am_optimize_order only when a proposed replacement order is wanted.",
     "am_optimize_order": "Compute a proposed order after the LLM has selected the songs and narrative blocks. It balances adjacent audio transitions with a chosen qualitative arc, returns an order without writing, and may fetch cached remote features; it must not choose songs or judge theme fit.",
-    "am_tag_directions": "Present and steer the playlist's direction tags: about five labels the host model authors, covering both musical character (sonic) and listening provenance (context, such as recent, high-rotation, or already in the library). It validates the set, applies user replies like 'more funk' or 'less disco' as explicit qualitative bookkeeping over three emphasis levels (soften/neutral/boost) with the user's own wording kept as a revision record, and returns a rendered line plus a direction note for the next curation round. There are no numeric weights, because decimals would read as precision the judgement does not have. Read-only and offline: it touches nothing in Apple Music, and the tags are a steering surface that never replaces the brief and never becomes a selection criterion.",
+    "am_tag_directions": "Present and steer the playlist's direction tags: about five labels the host model authors, covering both musical character (sonic) and listening provenance (context, such as recent, high-rotation, or already in the library). A context tag must name the call that backs it (am_recently_played, am_top_played, am_list_playlists); one reported as missing evidence is model inference and must not be presented as a fact about the user. The tool validates the set, applies user replies like 'more funk' or 'less disco' as explicit qualitative bookkeeping over three emphasis levels (soften/neutral/boost) with the user's own wording kept as a revision record, and returns a rendered line plus a direction note for the next curation round. There are no numeric weights, because decimals would read as precision the judgement does not have. Read-only and offline: it touches nothing in Apple Music, and the tags are a steering surface that never replaces the brief and never becomes a selection criterion.",
     "am_recently_played": "Read recent listening or recently added Apple Music content when recency matters. This API does not provide play counts; use am_top_played for Replay rankings.",
     "am_top_played": "Read Apple Music Replay play-count rankings by song, album, or artist when frequency matters. Use am_recently_played for latest listening; all-time data may be unavailable, so retry with a specific year.",
 }
@@ -826,7 +838,9 @@ def _render_direction_tags(raw: str, language: str = "") -> str:
     lines.append(
         "How to use them: the brief above and your curation contract stay authoritative, and the "
         "brief wins any conflict. Emphasis is a direction hint only — never a selection criterion "
-        "and never a score. A context tag must be backed by real listening evidence.")
+        "and never a score. A context tag must be backed by real listening evidence, and should "
+        "name the call that provides it; a context tag reported as missing evidence is inference, "
+        "not a fact about the user, so do not present it as one.")
     return "\n".join(lines) + "\n"
 
 

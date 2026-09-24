@@ -59,10 +59,17 @@ class TestNormalizeTags(unittest.TestCase):
 
     def test_axis_prefix(self):
         tags, problems = pt.normalize_tags(
-            ["sonic:synthwave", "context:recent-heavy-rotation"])
-        self.assertEqual([t["axis"] for t in tags], [pt.SONIC, pt.CONTEXT])
-        self.assertEqual(tags[1]["label"], "recent-heavy-rotation")
+            ["sonic:synthwave"])
+        self.assertEqual([t["axis"] for t in tags], [pt.SONIC])
+        self.assertEqual(tags[0]["label"], "synthwave")
         self.assertEqual(problems, [])
+
+    def test_axis_prefix_on_a_context_tag_without_evidence_is_reported(self):
+        """`context:` 前缀只解决「轴」，不解决「证据」——两者都要。"""
+        tags, problems = pt.normalize_tags(["context:in-library"])
+        self.assertEqual(tags[0]["axis"], pt.CONTEXT)
+        self.assertEqual(tags[0]["evidence"], "")
+        self.assertTrue(any("没写 evidence" in p for p in problems))
 
     def test_dict_form_with_emphasis(self):
         tags, problems = pt.normalize_tags([
@@ -361,6 +368,85 @@ class TestPresentation(unittest.TestCase):
         tags, _ = pt.normalize_tags(["sonic:funk"])
         text = pt.summary(tags, None, None, "zh", "   \n  ")
         self.assertNotIn("原始 brief", text)
+
+
+class TestContextEvidence(unittest.TestCase):
+    """`context` 轴描述的是「用户在听什么」，必须能说出证据来源。
+
+    这是仓库三分法（catalog 事实 / 收听证据 / 模型推断）在方向标签上的落点：
+    没有证据的行为标签，用户分不出它是事实还是模型的猜测。
+    """
+
+    @staticmethod
+    def _ctx(evidence=""):
+        item = {"label": "recent-heavy-rotation", "axis": "context"}
+        if evidence:
+            item["evidence"] = evidence
+        return item
+
+    def test_context_with_evidence_is_clean(self):
+        tags, problems = pt.normalize_tags([self._ctx("am_top_played year-2026")])
+        self.assertEqual(tags[0]["evidence"], "am_top_played year-2026")
+        self.assertEqual(problems, [])
+
+    def test_context_without_evidence_is_accepted_but_reported(self):
+        tags, problems = pt.normalize_tags([self._ctx()])
+        self.assertEqual(len(tags), 1)                      # 不阻断
+        self.assertTrue(any("没写 evidence" in p for p in problems))
+        self.assertTrue(any("模型推断" in p for p in problems))
+
+    def test_sonic_with_evidence_is_flagged_as_superfluous(self):
+        tags, problems = pt.normalize_tags(
+            [{"label": "funk", "axis": "sonic", "evidence": "am_top_played"}])
+        self.assertEqual(tags[0]["evidence"], "am_top_played")
+        self.assertTrue(any("不起支撑作用" in p for p in problems))
+
+    def test_evidence_shows_up_in_the_display_line(self):
+        tags, _ = pt.normalize_tags([self._ctx("am_top_played year-2026")])
+        out = pt.render_tags(tags, "zh")
+        self.assertIn("证据：am_top_played year-2026", out)
+
+    def test_missing_evidence_shows_up_in_the_display_line(self):
+        """用户有权看见哪个行为标签没有依据——藏起来才是问题。"""
+        tags, _ = pt.normalize_tags([self._ctx()])
+        self.assertIn("证据缺失", pt.render_tags(tags, "zh"))
+
+    def test_direction_note_carries_the_evidence(self):
+        tags, _ = pt.normalize_tags([self._ctx("am_recently_played")])
+        note = pt.direction_note(tags, "zh")
+        self.assertIn("证据：am_recently_played", note)
+
+    def test_direction_note_warns_about_missing_evidence(self):
+        tags, _ = pt.normalize_tags([self._ctx()])
+        note = pt.direction_note(tags, "zh")
+        self.assertIn("没有证据来源", note)
+        self.assertIn("不要说成用户事实", note)
+
+    def test_english_direction_note_mentions_no_evidence(self):
+        tags, _ = pt.normalize_tags([self._ctx()])
+        note = pt.direction_note(tags, "en")
+        self.assertIn("no evidence", note)
+
+    def test_summary_marks_missing_evidence(self):
+        tags, problems = pt.normalize_tags([self._ctx()])
+        text = pt.summary(tags, problems, None)
+        self.assertIn("证据=（缺）", text)
+        self.assertIn("无证据的行为标签", text)
+
+    def test_duplicate_merge_keeps_the_evidence_from_either_entry(self):
+        tags, _ = pt.normalize_tags([
+            {"label": "in-library", "axis": "context"},
+            {"label": "IN-LIBRARY", "axis": "context", "evidence": "am_list_playlists"}])
+        self.assertEqual(len(tags), 1)
+        self.assertEqual(tags[0]["evidence"], "am_list_playlists")
+
+    def test_add_without_evidence_reports_it_in_the_revision_record(self):
+        tags, _ = pt.normalize_tags(["sonic:funk"])
+        out, report = pt.apply_adjustments(tags, ["add context:in-library"])
+        self.assertEqual(report[0]["status"], "added")
+        self.assertIn("没写 evidence", report[0]["detail"])
+        added = [t for t in out if t["label"] == "in-library"][0]
+        self.assertEqual(added["evidence"], "")
 
 
 class TestPromptRendering(unittest.TestCase):

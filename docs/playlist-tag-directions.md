@@ -64,12 +64,43 @@
 - **`context`** —— 这些歌**为什么在这里**：最近在听、高播放、集中循环、本就在库里、
   来自某个参照曲、新加入但还没听。
 
-`context` 轴上的标签**必须有真实证据**（`am_recently_played` / `am_top_played` / 音乐库），
-不能凭印象写。这是仓库里「catalog 事实 / 收听证据 / 模型推断」三分法的延伸：
-把「我觉得他最近在听」写成 `context:recent` 是在伪造证据。
-
 轴必须**显式写**。本模块不猜轴——猜轴需要一份流派与行为词库，那等于把
 「这个模块不认识音乐」这句话作废。没写轴的标签会被接受但**报出来**，请补上。
+
+### `context` 必须带 `evidence`
+
+`context` 标签是「**用户在听什么**」的断言，所以它不能是印象。要写清**是哪一次调用**
+支撑它。可用的证据来源就这几个，各自的边界也一并列出：
+
+| 行为类方向 | 支撑它的调用 | 实际能看到 | 必须注意 |
+|---|---|---|---|
+| **近期** | `am_recently_played` | 最近**播放**的有序列表 | 没有播放次数，只有顺序 |
+| **高播放** | `am_top_played` | Replay 的 `playCount` 排名 | 按**周期**；`all-time` 不一定存在，须退到具体年份 |
+| **集中播放** | `am_top_played` | `firstPlayed` / `lastPlayed` + `playCount` | **没有现成字段**，要自己算「窄时间窗 × 高次数」——是**派生**结论 |
+| **在用户歌单中** | `am_list_playlists` + `am_show_playlist` | 歌单成员关系 | 直接、准确 |
+
+```json
+{"label": "recent-heavy-rotation", "axis": "context", "evidence": "am_top_played year-2026"}
+```
+
+**没有 `evidence` 的 `context` 标签会被接受，但一定报出来**，并在展示串与方向说明里
+标成「证据缺失」：
+
+```text
+行为 — in-library（证据缺失）
+⚠ 无证据的行为标签：in-library（只能当成待确认的推测，不要说成用户事实）
+```
+
+这是刻意的：用户有权分辨哪个行为说法是有依据的，哪个是模型的猜测。藏起来才是问题。
+
+两个尤其容易搞错的地方：
+
+- `am_recently_played(kind=added)` 是「最近**入库**」，**不等于**「最近在听」；
+  混用就是把入库当成收听。
+- 「集中播放」**不是任何接口的现成字段**。它只能由 `firstPlayed` / `lastPlayed`
+  与 `playCount` 推出来，所以它天生是**派生**结论，必须如实标注。
+
+`sonic` 标签带 `evidence` 会提示多余——音乐属性不需要收听证据。
 
 ## 写法
 
@@ -78,6 +109,7 @@
             sonic:night                              # 显式轴
             context:recent-heavy-rotation
 对象：     {"label": "night", "axis": "sonic", "emphasis": "boost"}
+            {"label": "in-library", "axis": "context", "evidence": "am_list_playlists"}
 ```
 
 约 5 个，上限 8 个——超过 8 个就不是操纵面，而是一份清单了。

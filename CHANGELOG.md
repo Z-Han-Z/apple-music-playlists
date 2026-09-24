@@ -30,6 +30,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   scoped negation, reference semantics, and narrative beats; this feature does not reopen that. The
   original request and the curation contract stay authoritative, and `direction_note()` states both
   boundaries inside its own output rather than relying on external docs.
+
+  A `context` tag describes **what the user has been listening to**, so it now carries an
+  `evidence` field naming the call that backs it. A context tag without one is accepted but always
+  reported, and is marked "no evidence" in the display line and the direction note: a listener has
+  the right to tell a grounded claim from a guess. Two traps are called out explicitly in the
+  contract, because both turn inference into a false fact about the user:
+  `am_recently_played(kind=added)` means recently **added**, not recently **played**; and
+  "concentrated listening" is not a field any endpoint returns — it can only be derived from
+  `firstPlayed` / `lastPlayed` together with `playCount`.
 - `am_resolve_candidates` now returns each grounded recording's Apple Music URL so users can
   audition and verify the exact catalog version before a playlist is written.
 - A root `llms.txt` gives agents and directory crawlers a concise, spec-shaped map of the project's
