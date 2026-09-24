@@ -95,7 +95,7 @@ python listening_stats.py top --kind songs --year 2026
 }
 ```
 
-13 個の MCP ツールを公開します。`am_resolve_candidates` は LLM が出した候補群を Apple Music の
+14 個の MCP ツールを公開します。`am_resolve_candidates` は LLM が出した候補群を Apple Music の
 実メタデータに照合しますが、テーマ適合度は採点しません。モデルがユーザーの言葉と候補を直接比較し、
 並び替え最適化は選曲後の任意の補助として使います。ツール説明は英語/中国語の併記で、読み取り専用・書き込み・
 破壊的操作の annotation も含みます。Codex、Claude、Cursor、VS Code/Copilot、Gemini CLI、

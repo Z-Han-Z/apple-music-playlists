@@ -9,6 +9,68 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Direction tags**, so a user can steer a finished curation stylistically instead of restating
+  the brief. After the grounded preview and **before anything is written**, the host model offers
+  about five tags across two axes: `sonic` for the music's own character and `context` for why
+  these tracks are here (recent, high rotation, already in the library, drawn from a reference).
+  The new read-only, offline `am_tag_directions` tool validates that set, applies replies such as
+  `more funk` or `less disco`, and returns both a display line and a direction note for the next
+  round. `playlist_tags.py` holds the contract; `docs/playlist-tag-directions.md` documents it.
+
+  The boundary is three layers, and the first draft got the middle one wrong. Tags **take part** in
+  the next round of candidate comparison — a qualitative revision of the curation contract, not a
+  number — but they **cannot override** an explicit must-have, avoidance, or reference in the brief.
+  An earlier draft called them "never a selection criterion", which is an over-correction: if an
+  adjustment can never change a candidate, then steering means nothing while the tool still claims
+  to steer. The prompt now also settles the direction **before** `dry_run=false`, because a window
+  placed after the write has nothing left to steer.
+
+  Emphasis is **qualitative, not numeric**: three levels (`soften` / `neutral` / `boost`), with the
+  user's own wording kept as a revision record. A `0.0–2.0` weight with a fixed `±0.5` step was
+  rejected in review, correctly: decimals dress an aesthetic judgement up as precision and conflict
+  with the project's rule that the model reads the brief directly. A `weight` field is now rejected
+  with that reason spelled out. An adjustment naming a tag the direction does not contain is
+  reported as `unknown` along with the labels that do exist, and unparsable input is reported
+  rather than ignored.
+
+  `brief` is **required** and echoed verbatim, so "the original request stays visible" holds on the
+  adjustment path too instead of depending on the caller volunteering an optional argument.
+
+  Tag input is sanitized rather than trusted: control characters and newlines are collapsed and
+  reported (a label is interpolated into the MCP prompt verbatim, so a newline in one would add a
+  line that reads like an instruction), over-long labels are truncated and reported, a bare string
+  passed where a list is expected is treated as one label instead of being split into characters,
+  and `evidence`/`axis` supplied on a structured adjustment are carried through instead of being
+  dropped silently. A dict label carrying a `context:` prefix now splits the same way the string
+  form does.
+
+  Adjustments are accepted in both the documented string form and a structured
+  `{op, label, axis?, evidence?}` form — the schema declares both and shares one evidence schema
+  with the tag contract, so the module and the public MCP surface cannot disagree. The English and
+  Chinese renderings of a structured source now say the same thing: a **declared** source that was
+  not checked against the free-text label, rather than English clients seeing `evidence:` while
+  Chinese clients see the weaker claim.
+
+  `docs/evaluation-signals.md` explains why collapsing requirements into tags or weights loses
+  scoped negation, reference semantics, and narrative beats; this feature does not reopen that. The
+  tags supplement the brief rather than replacing it, and `direction_note()` states all three
+  boundary layers inside its own output rather than relying on external docs.
+
+  A `context` tag describes **what the user has been listening to**, so it carries structured
+  provenance. A non-empty string is not evidence: `in-library` backed by `am_top_played` passes any
+  string check while proving nothing, so `evidence` is `{basis, call, ref}` and the chain is
+  validated — `playlist-membership` takes only `am_show_playlist`, because `am_list_playlists` lists
+  playlists and cannot show that a track is in one; `ref` is required so
+  `am_recently_played(kind=added)`, which is recently **added** and not recently played, cannot pass
+  as listening evidence; and concentrated listening must be declared `basis: "derived"` because no
+  endpoint returns it.
+
+  The result is presented as a **declared** source, never as verified evidence. The label is free
+  text, so this module cannot tell whether `in-library` and `basis: "play-count"` contradict each
+  other; validating the chain is all it can honestly do, and every structured source says so. Free
+  text is shown as an unverified claim and a tag with nothing is marked as missing evidence.
+  Evidence diagnostics run **after** duplicate merging, so a duplicate that later supplies
+  provenance cannot leave a stale "no evidence" warning behind.
 - `am_resolve_candidates` now returns each grounded recording's Apple Music URL so users can
   audition and verify the exact catalog version before a playlist is written.
 - A root `llms.txt` gives agents and directory crawlers a concise, spec-shaped map of the project's

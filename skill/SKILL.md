@@ -40,9 +40,10 @@ UI 时遵循同一流程：
 | "帮我排一下顺序" | `am_optimize_order`（MCP，见 §三）；离线/脚本化才用 `playlist_optimize.py` |
 | "我库里有什么" | `am_playlist.py library` |
 | "按我最近和以前爱听的歌来做" | `am_recently_played` + `am_top_played`；离线汇总可用 `build_pool.py` |
+| "多一点 funk / 少一点 disco"（调方向） | `am_tag_directions`（MCP）；契约见 `docs/playlist-tag-directions.md` |
 | 排查 API 报错 | 先看 §四 |
 
-**MCP 工具（13 个）**
+**MCP 工具（14 个）**
 
 ```
 am_status            先查这个：token 是否有效、是否已登录
@@ -56,9 +57,26 @@ am_delete_playlist   删除（必须 confirm=true）
 am_audit_playlist    元数据层体检
 am_analyze_flow      听感体检（BPM/调性/响度/能量/情绪 + 相邻衔接 + 弧线形状）
 am_optimize_order    排序：算出更好的曲序（可指定叙事弧；blocks 保留段落顺序）。只读
+am_tag_directions    方向标签：约 5 个（sonic 音乐属性 + context 行为来源），
+                     按 more X / less Y 改侧重档（定性三档，无数值），保留用户原话；
+                     返回展示行与可回填 brief 的方向说明。只读且离线
 am_recently_played   最近播放（曲目 / 歌单 / 电台 / 最近入库）
 am_top_played        播放次数排行（songs / albums / artists × 年份或 all-time）
 ```
+
+**方向标签是 brief 的定性补充：参与选曲，但不是数值，也不能越权。** 边界三层——它**参与**
+下一轮候选比较；**不是数值评分**（侧重只有 `soften` / `neutral` / `boost` 三档，没有权重，
+小数会让人以为有精度）；**不能推翻** brief 里的必须/排除/参照约束。
+
+窗口在**写入之前**：grounded 预演（`dry_run=true`）之后、`dry_run=false` 之前，写约 5 个标签
+（两个轴：`sonic` 音乐属性、`context` 为什么在这里），用 `am_tag_directions` 展示给用户
+（**`brief` 是必填**，把原始需求原样传回，它会被回显并始终优先）。用户回 `more X` / `less Y`
+就带 `adjustments` 再调一次，然后**重做候选比较与分段排序、再 dry-run 一次**，方向定下来才写入——
+没有这一步，「调整」就只是字符串变化，改变不了任何候选。
+
+`context` 标签要在 `evidence` 里写出支撑它的调用（`am_recently_played` / `am_top_played` /
+`am_list_playlists`）；没有证据的会被接受但报出来、并在展示串里标成「证据缺失」。
+找不到的标签会报 `unknown` 而不是静默无效。细节见 `docs/playlist-tag-directions.md`。
 
 **动手前先 `am_status`。** 未登录时不要反复重试——直接让用户跑一次 `python am_playlist.py login`。
 

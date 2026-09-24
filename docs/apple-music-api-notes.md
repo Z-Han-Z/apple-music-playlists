@@ -17,7 +17,7 @@
 | 登录一次之后能全自动多久？ | 约 **6 个月**（`music-user-token` 的寿命）。过期后重跑一次 `login`；developer token 由脚本自动续抓，无需干预。 |
 | 本机最佳路径 | 网页播放器内部 API `amp-api.music.apple.com`，脚本已实现并**端到端跑通**。 |
 | 当前状态 | ✅ **已跑通**。登录已完成，实测建成歌单「演示歌单」（8 首，顺序正确），删除也已验证。 |
-| 已经交付了什么 | `am_playlist.py`（命令行工具，纯标准库）、`am_mcp_server.py`（MCP 服务，13 个工具）、DSH 新预设「音乐歌单」。 |
+| 已经交付了什么 | `am_playlist.py`（命令行工具，纯标准库）、`am_mcp_server.py`（MCP 服务，14 个工具）、DSH 新预设「音乐歌单」。 |
 
 ---
 
@@ -175,7 +175,7 @@ D（macOS AppleScript）在 Mac 上确实更省事——本机应用、不需要
 ```
 <PROJECT_ROOT>\
 ├── am_playlist.py       # 命令行工具（纯标准库，零依赖）
-├── am_mcp_server.py     # MCP stdio 服务，把同样的能力暴露成 13 个工具
+├── am_mcp_server.py     # MCP stdio 服务，把同样的能力暴露成 14 个工具
 ├── refs\                # 调研过程抓下来的 Apple 官方文档 JSON / bundle 证据
 └── tools\               # 调研用的小脚本（文档解析、cookie 列举）
 
@@ -224,7 +224,7 @@ music-user-token: 无 —— 请先运行 login
  "instructions":"Apple Music playlist tools. ... / Apple Music 歌单工具…"}}
 ```
 
-暴露 13 个工具：`am_status`、`am_search_songs`、`am_resolve_candidates`、`am_list_playlists`、`am_show_playlist`、
+暴露 14 个工具：`am_status`、`am_search_songs`、`am_resolve_candidates`、`am_list_playlists`、`am_show_playlist`、
 `am_create_playlist`（主入口）、`am_add_tracks`、`am_delete_playlist`、`am_audit_playlist`、
 `am_analyze_flow`、`am_optimize_order`（排序，只读）、`am_recently_played`、`am_top_played`。
 服务端兼容 `2024-11-05` 至 `2025-11-25` 的握手版本；客户端提出未支持版本时，
