@@ -234,9 +234,10 @@ TOOLS = [
         "name": "am_optimize_order",
         "description": "为一批曲目**算出更好的顺序**。这是本项目唯一会排序的工具——"
                        "am_analyze_flow 只诊断（告诉你哪里有 2 处慢歌相邻、形状是 Icarus），"
-                       "不提供修法。这里用模拟退火在四条相邻硬规则（不要两首慢歌相邻 / "
+                       "不提供修法。这里用模拟退火处理四条相邻硬规则（不要两首慢歌相邻 / "
                        "不要「只慢一点」/ 相邻不该在 tempo 与 key 上同时相似 / 不要 BPM 无理由大跳、"
-                       "能量骤变）与选定叙事弧之间取平衡。**只读**：只返回建议顺序，不动任何歌单；"
+                       "能量骤变）。默认不拟合全局叙事弧；只有显式传入 arc 才套用一个命名预设。"
+                       "**只读**：只返回建议顺序，不动任何歌单；"
                        "把返回列表按原顺序交给 am_create_playlist 即可。因为需要每首的 BPM/调性，"
                        "首次会联网抓特征（之后走缓存）。",
         "inputSchema": {
@@ -251,8 +252,8 @@ TOOLS = [
                 "playlist": {"type": "string", "minLength": 1,
                              "description": "要重排的现有歌单名或 p.xxxx ID（与 tracks/blocks 二选一）"},
                 "arc": {"type": "string", "enum": list(SHAPE_ALIASES),
-                        "description": "目标叙事弧，默认 man-in-a-hole（先落再起）。"
-                                       "用 cinderella 表示起-落-起，等等"},
+                        "description": "可选的全局叙事弧预设。省略时不强加叙事形状，只优化局部衔接；"
+                                       "仅当用户明确要求某个命名曲线时才选择，例如 cinderella（起-落-起）。"},
                 "isrcs": {"type": "boolean", "description": "tracks/blocks 是否按 ISRC 精确匹配，默认 false"},
                 "refresh": {"type": "boolean", "description": "忽略音频特征缓存重抓，默认 false"},
             },
@@ -307,7 +308,7 @@ _ENGLISH_TOOL_DESCRIPTIONS = {
     "am_delete_playlist": "Delete one playlist permanently after it has been shown to the user. This is destructive, requires confirm=true, and does not delete the underlying songs from the library.",
     "am_audit_playlist": "Read-only metadata audit of playlist length, artist concentration, genres, eras, duplicates, and possible interludes. For BPM, key, energy, and transitions, use am_analyze_flow.",
     "am_analyze_flow": "Read-only diagnosis of BPM, key, loudness, energy, mood, adjacent transitions, and overall arc. It may fetch and cache remote feature data; use am_optimize_order only when a proposed replacement order is wanted.",
-    "am_optimize_order": "Compute a proposed order after the LLM has selected the songs and narrative blocks. It balances adjacent audio transitions with a chosen qualitative arc, returns an order without writing, and may fetch cached remote features; it must not choose songs or judge theme fit.",
+    "am_optimize_order": "Optionally refine local audio transitions after the LLM has selected the songs and narrative blocks. By default it does not impose a global narrative arc or tempo curve; pass a named arc only when the user explicitly requests that preset. It returns an order without writing and must not choose songs or judge theme fit.",
     "am_recently_played": "Read recent listening or recently added Apple Music content when recency matters. This API does not provide play counts; use am_top_played for Replay rankings.",
     "am_top_played": "Read Apple Music Replay play-count rankings by song, album, or artist when frequency matters. Use am_recently_played for latest listening; all-time data may be unavailable, so retry with a specific year.",
 }
@@ -600,7 +601,7 @@ def t_optimize(args: dict) -> str:
     dev = am.get_developer_token(cfg)
     user = am.require_user(cfg)
     sf = am.resolve_storefront(None, cfg, dev, user)
-    arc = args.get("arc") or opt_mod.DEFAULT_SHAPE
+    arc = args.get("arc", opt_mod.DEFAULT_ARC)
     refresh = bool(args.get("refresh"))
     isrcs = bool(args.get("isrcs"))
 
@@ -731,15 +732,15 @@ Requested size: {track_count} tracks
 Response language: {language}
 
 Use the Apple Music MCP tools to complete the task, not merely to suggest a list:
-1. Interpret the brief. Make reasonable assumptions instead of asking many questions; ask only if a missing choice would materially change the result.
-2. Call am_status before any write. If the user asks for personalization, use am_recently_played or am_top_played as supporting taste signals.
-3. Curate a candidate pool about 1.5–2 times the requested size. Use your direct understanding of the user's words, musical context, and relationships between songs. Do not turn theme fit into arbitrary 0–1 scores.
+1. Preserve the original brief, then write a compact curation contract in natural language: must-haves, avoidances, reference points, soft context or inferences, personalization scope, any narrative beats the user requested, and unresolved ambiguities. Do not invent a story, act structure, or emotional arc when the brief does not ask for one. A named song or artist used as "like X" is a reference, not an automatic request to include X; keep negation scoped to what the user rejected. Do not flatten the brief into mood/genre tags or numeric weights. Make reasonable assumptions instead of asking many questions; ask only if an ambiguity would materially change the result.
+2. Call am_status before any write. Decide from the user's words whether personalization is required, optional, or out of scope. Use am_recently_played or am_top_played only as supporting evidence when the request calls for personalization; do not silently bend a self-contained brief toward listening history.
+3. Curate a candidate pool about 1.5–2 times the requested size. Keep both the original brief and the curation contract visible. Use your direct understanding of the user's words, musical context, and relationships between songs. Do not turn theme fit into arbitrary 0–1 scores.
 4. Call am_resolve_candidates on that pool. Apple catalog data is the source of truth for availability and versions; do not invent catalog IDs. Treat has_lyrics=false as unknown, never as proof that a track is instrumental.
-5. Compare candidates directly within the role they could play: opening, development, peak, release, or landing. Prefer explicit natural-language reasons (essential / strong / bridge / optional / reject) over point scores. Unless the brief says otherwise, prefer original studio versions, avoid duplicates, and normally keep no more than two tracks per artist.
-6. Select the final set and arrange those narrative roles into ordered blocks. am_optimize_order is optional and may refine transitions inside blocks; it must not decide which songs fit the theme.
+5. Compare candidates directly against the user's brief and, only when requested or clearly implied, the narrative role they could play. For each retained track, connect the reason to the user's words or listening evidence and distinguish catalog facts from model inference. Prefer explicit natural-language reasons (essential / strong / bridge / optional / reject) over point scores. Unless the brief says otherwise, prefer original studio versions, avoid duplicates, and normally keep no more than two tracks per artist.
+6. Select the final set and choose an order that serves the brief. Use narrative sections only when requested or clearly implied; let the host LLM interpret free-form narrative intent rather than forcing it into a preset. am_optimize_order is optional and by default optimizes only local transitions; a named global arc is an opt-in for users who explicitly request that shape. It must not decide which songs fit the theme.
 7. Call am_create_playlist with dry_run=true using "Title - Artist" strings. Review misses and suspicious matches, revise candidates, and dry-run again when needed.
 8. Once the preview is sound, create the playlist with dry_run=false. If the user explicitly asked only for a plan or preview, stop before this write.
-9. Report the playlist name, ID, track count, unmatched tracks, and the most important curation choices briefly.
+9. Report the playlist name, ID, track count, unmatched tracks, the most important curation choices, and any must-have, avoidance, reference, or narrative requirement that remains uncertain. Do not collapse this coverage into one quality score.
 
 The language model in the MCP client performs the curation. This MCP server does not call or require a separate LLM provider."""
 

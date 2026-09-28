@@ -70,7 +70,7 @@ No subas `config.json`, claves `.p8`, historial de escucha ni listas generadas a
 - Crear, añadir, ver y borrar listas; `dry_run` antes de cambios grandes.
 - Auditoría de metadatos: duración, artistas, géneros, épocas, duplicados e interludios.
 - Auditoría sonora: BPM, tonalidad, volumen, energía, valencia, transiciones y arco global.
-- Optimización de orden con grupos conservados y seis arcos narrativos.
+- Optimización de orden con grupos conservados y seis arcos opcionales; sin `--arc` solo se optimizan las transiciones locales, y el LLM anfitrión interpreta las narrativas libres.
 - Reproducciones recientes y clasificaciones de Apple Music Replay.
 
 ```bash
@@ -104,7 +104,7 @@ Gemini CLI, Windsurf, Docker, Cordis/DSH y Harness está en
 [docs/client-setup.md](docs/client-setup.md).
 
 ```bash
-docker build -t apple-music-playlists:1.4.0 .
+docker build -t apple-music-playlists:1.5.0 .
 ```
 
 Un contenedor stdio necesita `-i` y no debe ejecutarse con `-d`. Inicia sesión en el host y monta la

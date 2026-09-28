@@ -69,7 +69,7 @@ Windows Apple Music アプリ、Playwright、または `media-user-token` の手
 - プレイリストの作成、追加、表示、削除。大量操作の前に `dry_run` が可能。
 - メタデータ診断：曲数、アーティスト集中度、ジャンル、年代、長さ、重複、短い間奏。
 - 音響診断：BPM、キー、ラウドネス、energy、valence、曲間遷移、全体の物語曲線。
-- グループを保持できる焼きなまし法の曲順最適化と、6 種類の narrative arc。
+- グループ順を保持する曲順最適化。6 種類の narrative arc は任意指定で、`--arc` を省略すると局所的な曲間遷移だけを最適化し、自由な物語はホスト LLM が解釈します。
 - 最近の再生履歴と Apple Music Replay の再生回数ランキング。
 
 ```bash
@@ -103,7 +103,7 @@ Windsurf、Docker、Cordis/DSH、Harness の設定は
 [docs/client-setup.md](docs/client-setup.md) を参照してください。
 
 ```bash
-docker build -t apple-music-playlists:1.4.0 .
+docker build -t apple-music-playlists:1.5.0 .
 ```
 
 stdio コンテナでは `-i` が必須で、`-d` は使用できません。ホストでログインした後、専用設定ディレクトリを

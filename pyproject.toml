@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "apple-music-playlists"
 # 版本号只有一个来源：am_paths.VERSION。手写第二份必然对不上。
 dynamic = ["version"]
-description = "Deep Apple Music playlist curation via MCP: grounded selection, narrative arcs, and flow-aware sequencing"
+description = "Deep Apple Music playlist curation via MCP: language-led selection, catalog grounding, and thoughtful listening flow"
 readme = "README.md"
 requires-python = ">=3.10"
 license = "MIT"

@@ -70,7 +70,7 @@ Não envie `config.json`, chaves `.p8`, histórico de reprodução ou playlists 
 - Criação, inclusão, visualização e exclusão de playlists, com `dry_run` antes de lotes grandes.
 - Auditoria de metadados: duração, artistas, gêneros, épocas, duplicatas e interlúdios.
 - Auditoria sonora: BPM, tom, volume, energia, valência, transições e arco geral.
-- Otimização da ordem preservando grupos e escolhendo entre seis arcos narrativos.
+- Otimização da ordem preservando grupos; os seis arcos são opcionais. Sem `--arc`, somente as transições locais são otimizadas, e narrativas livres ficam a cargo do LLM anfitrião.
 - Histórico recente e rankings de reproduções do Apple Music Replay.
 
 ```bash
@@ -103,7 +103,7 @@ operação destrutiva. A configuração para Codex, Claude, Cursor, VS Code/Copi
 Windsurf, Docker, Cordis/DSH e Harness está em [docs/client-setup.md](docs/client-setup.md).
 
 ```bash
-docker build -t apple-music-playlists:1.4.0 .
+docker build -t apple-music-playlists:1.5.0 .
 ```
 
 O contêiner stdio precisa de `-i` e não deve usar `-d`. Faça login no host, monte a configuração

@@ -32,7 +32,7 @@ Official references:
 
 1. Confirm the target version in `am_paths.VERSION`, the Git tag, GitHub Release, and changelog.
 2. Run the **publish PyPI package** workflow manually and enter the version without a leading `v`
-   (for example, `1.4.0`). The workflow checks out the immutable `v<version>` tag before testing
+   (for example, `1.5.0`). The workflow checks out the immutable `v<version>` tag before testing
    and building, so the PyPI artifact is made from the same source as the GitHub Release.
 3. Approve the `pypi` environment deployment only after the build and offline test job succeeds.
 4. Verify both the wheel and source distribution at

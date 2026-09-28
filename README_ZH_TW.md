@@ -67,7 +67,7 @@ am-playlist login
 - 建立、追加、查看與刪除歌單；大批操作可先 `dry_run`。
 - 元資料體檢：藝人集中度、類型、年代、時長、重複曲目與疑似間奏。
 - 音訊特徵體檢：BPM、調性、響度、能量、情緒、相鄰銜接與整體弧線。
-- 模擬退火重排，可保留分組，支援六種敘事弧。
+- 曲序最佳化會保留分組；六種敘事弧都是選用項。省略 `--arc` 時只最佳化局部銜接，自訂敘事由宿主 LLM 依使用者描述理解。
 - 最近播放與 Apple Music Replay 播放次數排行。
 
 ```bash
@@ -99,7 +99,7 @@ Codex、Claude、Cursor、VS Code/Copilot、Gemini CLI、Windsurf、Docker、Cor
 的完整設定請見 [docs/client-setup.zh-CN.md](docs/client-setup.zh-CN.md)。
 
 ```bash
-docker build -t apple-music-playlists:1.4.0 .
+docker build -t apple-music-playlists:1.5.0 .
 ```
 
 stdio 容器必須保留 `-i`、不可使用 `-d`。將應用專用憑證目錄掛載到
