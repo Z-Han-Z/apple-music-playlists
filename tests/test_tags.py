@@ -59,10 +59,17 @@ class TestNormalizeTags(unittest.TestCase):
 
     def test_axis_prefix(self):
         tags, problems = pt.normalize_tags(
-            ["sonic:synthwave", "context:recent-heavy-rotation"])
-        self.assertEqual([t["axis"] for t in tags], [pt.SONIC, pt.CONTEXT])
-        self.assertEqual(tags[1]["label"], "recent-heavy-rotation")
+            ["sonic:synthwave"])
+        self.assertEqual([t["axis"] for t in tags], [pt.SONIC])
+        self.assertEqual(tags[0]["label"], "synthwave")
         self.assertEqual(problems, [])
+
+    def test_axis_prefix_on_a_context_tag_without_evidence_is_reported(self):
+        """`context:` 前缀只解决「轴」，不解决「证据」——两者都要。"""
+        tags, problems = pt.normalize_tags(["context:in-library"])
+        self.assertEqual(tags[0]["axis"], pt.CONTEXT)
+        self.assertIsNone(tags[0]["evidence"])
+        self.assertTrue(any("没写 evidence" in p for p in problems))
 
     def test_dict_form_with_emphasis(self):
         tags, problems = pt.normalize_tags([
@@ -307,15 +314,23 @@ class TestPresentation(unittest.TestCase):
         self.assertEqual(pt.axis_summary(tags),
                          {pt.SONIC: 1, pt.CONTEXT: 1, pt.UNSPECIFIED: 1})
 
-    def test_direction_note_keeps_both_boundaries(self):
-        """「不是 brief」和「侧重不是选曲依据」都必须写进输出本身。"""
+    def test_direction_note_states_the_three_layer_boundary(self):
+        """边界必须是三层，缺一层就会自相矛盾。
+
+        第一版写「永不参与选曲」，评审指出那让 steer 在语义上失效：用户说 more funk
+        也没法改变歌单。所以现在要同时说清「参与 / 不是数值 / 不越权」。
+        """
         zh = pt.direction_note(self._tags(), "zh")
-        self.assertIn("不是 brief", zh)
+        self.assertIn("定性补充", zh)
+        self.assertIn("参与下一轮候选比较", zh)      # 参与
+        self.assertIn("不是数值评分", zh)            # 不是数值
+        self.assertIn("不能推翻", zh)                # 不越权
         self.assertIn("以 brief 为准", zh)
-        self.assertIn("不构成选曲依据", zh)
         en = pt.direction_note(self._tags(), "en")
-        self.assertIn("not the brief", en)
-        self.assertIn("not a selection criterion", en)
+        self.assertIn("qualitative supplement", en)
+        self.assertIn("take part in the", en)
+        self.assertIn("not a numeric score", en)
+        self.assertIn("cannot override", en)
 
     def test_direction_note_names_what_to_lean_toward(self):
         zh = pt.direction_note(self._tags(), "zh")
@@ -332,7 +347,7 @@ class TestPresentation(unittest.TestCase):
         self.assertIn("方向标签", text)
         self.assertIn("[unknown]", text)
         self.assertIn("没写轴", text)
-        self.assertIn("不是 brief", text)
+        self.assertIn("定性补充", text)
         self.assertIn("修订记录", text)
         self.assertIn("侧重=", text)
         self.assertNotIn("权重", text)
@@ -348,19 +363,280 @@ class TestPresentation(unittest.TestCase):
         text = pt.summary(tags, None, None, "zh", brief)
         self.assertIn(brief, text)                     # 原样，一字不改
         self.assertLess(text.index(brief), text.index("方向标签（1 个"))  # 出现在标签之前
-        self.assertIn("始终优先", text)
-        self.assertIn("不是 brief", text)               # 方向说明的边界仍在
+        self.assertIn("始终优先", text)                 # 回显块的抬头
+        self.assertIn("定性补充", text)                 # 方向说明的边界仍在
 
     def test_summary_without_brief_has_no_brief_block(self):
         tags, _ = pt.normalize_tags(["sonic:funk"])
         text = pt.summary(tags, None, None, "zh", "")
-        self.assertNotIn("原始 brief", text)
+        # 用回显块的抬头判断，而不是「原始 brief」子串——方向说明里本来就有这个词。
         self.assertNotIn("始终优先", text)
+        self.assertNotIn("原始 brief（", text)
 
     def test_summary_brief_blank_string_is_ignored(self):
         tags, _ = pt.normalize_tags(["sonic:funk"])
         text = pt.summary(tags, None, None, "zh", "   \n  ")
-        self.assertNotIn("原始 brief", text)
+        self.assertNotIn("始终优先", text)
+
+
+class TestContextEvidence(unittest.TestCase):
+    """`context` 轴描述的是「用户在听什么」，必须能说出**可核对的**来源。
+
+    [P1] 评审：A non-empty string is not evidence. 第一版只检查「非空字符串」，
+    于是 `in-library` 配 `evidence: "am_top_played"` 照样通过——而那个调用根本证明不了
+    歌单成员关系。所以来源改成结构化 provenance 并**按断言校验**；自由文本仍接受，
+    但只当作**未经校验的来源自述**展示，不当作证据。
+    """
+
+    @staticmethod
+    def _ctx(evidence=None):
+        item = {"label": "recent-heavy-rotation", "axis": "context"}
+        if evidence is not None:
+            item["evidence"] = evidence
+        return item
+
+    @staticmethod
+    def _structured(basis, call, ref=""):
+        return {"basis": basis, "call": call, "ref": ref}
+
+    @staticmethod
+    def _membership(evidence):
+        """in-library 是「歌单成员关系」类断言，用来测「来源撑不住断言」。"""
+        return {"label": "in-library", "axis": "context", "evidence": evidence}
+
+    # --- 结构化来源：按断言校验 -------------------------------------
+
+    def test_matching_structured_evidence_is_declared_not_verified(self):
+        """[P1] 结构化来源也只算**声明**：标签是自由文本，无法核对它与 basis 是否相符。
+
+        评审的绕过例子是 `{"label":"in-library","basis":"play-count"}`——上一版一路通过
+        还被渲染成「证据」。既然标签分类不了，就不能声称「已核实」。
+        """
+        tags, problems = pt.normalize_tags(
+            [self._ctx(self._structured("recent-listening", "am_recently_played",
+                                        "kind=tracks"))])
+        self.assertEqual(tags[0]["evidence"]["kind"], "structured")
+        self.assertEqual(len(problems), 1)
+        self.assertIn("声明", problems[0])
+        self.assertIn("无法判断", problems[0])
+        self.assertIn("不要说成已经核对过", problems[0])
+
+    def test_label_is_never_silently_matched_against_the_basis(self):
+        """评审的绕过：`in-library` + `basis=play-count` 曾经完全无问题、还被当证据。"""
+        tags, problems = pt.normalize_tags(
+            [self._membership(self._structured("play-count", "am_top_played", "year-2026"))])
+        self.assertTrue(problems, "结构化来源必须至少留下「声明而非已核实」的说明")
+        out = pt.render_tags(tags, "zh")
+        self.assertIn("未与标签核对", out)
+        self.assertNotIn("证据：", out)
+
+    def test_source_that_cannot_support_the_claim_is_rejected(self):
+        """评审举的原例：`in-library` 配 `am_top_played` 撑不住这条断言。"""
+        tags, problems = pt.normalize_tags(
+            [self._membership(self._structured("playlist-membership", "am_top_played"))])
+        self.assertEqual(len(tags), 1)                      # 接受但报出来
+        self.assertTrue(any("撑不住" in p for p in problems), problems)
+
+    def test_playlist_membership_needs_am_show_playlist(self):
+        """[P1] 评审：am_list_playlists 只列歌单名/ID，证明不了曲目在不在里面。"""
+        _, problems = pt.normalize_tags(
+            [self._membership(self._structured("playlist-membership",
+                                               "am_show_playlist", "p.abc123"))])
+        self.assertFalse([p for p in problems if "撑不住" in p], problems)
+
+    def test_list_playlists_is_rejected_as_membership_evidence(self):
+        _, problems = pt.normalize_tags(
+            [self._membership(self._structured("playlist-membership",
+                                               "am_list_playlists", "p.abc123"))])
+        self.assertTrue(any("撑不住" in p for p in problems), problems)
+        self.assertTrue(any("am_show_playlist" in p for p in problems), problems)
+
+    def test_missing_ref_is_rejected_with_what_to_record(self):
+        """[P1] 不记调用参数就无法复核。"""
+        _, problems = pt.normalize_tags(
+            [self._membership(self._structured("playlist-membership", "am_show_playlist"))])
+        self.assertTrue(any("没记 ref" in p for p in problems), problems)
+
+    def test_recent_listening_may_not_cite_kind_added(self):
+        """[P1] kind=added 是「最近入库」，不能当「最近在听」。"""
+        _, problems = pt.normalize_tags(
+            [self._ctx(self._structured("recent-listening", "am_recently_played",
+                                        "kind=added"))])
+        self.assertTrue(any("入库" in p for p in problems), problems)
+
+    def test_derived_basis_is_flagged_as_a_conclusion(self):
+        _, problems = pt.normalize_tags(
+            [self._ctx(self._structured("derived", "am_top_played",
+                                        "firstPlayed/lastPlayed × playCount"))])
+        self.assertTrue(any("推出来" in p for p in problems), problems)
+
+    def test_unknown_basis_is_reported(self):
+        _, problems = pt.normalize_tags(
+            [self._ctx(self._structured("vibes", "am_top_played", "x"))])
+        self.assertTrue(any("basis" in p and "不认识" in p for p in problems), problems)
+
+    def test_free_text_is_an_unverified_claim_not_evidence(self):
+        tags, problems = pt.normalize_tags([self._ctx("am_top_played year-2026")])
+        self.assertEqual(tags[0]["evidence"]["kind"], "claim")
+        self.assertTrue(any("未经校验" in p for p in problems))
+        self.assertIn("未校验", pt.render_tags(tags, "zh"))
+
+    def test_claim_is_never_rendered_as_verified_evidence(self):
+        tags, _ = pt.normalize_tags([self._ctx("trust me")])
+        out = pt.render_tags(tags, "zh")
+        self.assertIn("来源自述", out)
+        self.assertNotIn("证据：", out)
+
+    # --- 缺失与其它轴 ---------------------------------------------
+
+    def test_context_without_evidence_is_accepted_but_reported(self):
+        tags, problems = pt.normalize_tags([self._ctx()])
+        self.assertEqual(len(tags), 1)                      # 不阻断
+        self.assertTrue(any("没写 evidence" in p for p in problems))
+        self.assertTrue(any("模型推断" in p for p in problems))
+
+    def test_sonic_with_evidence_is_flagged_as_superfluous(self):
+        tags, problems = pt.normalize_tags(
+            [{"label": "funk", "axis": "sonic", "evidence": "am_top_played"}])
+        self.assertIsNotNone(tags[0]["evidence"])
+        self.assertTrue(any("不起支撑作用" in p for p in problems))
+
+    def test_missing_evidence_shows_up_in_the_display_line(self):
+        """用户有权看见哪个行为标签没有依据——藏起来才是问题。"""
+        tags, _ = pt.normalize_tags([self._ctx()])
+        self.assertIn("证据缺失", pt.render_tags(tags, "zh"))
+
+    def test_direction_note_carries_the_structured_evidence(self):
+        tags, _ = pt.normalize_tags(
+            [self._ctx(self._structured("play-count", "am_top_played", "year-2026"))])
+        note = pt.direction_note(tags, "zh")
+        self.assertIn("play-count", note)
+        self.assertIn("am_top_played", note)
+
+    def test_direction_note_warns_about_missing_evidence(self):
+        tags, _ = pt.normalize_tags([self._ctx()])
+        note = pt.direction_note(tags, "zh")
+        self.assertIn("没有证据来源", note)
+        self.assertIn("不要说成用户事实", note)
+
+    def test_direction_note_separates_claims_from_evidence(self):
+        tags, _ = pt.normalize_tags([self._ctx("trust me")])
+        note = pt.direction_note(tags, "zh")
+        self.assertIn("未经校验", note)
+        self.assertIn("自述", note)
+
+    def test_english_direction_note_mentions_no_evidence(self):
+        tags, _ = pt.normalize_tags([self._ctx()])
+        self.assertIn("no evidence", pt.direction_note(tags, "en"))
+
+    def test_summary_marks_missing_evidence(self):
+        tags, problems = pt.normalize_tags([self._ctx()])
+        text = pt.summary(tags, problems, None)
+        self.assertIn("证据缺失", text)
+        self.assertIn("无证据的行为标签", text)
+
+    # --- [P2] 去重之后才算证据诊断 ---------------------------------
+
+    def test_duplicate_that_later_supplies_evidence_leaves_no_stale_warning(self):
+        """[P2] 评审：先出现无证据、后来的重复项补上，那条「没写 evidence」必须消失，
+        否则同一条标签会同时显示有效证据和缺证据警告。"""
+        tags, problems = pt.normalize_tags([
+            {"label": "in-library", "axis": "context"},
+            {"label": "IN-LIBRARY", "axis": "context",
+             "evidence": self._structured("playlist-membership", "am_list_playlists")}])
+        self.assertEqual(len(tags), 1)
+        self.assertIsNotNone(tags[0]["evidence"])
+        self.assertFalse([p for p in problems if "没写 evidence" in p], problems)
+
+    def test_duplicate_prefers_structured_over_free_text(self):
+        tags, _ = pt.normalize_tags([
+            {"label": "in-library", "axis": "context", "evidence": "trust me"},
+            {"label": "IN-LIBRARY", "axis": "context",
+             "evidence": self._structured("playlist-membership", "am_list_playlists")}])
+        self.assertEqual(tags[0]["evidence"]["kind"], "structured")
+
+    def test_duplicate_keeps_exactly_one_evidence_diagnostic(self):
+        """两条重复项各自缺证据，最终只应留下针对**最终记录**的一份说明。"""
+        _, problems = pt.normalize_tags([
+            {"label": "in-library", "axis": "context"},
+            {"label": "in-library", "axis": "context"}])
+        self.assertEqual(len([p for p in problems if "没写 evidence" in p]), 1)
+
+    # --- add 路径 --------------------------------------------------
+
+    def test_add_without_evidence_reports_it_in_the_revision_record(self):
+        tags, _ = pt.normalize_tags(["sonic:funk"])
+        out, report = pt.apply_adjustments(tags, ["add context:in-library"])
+        self.assertEqual(report[0]["status"], "added")
+        self.assertIn("没写 evidence", report[0]["detail"])
+        added = [t for t in out if t["label"] == "in-library"][0]
+        self.assertIsNone(added["evidence"])
+
+
+class TestInputHygiene(unittest.TestCase):
+    """自查发现的一类问题：**静默丢数据 / 静默改写**。
+
+    这个仓库拒绝「看起来生效了、其实没有」的行为，所以下面每一条都既要**修**，
+    也要**报**——修而不报同样会让人误判。
+    """
+
+    def test_a_bare_string_is_one_label_not_characters(self):
+        """`for raw in items` 会把字符串**逐字符**拆成多个标签。"""
+        tags, problems = pt.normalize_tags("funk")
+        self.assertEqual([t["label"] for t in tags], ["funk"])
+        self.assertTrue(any("strings" in p or "字符串" in p for p in problems))
+
+    def test_control_characters_and_newlines_are_collapsed_and_reported(self):
+        """标签会被原样插进 MCP 提示词，含换行的标签能凭空多出一行。"""
+        tags, problems = pt.normalize_tags(["sonic:a\nb", {"label": "x\u0000y",
+                                                          "axis": "sonic"}])
+        self.assertEqual([t["label"] for t in tags], ["a b", "x y"])
+        self.assertTrue(any("控制字符" in p for p in problems))
+        self.assertNotIn("\n", pt.render_tags(tags, "zh"))
+
+    def test_overlong_labels_are_truncated_and_reported(self):
+        tags, problems = pt.normalize_tags([{"label": "z" * 5000, "axis": "sonic"}])
+        self.assertEqual(len(tags[0]["label"]), pt.MAX_LABEL_LEN)
+        self.assertTrue(any("过长" in p for p in problems))
+
+    def test_dict_label_with_axis_prefix_is_split_like_the_string_form(self):
+        """两种写法必须一致：`{"label": "context:x"}` 不能把前缀留在标签里。"""
+        as_dict, _ = pt.normalize_tags([{"label": "context:in-library"}])
+        as_str, _ = pt.normalize_tags(["context:in-library"])
+        self.assertEqual(as_dict[0]["label"], as_str[0]["label"])
+        self.assertEqual(as_dict[0]["axis"], pt.CONTEXT)
+
+    def test_explicit_axis_wins_over_the_label_prefix(self):
+        tags, _ = pt.normalize_tags([{"label": "context:x", "axis": "sonic"}])
+        self.assertEqual(tags[0]["label"], "x")
+        self.assertEqual(tags[0]["axis"], pt.SONIC)
+
+    def test_dict_adjustment_carries_evidence_instead_of_dropping_it(self):
+        """上一版把 dict 形式带的 evidence **直接丢掉**，报告也不提。"""
+        tags, _ = pt.normalize_tags([{"label": "funk", "axis": "sonic"}])
+        out, report = pt.apply_adjustments(tags, [
+            {"op": "add", "label": "in-library", "axis": "context",
+             "evidence": {"basis": "playlist-membership", "call": "am_show_playlist",
+                          "ref": "p.x"}}])
+        added = [t for t in out if t["label"] == "in-library"][0]
+        self.assertEqual(added["evidence"]["kind"], "structured")
+        self.assertIn("am_show_playlist", added["evidence"]["call"])
+
+    def test_evidence_without_an_axis_is_flagged(self):
+        """带 evidence 却没写轴 → 必须提示，而不是含混地当成 sonic。"""
+        tags, _ = pt.normalize_tags([{"label": "funk", "axis": "sonic"}])
+        _, report = pt.apply_adjustments(tags, [
+            {"op": "add", "label": "in-library",
+             "evidence": {"basis": "playlist-membership", "call": "am_show_playlist",
+                          "ref": "p.x"}}])
+        self.assertIn("没写轴", report[0]["detail"])
+
+    def test_evidence_on_a_non_add_adjustment_is_reported_not_ignored(self):
+        tags, _ = pt.normalize_tags(["context:in-library"])
+        _, report = pt.apply_adjustments(tags, [
+            {"op": "more", "label": "in-library", "evidence": "x"}])
+        self.assertTrue(any(r["status"] == "note" and "只对 add 有意义" in r["detail"]
+                            for r in report), report)
 
 
 class TestPromptRendering(unittest.TestCase):
@@ -392,14 +668,38 @@ class TestPromptRendering(unittest.TestCase):
         self.assertIn("axis=", text)
         self.assertIn("emphasis=", text)
 
-    def test_prompt_names_the_tool_and_the_priority(self):
+    def test_prompt_states_the_three_layer_boundary(self):
         text = self._render(tags="sonic:night")
         self.assertIn("am_tag_directions", text)
-        self.assertIn("never a selection criterion", text)
-        self.assertIn("wins any conflict", text)
+        self.assertIn("qualitative supplement", text)        # 参与
+        self.assertIn("take part in that next round", text)
+        self.assertIn("not a numeric score", text)           # 不是数值
+        self.assertIn("cannot override", text)               # 不越权
+
+    def test_steering_window_precedes_the_final_write(self):
+        """[P1] 评审：方向窗口原先排在 `dry_run=false` **之后**，用户第一次看到
+        可调方向时歌单已经写入了。所以顺序必须是「预演 → 定方向 → 写入」。"""
+        text = self._render(tags="sonic:night")
+        steering = text.index("Settle the direction with the user BEFORE anything is written")
+        preview = text.index("dry_run=true")
+        write = text.index("dry_run=false")
+        self.assertLess(preview, steering, "方向窗口应在预演之后")
+        self.assertLess(steering, write, "方向窗口必须在最终写入之前")
+
+    def test_prompt_requires_recuration_after_an_adjustment(self):
+        """[P1] 调整之后必须重做比较与排序，否则 more funk 改不了任何东西。"""
+        text = self._render()
+        self.assertIn("redo the candidate comparison", text)
+        self.assertIn("and dry-run again", text)
+        self.assertIn("Continue only once the direction is settled", text)
+
+    def test_prompt_requires_passing_the_original_brief(self):
+        """[P2] brief 必须原样带回，否则「始终可见」只在调用方自愿时成立。"""
+        text = self._render()
+        self.assertIn("always passing `brief` = the user's original description verbatim", text)
 
     def test_prompt_states_the_steering_step_even_without_tags(self):
-        """没传 tags 时也要有第 10 步——否则模型不会主动给方向。"""
+        """没传 tags 时也要有这一段——否则模型不会主动给方向。"""
         text = self._render()
         self.assertIn("am_tag_directions", text)
         self.assertNotIn("Direction tags the caller supplied", text)
@@ -433,12 +733,50 @@ class TestPromptRendering(unittest.TestCase):
         self.assertIn("unknown prompt argument", err or "")
 
 
+class TestBriefIsRequired(unittest.TestCase):
+    """[P2] 评审：`brief` 可选等于没有保证——不传就回到「原始需求被挤出上下文」。
+
+    所以强制点在**工具契约层**：schema 里 required，handler 再挡一次。
+    而且测试要**走 handler**，不是直接调 `summary()`——评审明确要求这一点。
+    """
+
+    def setUp(self):
+        import am_mcp_server as srv
+        self.srv = srv
+
+    def _tool(self):
+        return next(t for t in self.srv.TOOLS if t["name"] == "am_tag_directions")
+
+    def test_schema_marks_brief_required(self):
+        self.assertIn("brief", self._tool()["inputSchema"]["required"])
+
+    def test_validator_rejects_a_call_without_brief(self):
+        err = self.srv._validate_tool_arguments(
+            "am_tag_directions", {"tags": ["sonic:funk"]})
+        self.assertIn("brief", err or "")
+
+    def test_handler_refuses_a_blank_brief_even_below_the_schema(self):
+        got = self.srv.t_tag_directions({"tags": ["sonic:funk"], "brief": "   "})
+        self.assertIn("缺少必填参数 brief", got)
+
+    def test_handler_echoes_the_brief_through_the_real_call_path(self):
+        brief = "深夜开车听的那种，霓虹感，偏冷。"
+        got = self.srv.t_tag_directions(
+            {"tags": [{"label": "in-library", "axis": "context",
+                       "evidence": "am_list_playlists"}],
+             "adjustments": ["more in-library"], "brief": brief})
+        self.assertIn(brief, got)
+        self.assertIn("始终优先", got)
+        self.assertIn("「more in-library」→ [applied]", got)
+
+
 class TestMcpSchemaValidation(unittest.TestCase):
     def setUp(self):
         import am_mcp_server as srv
         self.srv = srv
 
     def _call(self, arguments):
+        arguments = {"brief": "test brief", **arguments}
         return self.srv.handle({
             "jsonrpc": "2.0", "id": 1, "method": "tools/call",
             "params": {"name": "am_tag_directions", "arguments": arguments},
@@ -467,6 +805,95 @@ class TestMcpSchemaValidation(unittest.TestCase):
     def test_adjustment_array_rejects_non_strings(self):
         response = self._call({"tags": ["sonic:funk"], "adjustments": [123]})
         self.assertEqual(response["error"]["code"], -32602)
+
+
+class TestStructuredAdjustmentsReachable(unittest.TestCase):
+    """[P1] 评审：模块支持结构化 adjustment，但 **MCP schema 只声明了 string**，
+    `_validate_tool_arguments` 在到达 handler 之前就拒了——那段新代码是死代码。
+
+    所以回归测试必须**走 MCP 契约**，不能只直接调 `apply_adjustments()`。
+    """
+
+    def setUp(self):
+        import am_mcp_server as srv
+        self.srv = srv
+
+    def _args(self, adjustments):
+        return {"tags": [{"label": "in-library", "axis": "context",
+                          "evidence": {"basis": "playlist-membership",
+                                       "call": "am_show_playlist", "ref": "p.x"}}],
+                "adjustments": adjustments,
+                "brief": "照我歌单里的来。"}
+
+    def test_schema_declares_both_string_and_object_forms(self):
+        tool = next(t for t in self.srv.TOOLS if t["name"] == "am_tag_directions")
+        items = tool["inputSchema"]["properties"]["adjustments"]["items"]
+        kinds = [b.get("type") for b in items["anyOf"]]
+        self.assertIn("string", kinds)
+        self.assertIn("object", kinds)
+
+    def test_validator_accepts_a_string_adjustment(self):
+        err = self.srv._validate_tool_arguments(
+            "am_tag_directions", self._args(["more in-library"]))
+        self.assertIsNone(err)
+
+    def test_validator_accepts_a_structured_adjustment(self):
+        """这一条就是评审说的「走不到」——以前会在这里被拒。"""
+        err = self.srv._validate_tool_arguments(
+            "am_tag_directions",
+            self._args([{"op": "add", "label": "recent", "axis": "context",
+                         "evidence": {"basis": "recent-listening",
+                                      "call": "am_recently_played", "ref": "kind=tracks"}}]))
+        self.assertIsNone(err, err)
+
+    def test_handler_records_a_structured_adjustments_evidence(self):
+        got = self.srv.t_tag_directions(
+            self._args([{"op": "add", "label": "recent", "axis": "context",
+                         "evidence": {"basis": "recent-listening",
+                                      "call": "am_recently_played", "ref": "kind=tracks"}}]))
+        self.assertIn("[added]", got)
+        self.assertIn("recent-listening", got)
+        self.assertIn("kind=tracks", got)
+
+
+class TestEnglishRenderingDoesNotOverclaim(unittest.TestCase):
+    """[P1] 评审：英文路径仍写 `evidence: …`，而中文路径已改成「已声明的来源（未与标签核对）」。
+
+    同一份东西两种语言说法不同，英文客户端就会把它当成已核实的证据。
+    """
+
+    @staticmethod
+    def _tags():
+        return pt.normalize_tags([{
+            "label": "in-library", "axis": "context",
+            "evidence": {"basis": "playlist-membership", "call": "am_show_playlist",
+                         "ref": "p.x"}}])[0]
+
+    def test_english_direction_note_says_declared_not_evidence(self):
+        note = pt.direction_note(self._tags(), "en")
+        self.assertIn("declared source", note)
+        self.assertIn("not checked against the label", note)
+        self.assertNotIn("evidence:", note)
+
+    def test_english_render_does_not_say_evidence(self):
+        out = pt.render_tags(self._tags(), "en")
+        self.assertIn("declared source", out)
+        self.assertNotIn("evidence", out)
+
+    def test_chinese_and_english_both_refuse_to_claim_verification(self):
+        zh = pt.direction_note(self._tags(), "zh")
+        en = pt.direction_note(self._tags(), "en")
+        self.assertIn("声明", zh)
+        self.assertIn("未与标签核对", zh)
+        self.assertIn("declared", en)
+        self.assertIn("not checked", en)
+
+    def test_english_free_text_is_still_an_unverified_claim(self):
+        tags = pt.normalize_tags([{"label": "recent", "axis": "context",
+                                   "evidence": "trust me"}])[0]
+        out = pt.render_tags(tags, "en")
+        self.assertIn("unverified provenance claim", out)
+        self.assertNotIn("evidence:", out)
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

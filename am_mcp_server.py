@@ -91,21 +91,56 @@ PROMPTS = [
             {
                 "name": "tags",
                 "description": (
-                    "Optional direction tags to show the user before or after curation: about five "
-                    "labels mixing musical character (sonic) with listening provenance (context, such "
-                    "as recent, high-rotation, or already in the library). They are rendered into the "
-                    "prompt with their priority stated. The user may reply with adjustments like "
-                    "'more funk' or 'less disco'; apply them with am_tag_directions. Emphasis is "
-                    "qualitative (soften/neutral/boost), never a number, and tags steer the result but "
-                    "never replace the brief. / "
-                    "可选的方向标签，约 5 个（音乐属性 + 用户行为来源）；用户可用 "
-                    "more X / less Y 调整，用 am_tag_directions 记账。侧重是定性的，不是数值。"
+                    "Optional direction tags to offer the user during the steering window — after "
+                    "the grounded preview and before the final write, so an adjustment can still "
+                    "change the result. About five labels mixing musical character (sonic) with "
+                    "listening provenance (context, such as recent, high-rotation, or already in the "
+                    "library). A context tag needs provenance, not a bare string: give "
+                    "{basis, call, ref}, where membership requires am_show_playlist and ref records "
+                    "the call parameters. The check covers that chain only — a free-text label "
+                    "cannot be matched to a basis — so the source is shown as declared, never as "
+                    "verified evidence. They are rendered into the prompt with their boundary "
+                    "stated: a qualitative supplement that takes part in the next round of "
+                    "comparison, is not a numeric score, and cannot override an explicit constraint "
+                    "in the brief. The user may reply with adjustments like 'more funk' or "
+                    "'less disco', which you apply with am_tag_directions (always passing their "
+                    "original description as `brief`). / "
+                    "可选的方向标签，约 5 个（音乐属性 + 用户行为来源）；context 标签要给 provenance "
+                    "{basis, call, ref}，非空字符串不算证据，成员关系必须用 am_show_playlist、"
+                    "且 ref 要记下调用参数；因为标签是自由文本，来源只算「已声明」而非「已核实」。"
+                    "用户可用 more X / less Y 调整，用 am_tag_directions 记账（始终带上原始需求）。"
                 ),
                 "required": False,
             },
         ],
     }
 ]
+
+# context 标签的 provenance 形状。tags 与 adjustments 两处都要用同一份——
+# 写两份必然漂移（评审正是先在这里找到「模块支持、schema 不支持」的落差）。
+_EVIDENCE_SCHEMA = {"anyOf": [
+    {"type": "string",
+     "description": "自由文本来源。会被接受，但只当作**未经校验的来源自述**，不当作证据"},
+    {"type": "object",
+     "properties": {
+         "basis": {"type": "string",
+                   "enum": ["recent-listening", "play-count",
+                            "playlist-membership", "derived"],
+                   "description": "这条行为断言属于哪一类"},
+         "call": {"type": "string",
+                  "enum": ["am_recently_played", "am_top_played", "am_show_playlist"],
+                  "description": "能支撑该 basis 的调用；注意 am_list_playlists 只列歌单名，"
+                                 "证明不了曲目在不在里面"},
+         "ref": {"type": "string",
+                 "description": "**必填**：调用参数，用于复核。如 kind=tracks、year-2026、"
+                                "歌单名或 p.xxxx"},
+     },
+     "required": ["basis", "call", "ref"],
+     "additionalProperties": False},
+],
+    "description": "支撑该 context 标签的 provenance。写成 {basis, call, ref} 才会被校验；"
+                   "校验的是 **basis↔call↔ref 自洽**，标签是自由文本、无法核对，"
+                   "所以展示为「已声明的来源（未与标签核对）」，不声称已核实"}
 
 TOOLS = [
     {
@@ -284,13 +319,22 @@ TOOLS = [
                        "标签由你（宿主模型）写：既包括音乐本身的属性（流派/年代/织体/氛围），"
                        "也包括**用户行为来源**（最近在听、高播放、集中循环、本就在库里、来自某个参照曲）。"
                        "两个轴要分清——sonic 是音乐属性，context 是这些歌为什么在这里；"
-                       "context 标签必须有真实收听证据（am_recently_played / am_top_played / 音乐库）支持。"
+                       "context 标签必须有来源，写成 evidence {basis, call, ref}——"
+                       "**光有非空字符串不算证据**。校验的是 **basis↔call↔ref 是否自洽**："
+                       "`am_list_playlists` 只列歌单名、证明不了曲目在不在里面，"
+                       "成员关系必须用 `am_show_playlist`；`ref` 必填且要记下调用参数，"
+                       "否则 `am_recently_played(kind=added)`（最近**入库**）会被当成「最近在听」。"
+                       "**标签是自由文本，本模块无法核对它与 basis 是否相符**，"
+                       "所以结构化来源只展示为「已声明的来源（未与标签核对）」，不声称已核实；"
+                       "自由文本则标成「未经校验的来源自述」。"
                        "把方向展示给用户后，用户可以回 `more funk` / `less disco` / `drop dark` / `add ambient`，"
                        "本工具把它做成**定性记账**：侧重只有 soften / neutral / boost 三档，"
                        "全程没有数值权重（小数会让人误以为有精度），并保留用户原话作为修订记录。"
                        "找不到的标签会报 unknown，不会静默无效果。**只读且离线**，不碰 Apple Music。"
-                       "标签是给用户的操纵面，**不是 brief**，也**不是选曲依据**——"
-                       "原始需求与策展契约仍然优先，冲突时以 brief 为准。",
+                       "**brief 是必填**：原样回传用户的原始需求，它会被回显在最前面并始终优先。"
+                       "边界是三层：方向标签**参与**下一轮候选比较（是 curation contract 的定性修订），"
+                       "**不是数值评分**，也**不能推翻** brief 里的明确约束（必须/排除/参照）——"
+                       "冲突时以 brief 为准。因此要在**最终写入之前**用它，否则 steer 没有实际意义。",
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -303,23 +347,45 @@ TOOLS = [
                                   "axis": {"type": "string", "enum": ["sonic", "context"]},
                                   "emphasis": {"type": "string",
                                                "enum": ["soften", "neutral", "boost"]},
+                                  "evidence": _EVIDENCE_SCHEMA,
                               },
                               "required": ["label"], "additionalProperties": False},
                          ]},
                          "description": "方向标签，约 5 个。字符串可用 `context:recent-heavy-rotation` "
-                                        "给轴加前缀；也可给对象 {label, axis, emphasis}。"
-                                        "侧重只有 soften/neutral/boost 三档定性状态，没有数值"},
-                "adjustments": {"type": "array", "items": {"type": "string"},
-                                "description": "用户对方向的调整，如 more funk / less disco / drop dark / "
-                                               "add ambient（也认「多一点/少一点」与 +funk/-disco）"},
+                                        "给轴加前缀；也可给对象 {label, axis, emphasis, evidence}。"
+                                        "侧重只有 soften/neutral/boost 三档定性状态，没有数值。"
+                                        "context（行为）标签要带 evidence——没有证据的会被接受但报出来，"
+                                        "并在展示串里标成「证据缺失」"},
+                # [P1] 评审：模块支持 dict 形式（可带 evidence / axis），但这里只声明了 string，
+                # `_validate_tool_arguments` 于是在到达 handler 之前就拒了——新代码成了死代码。
+                # 两种形式都要声明，并共用同一份 _EVIDENCE_SCHEMA，避免再次漂移。
+                "adjustments": {"type": "array",
+                                "items": {"anyOf": [
+                                    {"type": "string"},
+                                    {"type": "object",
+                                     "properties": {
+                                         "op": {"type": "string",
+                                                "enum": ["more", "less", "drop", "add"]},
+                                         "label": {"type": "string"},
+                                         "axis": {"type": "string",
+                                                  "enum": ["sonic", "context"]},
+                                         "evidence": _EVIDENCE_SCHEMA,
+                                     },
+                                     "required": ["op", "label"],
+                                     "additionalProperties": False},
+                                ]},
+                                "description": "用户对方向的调整。字符串形式：more funk / less disco / "
+                                               "drop dark / add ambient（也认「多一点/少一点」与 "
+                                               "+funk/-disco）；结构化形式 {op, label, axis?, evidence?}，"
+                                               "用 add 新增行为标签时可一并带上 provenance"},
                 "language": {"type": "string",
                              "description": "方向说明所用语言，zh 或 en，默认 zh"},
-                "brief": {"type": "string",
-                          "description": "原始歌单需求（可选）。传了就原样回显在最前面，"
-                                         "确保「brief 始终可见且优先」在**调整路径**上也成立——"
-                                         "用户隔一轮只说 more X 时，模型手上不该只剩方向说明"},
+                "brief": {"type": "string", "minLength": 1,
+                          "description": "**必填**：用户的原始歌单需求，原样回传。"
+                                         "它会被回显在最前面，确保「brief 始终可见且优先」"
+                                         "不依赖调用方自觉——评审指出可选参数等于没有保证"},
             },
-            "required": ["tags"],
+            "required": ["tags", "brief"],
             "additionalProperties": False,
         },
     },
@@ -372,7 +438,7 @@ _ENGLISH_TOOL_DESCRIPTIONS = {
     "am_audit_playlist": "Read-only metadata audit of playlist length, artist concentration, genres, eras, duplicates, and possible interludes. For BPM, key, energy, and transitions, use am_analyze_flow.",
     "am_analyze_flow": "Read-only diagnosis of BPM, key, loudness, energy, mood, adjacent transitions, and overall arc. It may fetch and cache remote feature data; use am_optimize_order only when a proposed replacement order is wanted.",
     "am_optimize_order": "Optionally refine local audio transitions after the LLM has selected the songs and narrative blocks. By default it does not impose a global narrative arc or tempo curve; pass a named arc only when the user explicitly requests that preset. It returns an order without writing and must not choose songs or judge theme fit.",
-    "am_tag_directions": "Present and steer the playlist's direction tags: about five labels the host model authors, covering both musical character (sonic) and listening provenance (context, such as recent, high-rotation, or already in the library). It validates the set, applies user replies like 'more funk' or 'less disco' as explicit qualitative bookkeeping over three emphasis levels (soften/neutral/boost) with the user's own wording kept as a revision record, and returns a rendered line plus a direction note for the next curation round. There are no numeric weights, because decimals would read as precision the judgement does not have. Read-only and offline: it touches nothing in Apple Music, and the tags are a steering surface that never replaces the brief and never becomes a selection criterion.",
+    "am_tag_directions": "Present and steer the playlist's direction tags: about five labels the host model authors, covering both musical character (sonic) and listening provenance (context, such as recent, high-rotation, or already in the library). Context provenance may be structured as {basis, call, ref} and is checked for internal consistency only: a non-empty string is not evidence, membership requires am_show_playlist (am_list_playlists only lists playlists), ref is required so am_recently_played(kind=added) cannot pass as recent listening, and because the label itself is free text the result is shown as a declared source, never as verified evidence. The `brief` argument is required and is echoed verbatim so the original request stays visible. The tool validates the set, applies user replies like 'more funk' or 'less disco' as explicit qualitative bookkeeping over three emphasis levels (soften/neutral/boost) with the user's own wording kept as a revision record, and returns a rendered line plus a direction note for the next curation round. Use it before the final write: the tags are a qualitative supplement that takes part in the next round of candidate comparison, is not a numeric score, and cannot override an explicit constraint in the brief. Read-only and offline: it touches nothing in Apple Music.",
     "am_recently_played": "Read recent listening or recently added Apple Music content when recency matters. This API does not provide play counts; use am_top_played for Replay rankings.",
     "am_top_played": "Read Apple Music Replay play-count rankings by song, album, or artist when frequency matters. Use am_recently_played for latest listening; all-time data may be unavailable, so retry with a specific year.",
 }
@@ -730,17 +796,23 @@ def t_tag_directions(args: dict) -> str:
 
     刻意不碰 Apple Music：这条路径不需要登录、不联网，因此随时可调用，
     也就能在真正的策展开始前先把方向谈清楚。
+
+    `brief` 是**必填**（schema 里 required，这里再挡一次绕过 schema 的调用路径）：
+    评审指出可选参数等于没有保证——不传就回到「原始需求被挤出上下文」的老问题。
     """
     raw_tags = args.get("tags") or []
     if not isinstance(raw_tags, list):
         return "tags 必须是数组。"
+    brief = str(args.get("brief") or "").strip()
+    if not brief:
+        return ("缺少必填参数 brief：请把用户的原始歌单需求**原样**传进来。"
+                "它会被回显在最前面并始终优先，这样方向调整不会把原始需求挤出上下文。")
     tags, problems = tags_mod.normalize_tags(raw_tags)
     adjustments = args.get("adjustments") or []
     if not isinstance(adjustments, list):
         return "adjustments 必须是字符串数组。"
     tags, report = tags_mod.apply_adjustments(tags, adjustments)
-    return tags_mod.summary(tags, problems, report, args.get("language") or "zh",
-                            args.get("brief") or "")
+    return tags_mod.summary(tags, problems, report, args.get("language") or "zh", brief)
 
 
 def t_recent(args: dict) -> str:
@@ -825,9 +897,13 @@ def _render_direction_tags(raw: str, language: str = "") -> str:
         lines.append("  Validation notes (report these to the user):")
         lines.extend(f"    ! {p}" for p in problems)
     lines.append(
-        "How to use them: the brief above and your curation contract stay authoritative, and the "
-        "brief wins any conflict. Emphasis is a direction hint only — never a selection criterion "
-        "and never a score. A context tag must be backed by real listening evidence.")
+        "How to use them: they are a qualitative supplement to the brief above — they take part "
+        "in the next round of candidate comparison, they are not a numeric score, and they cannot "
+        "override an explicit constraint in the brief (must-have, avoidance, or reference); the "
+        "brief wins any conflict. A context tag needs provenance — a non-empty string is not "
+        "evidence, so give {basis, call, ref}; the check covers only that chain, because a free-text "
+        "label cannot be matched to a basis, so the source is presented as declared rather than "
+        "verified. One with nothing is inference, not a fact about the user.")
     return "\n".join(lines) + "\n"
 
 
@@ -853,12 +929,11 @@ Use the Apple Music MCP tools to complete the task, not merely to suggest a list
 5. Compare candidates directly against the user's brief and, only when requested or clearly implied, the narrative role they could play. For each retained track, connect the reason to the user's words or listening evidence and distinguish catalog facts from model inference. Prefer explicit natural-language reasons (essential / strong / bridge / optional / reject) over point scores. Unless the brief says otherwise, prefer original studio versions, avoid duplicates, and normally keep no more than two tracks per artist.
 6. Select the final set and choose an order that serves the brief. Use narrative sections only when requested or clearly implied; let the host LLM interpret free-form narrative intent rather than forcing it into a preset. am_optimize_order is optional and by default optimizes only local transitions; a named global arc is an opt-in for users who explicitly request that shape. It must not decide which songs fit the theme.
 7. Call am_create_playlist with dry_run=true using "Title - Artist" strings. Review misses and suspicious matches, revise candidates, and dry-run again when needed.
-8. Once the preview is sound, create the playlist with dry_run=false. If the user explicitly asked only for a plan or preview, stop before this write.
-9. Report the playlist name, ID, track count, unmatched tracks, the most important curation choices, and any must-have, avoidance, reference, or narrative requirement that remains uncertain. Do not collapse this coverage into one quality score.
+8. Settle the direction with the user BEFORE anything is written — this window sits after the grounded preview and before the write, and it is the only point where the user's steering can still change the result. Offer about five direction tags with am_tag_directions, always passing `brief` = the user's original description verbatim so it stays visible, and show the user the returned display line. If the user replies with something like "more funk" or "less disco", call am_tag_directions again with those adjustments, then redo the candidate comparison and the block ordering under the brief's constraints, and dry-run again. Direction tags are a qualitative supplement: they take part in that next round of comparison, they are not a numeric score, and they cannot override an explicit constraint in the brief (must-have, avoidance, or reference). A context tag must name the call that backs it. Continue only once the direction is settled.
+9. Once the preview is sound and the direction is settled, create the playlist with dry_run=false. If the user explicitly asked only for a plan or preview, stop before this write.
+10. Report the playlist name, ID, track count, unmatched tracks, the most important curation choices, and any must-have, avoidance, reference, or narrative requirement that remains uncertain. Do not collapse this coverage into one quality score.
 
-The language model in the MCP client performs the curation. This MCP server does not call or require a separate LLM provider.
-
-Direction tags are how the user steers the result after the fact: offer about five of them with am_tag_directions — sonic tags for the music's own character, and context tags for why these tracks are here (a context tag must be backed by real listening evidence) — and show the user the returned display line. If the user replies with something like "more funk" or "less disco", call am_tag_directions again with those adjustments and treat the returned direction note as a supplement to the brief. The brief and your curation contract stay authoritative, emphasis is a direction hint and never a selection criterion, and the brief wins any conflict."""
+The language model in the MCP client performs the curation. This MCP server does not call or require a separate LLM provider."""
     # 没有方向标签时会留下多余空行；提示词是要被人读的，收一下。
     return re.sub(r"\n{3,}", "\n\n", rendered)
 
