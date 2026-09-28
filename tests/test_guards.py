@@ -17,6 +17,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -504,6 +505,32 @@ class TestOptimizeToolWiring(unittest.TestCase):
         from playlist_core import SHAPE_ALIASES
         enum = self._tool()["inputSchema"]["properties"]["arc"]["enum"]
         self.assertEqual(set(enum), set(SHAPE_ALIASES))
+
+    def test_arc_is_an_explicit_opt_in(self):
+        description = self._tool()["inputSchema"]["properties"]["arc"]["description"]
+        self.assertIn("省略", description)
+        self.assertIn("只优化局部衔接", description)
+        self.assertNotIn("默认 man-in-a-hole", description)
+
+    def test_omitted_arc_reaches_optimizer_as_none(self):
+        import am_mcp_server as srv
+
+        metadata = {
+            "1": {"name": "One", "artistName": "Artist", "isrc": "ISRC1"},
+            "2": {"name": "Two", "artistName": "Artist", "isrc": "ISRC2"},
+        }
+        with (
+            patch.object(srv.am, "load_config", return_value={}),
+            patch.object(srv.am, "get_developer_token", return_value="dev"),
+            patch.object(srv.am, "require_user", return_value="user"),
+            patch.object(srv.am, "resolve_storefront", return_value="us"),
+            patch.object(srv.am, "resolve_tracks", return_value=(["1", "2"], [])),
+            patch.object(srv, "catalog_meta", return_value=metadata),
+            patch.object(srv.flow_mod, "fetch_features", return_value={}),
+            patch.object(srv.opt_mod, "order_from_features", return_value=([], "report")) as order,
+        ):
+            srv.t_optimize({"tracks": ["One - Artist", "Two - Artist"]})
+        self.assertIsNone(order.call_args.kwargs["arc"])
 
     def test_input_is_three_way_exclusive_by_handler(self):
         """JSON Schema 表达不了"三选一"，所以 schema 不该写 required，由 handler 拦。"""

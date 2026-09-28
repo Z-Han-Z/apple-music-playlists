@@ -20,6 +20,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- The ordering optimizer no longer applies a fixed narrative arc or global tempo curve when `arc`
+  is omitted. Named archetypes remain available as explicit opt-ins; free-form narrative and block
+  order belong to the host LLM.
 - Package discovery metadata now describes the project as semantic curation and narrative
   playlist sequencing instead of a generic playlist generator.
 - All localized READMEs and both client guides now document the official MCP Registry's `uvx`

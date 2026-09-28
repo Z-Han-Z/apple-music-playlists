@@ -204,12 +204,12 @@ def classify_shape(vals: list[float]) -> tuple[str, list[float], dict[str, float
 
 # ---------------------------------------------------------------- 目标形状
 #
-# 上面是"认出你排出来的是什么形状"，这里是"朝着哪个形状排"。
-# 两者共用 ARCHETYPES 这**一份**曲线定义，这是刻意的：
-# 以前"选形状"只停在诊断层，优化器永远朝 man-in-a-hole 走，
-# 而策划文档把"先选一个形状"列为第一步——工具没兑现它自己写的流程。
+# 上面是"认出你排出来的是什么形状"，这里提供显式选择的排序目标。
+# 两者共用 ARCHETYPES 这**一份**曲线定义；诊断结果不会自动成为排序目标。
 
-DEFAULT_SHAPE = "man-in-a-hole"
+# A missing arc means local adjacency assistance only. Narrative shapes remain
+# available as explicit opt-ins; no playlist receives a story by default.
+DEFAULT_ARC = None
 
 # 文档与命令行里用的短名 → ARCHETYPES 的键
 SHAPE_ALIASES = {

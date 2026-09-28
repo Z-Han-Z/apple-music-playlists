@@ -90,6 +90,7 @@ am-playlist library
 
 python playlist_audit.py "歌单名"
 python playlist_flow.py "歌单名"
+# 不指定 --arc：只优化局部衔接；自定义叙事由宿主 LLM 直接理解
 python playlist_optimize.py 清单.json -o 曲序.json --arc cinderella
 python listening_stats.py top --kind songs --year 2026
 ```
