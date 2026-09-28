@@ -30,21 +30,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   scoped negation, reference semantics, and narrative beats; this feature does not reopen that. The
   original request and the curation contract stay authoritative, and `direction_note()` states both
   boundaries inside its own output rather than relying on external docs.
+
+## [1.5.0] - 2026-09-28
+
+### Added
+
 - `am_resolve_candidates` now returns each grounded recording's Apple Music URL so users can
   audition and verify the exact catalog version before a playlist is written.
 - A root `llms.txt` gives agents and directory crawlers a concise, spec-shaped map of the project's
   curation boundary, setup, research, and implementation documentation.
-- A reusable multilingual curation evaluation set provides five difficult briefs with auditable
+- A reusable multilingual curation evaluation set provides seven difficult briefs with auditable
   constraints and blind-listening questions, without freezing any model's selections as truth.
+  It includes an explicit no-narrative brief to check that routine functional playlists are not
+  forced into invented stories or preset emotional arcs.
 - The evaluation guide now defines a reproducible one-shot baseline, result template, blind-listening
   protocol, interpretation boundaries, and privacy-safe sharing rules.
+- A primary-source research note connects broad music intent, preference-bearing references,
+  query-scoped personalization, catalog-grounding limits, scrutable language profiles, and intent
+  hallucination to a testable curation workflow.
 
 ### Changed
 
-- Package discovery metadata now describes the project as semantic curation and narrative
-  playlist sequencing instead of a generic playlist generator.
+- Package discovery metadata now describes language-led curation, catalog grounding, and
+  thoughtful listening flow rather than suggesting that every playlist needs a narrative arc.
+- The ordering optimizer no longer applies a fixed narrative arc or global tempo curve when `arc`
+  is omitted. Named archetypes remain available as explicit opt-ins; free-form narrative and block
+  order belong to the host LLM.
 - All localized READMEs and both client guides now document the official MCP Registry's `uvx`
   launch path for running the PyPI package without a permanent install.
+- The description-to-playlist prompt now preserves the original brief beside a readable curation
+  contract, distinguishes reference-only anchors from inclusion requests, scopes negation, and
+  reports unresolved intent coverage without inventing a quality score. The contract also makes
+  personalization scope explicit so listening history supports requests that need it without
+  silently bending self-contained briefs toward old taste. Narrative structure is conditional on
+  the user's brief; a named global arc is an explicit opt-in, not the default.
 
 ## [1.4.0] - 2026-09-23
 
@@ -326,7 +345,8 @@ First working toolkit.
 - `docs/` — the curation research the sequencing rules are derived from.
 - `skill/` and `preset/` — an agent skill, and a Cordis preset that mounts the MCP server.
 
-[Unreleased]: https://github.com/Z-Han-Z/apple-music-playlists/compare/v1.4.0...HEAD
+[Unreleased]: https://github.com/Z-Han-Z/apple-music-playlists/compare/v1.5.0...HEAD
+[1.5.0]: https://github.com/Z-Han-Z/apple-music-playlists/compare/v1.4.0...v1.5.0
 [1.4.0]: https://github.com/Z-Han-Z/apple-music-playlists/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/Z-Han-Z/apple-music-playlists/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/Z-Han-Z/apple-music-playlists/compare/v1.1.0...v1.2.0

@@ -90,6 +90,7 @@ am-playlist library
 
 python playlist_audit.py "歌单名"
 python playlist_flow.py "歌单名"
+# 不指定 --arc：只优化局部衔接；自定义叙事由宿主 LLM 直接理解
 python playlist_optimize.py 清单.json -o 曲序.json --arc cinderella
 python listening_stats.py top --kind songs --year 2026
 ```
@@ -125,7 +126,7 @@ Codex、Claude、Cursor、VS Code/Copilot、Gemini CLI、Windsurf、Docker、Cor
 ## Docker
 
 ```bash
-docker build -t apple-music-playlists:1.4.0 .
+docker build -t apple-music-playlists:1.5.0 .
 ```
 
 容器使用 stdio，必须保留 `-i`，不要加 `-d`。先在宿主机登录，再把应用专用配置目录挂载到

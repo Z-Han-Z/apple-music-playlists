@@ -34,12 +34,17 @@ It does **not** expand artists, inject diversity, fetch audio features as a prer
 track “old favourite”, or emit a recommendation score. “Recent” and “old” are conclusions the LLM
 draws from the evidence in the context of the user's actual request.
 
+## Completed review decisions
+
+- `am_optimize_order`: omitted `arc` means adjacency-only; named narrative curves remain explicit
+  compatibility presets. The host LLM owns free-form narrative interpretation and block order,
+  while deterministic code can assist with local physical transitions.
+
 ## Remaining review queue
 
 - `profile_library.py`: retain descriptive statistics, with sample-relative labels and no claim
   that the report defines the user's taste.
-- `am_optimize_order`: retain an explicitly requested narrative arc and deterministic adjacency
-  assistance; review the current implicit default so omitted `arc` can mean adjacency-only.
+
 - playlist audits: keep measurable diagnostics and coverage reporting, while ensuring thresholds
   remain warnings rather than universal aesthetic laws.
 

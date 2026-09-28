@@ -433,5 +433,40 @@ class TestPromptRendering(unittest.TestCase):
         self.assertIn("unknown prompt argument", err or "")
 
 
+class TestMcpSchemaValidation(unittest.TestCase):
+    def setUp(self):
+        import am_mcp_server as srv
+        self.srv = srv
+
+    def _call(self, arguments):
+        return self.srv.handle({
+            "jsonrpc": "2.0", "id": 1, "method": "tools/call",
+            "params": {"name": "am_tag_directions", "arguments": arguments},
+        })
+
+    def test_union_items_accept_string_and_structured_tag(self):
+        for tag in ("sonic:funk", {"label": "funk", "axis": "sonic", "emphasis": "boost"}):
+            with self.subTest(tag=tag):
+                response = self._call({"tags": [tag]})
+                self.assertIn("result", response)
+                self.assertNotIn("error", response)
+
+    def test_union_items_reject_invalid_tag_shapes_before_handler(self):
+        invalid_tags = (
+            [123],
+            [{"axis": "sonic"}],
+            [{"label": "funk", "unknown": True}],
+            [{"label": "funk", "axis": "other"}],
+            [{"label": "funk", "emphasis": "very"}],
+        )
+        for tags in invalid_tags:
+            with self.subTest(tags=tags):
+                response = self._call({"tags": tags})
+                self.assertEqual(response["error"]["code"], -32602)
+
+    def test_adjustment_array_rejects_non_strings(self):
+        response = self._call({"tags": ["sonic:funk"], "adjustments": [123]})
+        self.assertEqual(response["error"]["code"], -32602)
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

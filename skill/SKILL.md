@@ -12,13 +12,18 @@ description: Use when creating, curating, auditing, or reordering Apple Music pl
 另接一个 LLM。支持 MCP Prompt 的宿主可调用 `create_playlist_from_description`；不支持 Prompt
 UI 时遵循同一流程：
 
-1. 理解描述，只在缺失信息会实质改变结果时提问；否则做合理假设。
-2. 调用 `am_status`；需要个性化时再参考 `am_recently_played` / `am_top_played`。
-3. 先策划目标数量 1.5–2 倍的候选池；用自然语言记录必须项、偏好、排除项与叙事角色，不生成任意的 0–1 主题分。
+1. 保留用户原文，并写一份可读的策展契约：必须、排除、仅作参照、软语境/推断、个性化范围、叙事节点、未知。
+   “像 X、但不要 X”里的 X 是参照兼排除，不是必选项；否定只约束用户实际排除的对象。只有未知项会
+   实质改变结果时才提问，否则说明合理假设。不要把描述压成流派/情绪标签或权重表。
+2. 调用 `am_status`；根据用户原话明确个性化是必需、可选还是不在范围。只有请求需要时才参考
+   `am_recently_played` / `am_top_played`，不要让收听历史静默改写一个自洽的 brief。
+3. 同时保留原始 brief 与策展契约，先策划目标数量 1.5–2 倍的候选池；不生成任意的 0–1 主题分。
 4. 用 `am_resolve_candidates` 一次校验候选池；`am_search_songs` 只用于单曲歧义或探索性搜索。不臆造 catalog ID，也不把 `has_lyrics=false` 当作纯音乐证据。
-5. 直接对照用户的原话比较候选，用 `essential / strong / bridge / optional / reject` 和开场、发展、高潮、释放、落地等角色说明取舍。
+5. 直接对照用户的原话比较候选，用 `essential / strong / bridge / optional / reject` 和开场、发展、
+   高潮、释放、落地等角色说明取舍。每个保留理由要区分 catalog 事实、收听证据与模型推断。
 6. 先定最终曲目和叙事分段；`am_optimize_order` 只可选地优化段内衔接，不负责判断主题契合度。
-7. 调用 `am_create_playlist(dry_run=true)`，处理遗漏或可疑匹配后，再正式创建并简要报告结果。
+7. 调用 `am_create_playlist(dry_run=true)`，处理遗漏或可疑匹配后，再正式创建并简要报告结果；逐项报告
+   必须、排除、参照和叙事覆盖以及仍未知之处，不合并成一个“质量分”。
 
 若用户明确只要建议或预览，则停在写入之前。CLI 主要用于登录、诊断、脚本、体检和高级维护。
 本项目不含固定艺人清单或主题，内容来自用户描述和 Agent 策划。
@@ -97,7 +102,7 @@ python build_pool.py --tag old-and-new --years 2026 2023 2021
 python playlist_audit.py     "歌单名"              # 元数据层体检
 python playlist_flow.py      "歌单名" [--refresh]  # 听感层体检（联网抓特征）
 python playlist_optimize.py  清单.json [-o 输出.json] [--features 缓存.json] [--arc 形状]
-python playlist_optimize.py  --list-shapes   # 六个可选形状
+python playlist_optimize.py  --list-shapes   # 查看六个显式预设（默认不套用）
 python -m unittest discover -s tests         # 测试（全部离线）
 ```
 
@@ -118,36 +123,34 @@ python -m unittest discover -s tests         # 测试（全部离线）
 
 ## 三、排序：怎么排出一个「好听又有意思」的顺序
 
-**MCP 里有 `am_optimize_order`**（只读：返回建议曲序，不改动歌单）。它跑的就是下面这套规则与
-形状，参数 `arc` 选叙事弧、`blocks` 保留乐章顺序、`tracks` 自由重排。它是候选已由 LLM
-选定后的**可选衔接器**：适合在不改叙事分段的前提下减少明显的 BPM/能量突变，不能用它替代 LLM 判断主题、语义和文化语境。
+**MCP 里有 `am_optimize_order`**（只读：返回建议曲序，不改动歌单）。它是候选已由 LLM
+选定后的可选局部衔接器：省略 `arc` 时不拟合任何全局叙事弧或 tempo 曲线；`blocks` 保留
+LLM 排出的段落顺序，只在段内处理相邻衔接。只有用户明确要求某个固定形状时，才显式传入
+`arc` 预设。它不能替代 LLM 对主题、语义、文化语境或自然语言叙事的理解。
 `playlist_optimize.py` 是同一算法的离线/脚本化入口，两者共用 `playlist_core`，不会分叉。
 
-完整依据见仓库 `docs/how-to-build-a-good-playlist.md`（含 PLOS ONE 2025 的实证数据表）。
+完整排序依据见仓库 `docs/how-to-build-a-good-playlist.md`（含 PLOS ONE 2025 的实证数据表）；
+自然语言意图、参照误读和验证边界见 `docs/natural-language-curation-evidence.md`。
 
-### 3.1 先选一个形状
+### 3.1 叙事弧是可选的
 
-六种叙事弧（Reagan et al. 2016 实证）：`rags to riches`（持续升）、`tragedy`（持续降）、
-**`man in a hole`（先落再起）**、`icarus`（先起再落）、`cinderella`（起落起）、`oedipus`（落起落）。
+歌单可以有清楚的故事，也可以只是围绕声音、场景或情绪形成连贯体验；不应默认替用户
+选一种固定曲线。由宿主 LLM 直接理解 brief、决定歌曲角色与顺序。若用户用自然语言描述
+了自定义叙事，把 LLM 排好的段落作为有序 `blocks` 传入；不要把叙事改写成数值轴或强行套用
+六种预设。
 
-**专业音乐人排专辑时偏向 `man in a hole`。** 30 首以上建议用"两个连续的 man-in-a-hole"——
-一个 40 分钟的大弧太难撑。**先选形状并写下来**，它是后面所有决定的裁判。
-
-**`--arc` 就是这一步的实现。** 六个形状：`rags-to-riches` / `tragedy` / `man-in-a-hole`（默认）/
-`icarus` / `cinderella` / `oedipus`。目标曲线和体检用来分类的曲线是
-`playlist_core.ARCHETYPES` 里的**同一张表**——所以"你是什么形状"和"你朝哪个形状排"不会跑偏。
+优化器省略 `--arc` 时只考虑局部相邻衔接。六种固定形状仍可作为兼容性选项，但必须由用户
+明确要求后显式传入：`rags-to-riches`、`tragedy`、`man-in-a-hole`、`icarus`、`cinderella`、
+`oedipus`。审计报告可以描述一张歌单像哪种形状；诊断不等于建议，更不代表所有歌单都应
+符合某条曲线。
 
 ```bash
 python playlist_optimize.py 清单.json --arc cinderella
 python playlist_optimize.py --list-shapes
 ```
 
-**valence / energy / loudness 跟选定的形状走，tempo 不跟。** 叙事弧描述的是情绪走向，
-而"快的放中段"是排序惯例——让 tempo 也跟着起落起，等于把两个独立的原则搅成一个。
-
-实测过为什么值得接上：那张 45 首歌单的前 30 首，在 `man-in-a-hole`（优化器原来**硬编码**的
-目标）下 arc cost 是 **2.95**，**六个形状里最差**；换成 `cinderella` 是 **1.19**。
-工具当时瞄的正是最不合身的那一个。
+显式选用预设形状时，优化器会对 `valence` / `energy` / `loudness` 拟合该曲线，并对 tempo
+使用倒 U。省略 `--arc` 则两类全局目标都关闭，避免把机械曲线误当成音乐理解。
 
 ### 3.2 四条硬性相邻规则
 
@@ -179,21 +182,18 @@ python playlist_optimize.py --list-shapes
 > 优化器只能组内重排，跨段的跳变是"六幕结构"这个决定本身的代价，不是排序没排好。
 > **结构从来不是免费的。**
 
-### 3.3 整体弧线
+### 3.3 全局曲线只在显式请求时启用
 
-```
-valence  → U 型（两端高）      ← man in a hole
-energy   → U 型
-loudness → U 型
-tempo    → 倒 U 型（两端慢、中段快）
-```
+默认没有统一的全局目标曲线。只有用户明确要求某条命名预设时，才为情绪特征增加该曲线
+偏差项，并同时启用独立的 tempo 倒 U 项；否则不把特征均值或某种情绪形状当成“好歌单”的
+定义。
 **第一首是专业人共识最高、最该单独打磨的位置。** 开场情绪按 ISO 原则：
 **先匹配听众当下状态，再引导**，而不是一上来就最炸。
 
 ### 3.4 用优化器算，而不是手排
 
-`playlist_optimize.py` 用模拟退火，在**保留分组顺序**的约束下只做组内重排，
-最小化「4 项相邻惩罚 + 4 项弧线形状偏差」。
+`playlist_optimize.py` 用模拟退火，在**保留分组顺序**的约束下只做组内重排。默认最小化
+局部相邻惩罚；只有显式指定 `--arc` 时才额外加入全局曲线偏差。
 
 输入清单两种格式：
 
@@ -208,7 +208,8 @@ tempo    → 倒 U 型（两端慢、中段快）
 
 特征数据来自 `playlist_flow.py` 生成的缓存（按 catalog id 索引，自动匹配）。
 
-**权重在文件顶部**（`W_TWO_SLOW` / `W_ARC` 等）。想让形状优先就调大 `W_ARC`；想更顺耳就调大相邻那几项。
+**权重在文件顶部**（`W_TWO_SLOW` / `W_ARC` 等）。`W_ARC` 只影响显式启用预设的调用；
+不要把调权重当作表达审美或修复主题理解的手段。
 **这两个目标会打架，得明确取舍**——实测同一份 39 首清单：保留分组时 cost 降到 19.41，
 完全自由重排能降到 1.28（相邻惩罚归零）。**分组本身是有代价的。**
 

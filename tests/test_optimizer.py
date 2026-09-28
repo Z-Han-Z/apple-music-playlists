@@ -84,25 +84,25 @@ class TestAdjacencyCostEdgeCases(unittest.TestCase):
 
 class TestArcCost(unittest.TestCase):
     def test_needs_at_least_five_featured_tracks(self):
-        self.assertEqual(po.arc_cost([T(120) for _ in range(4)]), 0.0)
-        self.assertEqual(po.arc_cost([]), 0.0)
+        self.assertEqual(po.arc_cost([T(120) for _ in range(4)], "man-in-a-hole"), 0.0)
+        self.assertEqual(po.arc_cost([], "man-in-a-hole"), 0.0)
 
     def test_non_negative(self):
         seq = [T(120, valence=v) for v in (0.1, 0.5, 0.9, 0.4, 0.2)]
-        self.assertGreaterEqual(po.arc_cost(seq), 0.0)
+        self.assertGreaterEqual(po.arc_cost(seq, "man-in-a-hole"), 0.0)
 
     def test_valence_valley_late_beats_valley_centred(self):
         """valence 的目标是"先落再起"（谷底在 60% 处），倒 U 应该明显更贵。"""
         hole = [0.9, 0.4, 0.2, 0.5, 1.0]
         inverted = [0.2, 0.5, 0.9, 0.5, 0.2]
-        a = po.arc_cost([T(120, valence=v) for v in hole])
-        b = po.arc_cost([T(120, valence=v) for v in inverted])
+        a = po.arc_cost([T(120, valence=v) for v in hole], "man-in-a-hole")
+        b = po.arc_cost([T(120, valence=v) for v in inverted], "man-in-a-hole")
         self.assertLess(a, b)
 
     def test_uniform_features_are_tolerated(self):
         """所有歌特征完全相同时，无法构成任何弧线，cost 应为确定值而非崩溃/除零。"""
         seq = [T(120, valence=0.5) for _ in range(6)]
-        self.assertIsInstance(po.arc_cost(seq), float)
+        self.assertIsInstance(po.arc_cost(seq, "man-in-a-hole"), float)
 
 
 def _blocks():
@@ -177,12 +177,7 @@ class TestTotalCost(unittest.TestCase):
 
 
 class TestArcCostHonoursTheChosenShape(unittest.TestCase):
-    """arc_cost 必须真的朝**选定**的形状排。
-
-    以前它把 man-in-a-hole 硬编码在函数体里（valence 谷底固定在 60%），
-    而策划文档把"先选一个形状"列为第一步——那一步当时只有诊断价值，
-    工具并没有兑现它自己写的流程。
-    """
+    """显式选择预设时，arc_cost 必须真的朝该形状排。"""
 
     @staticmethod
     def _ideal_seq(shape_name):
@@ -211,17 +206,15 @@ class TestArcCostHonoursTheChosenShape(unittest.TestCase):
             self.assertLessEqual(own, min(others) + 1e-9,
                                  f"{name} 的理想序列在别的形状下反而更便宜")
 
-    def test_default_shape_is_man_in_a_hole(self):
+    def test_no_narrative_arc_is_the_default(self):
         seq = self._ideal_seq("man-in-a-hole")
-        self.assertAlmostEqual(po.arc_cost(seq),
-                               po.arc_cost(seq, core.DEFAULT_SHAPE), places=12)
+        self.assertIsNone(core.DEFAULT_ARC)
+        self.assertEqual(po.arc_cost(seq), 0.0)
+        self.assertEqual(po.arc_cost(seq, None), 0.0)
 
-    def test_default_shape_is_not_all_slow_or_empty(self):
-        """默认值不该是个占位符：它必须是六个之一，而且确实是"落-起"。"""
-        self.assertIn(core.DEFAULT_SHAPE, core.SHAPE_ALIASES)
-        ideal = core.ARCHETYPES[core.resolve_shape(core.DEFAULT_SHAPE)]
-        self.assertLess(min(ideal), ideal[0])      # 中间比开头低
-        self.assertGreater(ideal[-1], ideal[0])    # 结尾比起步高
+    def test_no_arc_total_cost_is_adjacency_only(self):
+        seq = self._ideal_seq("icarus")
+        self.assertAlmostEqual(po.total_cost(seq), po.adjacency_cost(seq), places=12)
 
     def test_unknown_shape_raises(self):
         with self.assertRaises(ValueError):
@@ -325,6 +318,11 @@ class TestOrderFromFeatures(unittest.TestCase):
         labels = json.loads(last)
         self.assertEqual(len(labels), 6)
         self.assertTrue(all(label.endswith(" - X") for label in labels))
+
+    def test_report_states_that_no_global_arc_is_applied_by_default(self):
+        entries, feats = self._fixture()
+        _, report = po.order_from_features(entries, feats)
+        self.assertIn("整体叙事弧：无（仅局部衔接）", report)
 
     def test_blocks_preserve_group_order(self):
         """段落顺序是硬约束——`有意思`那一层不能为了顺耳被牺牲。"""

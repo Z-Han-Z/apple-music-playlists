@@ -21,6 +21,10 @@ English | [简体中文](README_ZH_CN.md) | [繁體中文](README_ZH_TW.md) |
 your agent turns it into a catalog-grounded selection whose versions, pacing, and transitions hold
 together as a listening experience.**
 
+[See the 12-track curation demo](#a-real-curation-demo-a-machine-dreams-it-is-human): 22 grounded
+candidates become a three-act story, including a case where the numerically cheaper order damaged
+the narrative.
+
 Pure Python standard library — no `pip install` required to run, and **no Apple Developer Program
 membership needed**. Requires Python 3.10+ and works on Windows / macOS / Linux.
 
@@ -31,7 +35,7 @@ API key, artist list, or fixed theme. The CLI remains available for login, diagn
 audits, and advanced sequencing.
 
 ```
-  understand  →  curate  →  ground  →  shape the arc  →  dry-run  →  create
+  understand  →  curate  →  ground  →  sequence with intent  →  dry-run  →  create
 ```
 
 ## Why this project
@@ -188,11 +192,11 @@ linguistic; BPM, key, energy, and valence remained supporting evidence.
 </details>
 
 This is the normal MCP workflow: the host model interprets the brief and proposes more candidates
-than it needs; `am_resolve_candidates` grounds them; the model chooses and assigns narrative roles;
+than it needs; `am_resolve_candidates` grounds them; the model chooses tracks and interprets narrative roles only when the brief calls for them;
 `am_optimize_order` optionally checks local flow without crossing semantic boundaries; and
 `am_create_playlist(dry_run=true)` verifies the exact final recordings before the write.
 
-To compare that workflow with a one-shot baseline, use the five difficult multilingual briefs and
+To compare that workflow with a one-shot baseline, use the six difficult multilingual briefs and
 blind-listening protocol in **[examples/](examples/README.md)**. The suite provides auditable
 constraints, not predetermined “correct” songs.
 
@@ -261,7 +265,7 @@ Docker, Cordis/DSH, and Harness are in **[docs/client-setup.md](docs/client-setu
 Build the non-root local container with:
 
 ```bash
-docker build -t apple-music-playlists:1.4.0 .
+docker build -t apple-music-playlists:1.5.0 .
 ```
 
 The client must run it attached with `docker run --rm -i`; mount only the app config directory and
@@ -356,7 +360,10 @@ standard and repairing against another — so the count it reported could not be
 > that a uniformly slow playlist flags *every* adjacent pair — that is real, not a sequencing
 > failure, and the report says so.
 
-**Global arc** — you choose the target shape:
+**Global narrative arc is optional.** With no `--arc`, the optimizer only considers local
+adjacency and does not impose an emotional or tempo trajectory. The host LLM should interpret a
+free-form story from the brief and preserve its order through blocks; use a named preset only when
+the user explicitly asks for that kind of curve.
 
 ```bash
 python playlist_optimize.py stack.json --arc cinderella
@@ -365,22 +372,21 @@ python playlist_optimize.py --list-shapes
 
 | Axis | Target |
 |---|---|
-| `valence`, `energy`, `loudness` | the chosen narrative archetype |
-| `tempo` | inverted U — fast in the middle |
+| `valence`, `energy`, `loudness` | the chosen archetype, only when `--arc` is explicit |
+| `tempo` | inverted U — fast in the middle, only when `--arc` is explicit |
 
-Six shapes: `rags-to-riches`, `tragedy`, `man-in-a-hole` (default), `icarus`, `cinderella`,
+Six optional shapes: `rags-to-riches`, `tragedy`, `man-in-a-hole`, `icarus`, `cinderella`,
 `oedipus`. The target curve and the shape the audit *classifies* come from the same table in
-`playlist_core.ARCHETYPES`, so "what shape is this" and "what shape am I aiming for" cannot drift
-apart.
+`playlist_core.ARCHETYPES`. The audit may still report which preset a playlist resembles; that
+diagnosis does not make the preset a recommendation or an ordering target.
 
-Tempo deliberately does **not** follow the chosen shape. The archetypes describe an emotional
-trajectory (valence / arousal); "put the fast ones in the middle" is a sequencing convention.
-Making tempo follow Cinderella too would conflate two independent principles.
+When a preset is explicitly requested, `valence` / `energy` / `loudness` follow its emotional
+trajectory and tempo uses a separate inverted-U target. With no `--arc`, neither global target is
+applied.
 
-Measuring this on a real arc playlist is what justified wiring it up: under `man-in-a-hole` — the
-shape the optimizer used to hardcode — that playlist's opening 30 tracks score an arc cost of
-**2.95**, the *worst* of the six. The same tracks score **1.19** under `cinderella`. The tool had
-been aiming at the one shape that fit least.
+An arc cost is a distance from an explicitly requested feature curve, not a measure of whether a
+playlist is good. Coverage limits what it describes, and a lower cost cannot override the brief or
+prove that one sequence sounds better.
 
 The optimizer preserves your grouping (movements / eras / moods) and only reorders *within*
 groups, so thematic structure survives the loudness tuning. Drop the grouping and it reorders
@@ -422,7 +428,8 @@ More in [`docs/apple-music-api-notes.md`](docs/apple-music-api-notes.md) and
 | [`docs/how-to-build-a-good-playlist.md`](docs/how-to-build-a-good-playlist.md) | Curation methodology: adjacency physics, arc data, six narrative shapes, the ISO principle |
 | [`docs/playlist-curation-survey.md`](docs/playlist-curation-survey.md) | Survey of published curation guidance (platform rules, DJ methods, academic findings) |
 | [`docs/evaluation-signals.md`](docs/evaluation-signals.md) | LLM-native curation: direct candidate comparison, catalog grounding, readable constraints, and why scalar theme scores stay out of the critical path |
-| [`examples/`](examples/README.md) | Reproducible multilingual curation evaluations: five difficult briefs, a baseline protocol, auditable evidence, privacy rules, and no golden track lists |
+| [`docs/natural-language-curation-evidence.md`](docs/natural-language-curation-evidence.md) | Primary research on broad music intent, reference-vs-request errors, intent hallucination, scrutable language profiles, and the reusable validation protocol |
+| [`examples/`](examples/README.md) | Reproducible multilingual curation evaluations: six difficult briefs, a baseline protocol, auditable evidence, privacy rules, and no golden track lists |
 | [`docs/algorithm-review.md`](docs/algorithm-review.md) | Review boundary for early heuristics: which decisions belong to the LLM and which deterministic algorithms should retain |
 | [`docs/platform-adapters.md`](docs/platform-adapters.md) | The platform-adapter boundary: what is platform-neutral, what an adapter must provide, and what breaks on a service that exposes no ISRC |
 | [`llms.txt`](llms.txt) | Concise agent-readable map of the curation boundary and the most useful project documents |

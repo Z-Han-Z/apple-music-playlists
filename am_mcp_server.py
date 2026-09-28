@@ -252,9 +252,10 @@ TOOLS = [
         "name": "am_optimize_order",
         "description": "为一批曲目**算出更好的顺序**。这是本项目唯一会排序的工具——"
                        "am_analyze_flow 只诊断（告诉你哪里有 2 处慢歌相邻、形状是 Icarus），"
-                       "不提供修法。这里用模拟退火在四条相邻硬规则（不要两首慢歌相邻 / "
+                       "不提供修法。这里用模拟退火处理四条相邻硬规则（不要两首慢歌相邻 / "
                        "不要「只慢一点」/ 相邻不该在 tempo 与 key 上同时相似 / 不要 BPM 无理由大跳、"
-                       "能量骤变）与选定叙事弧之间取平衡。**只读**：只返回建议顺序，不动任何歌单；"
+                       "能量骤变）。默认不拟合全局叙事弧；只有显式传入 arc 才套用一个命名预设。"
+                       "**只读**：只返回建议顺序，不动任何歌单；"
                        "把返回列表按原顺序交给 am_create_playlist 即可。因为需要每首的 BPM/调性，"
                        "首次会联网抓特征（之后走缓存）。",
         "inputSchema": {
@@ -269,8 +270,8 @@ TOOLS = [
                 "playlist": {"type": "string", "minLength": 1,
                              "description": "要重排的现有歌单名或 p.xxxx ID（与 tracks/blocks 二选一）"},
                 "arc": {"type": "string", "enum": list(SHAPE_ALIASES),
-                        "description": "目标叙事弧，默认 man-in-a-hole（先落再起）。"
-                                       "用 cinderella 表示起-落-起，等等"},
+                        "description": "可选的全局叙事弧预设。省略时不强加叙事形状，只优化局部衔接；"
+                                       "仅当用户明确要求某个命名曲线时才选择，例如 cinderella（起-落-起）。"},
                 "isrcs": {"type": "boolean", "description": "tracks/blocks 是否按 ISRC 精确匹配，默认 false"},
                 "refresh": {"type": "boolean", "description": "忽略音频特征缓存重抓，默认 false"},
             },
@@ -370,7 +371,7 @@ _ENGLISH_TOOL_DESCRIPTIONS = {
     "am_delete_playlist": "Delete one playlist permanently after it has been shown to the user. This is destructive, requires confirm=true, and does not delete the underlying songs from the library.",
     "am_audit_playlist": "Read-only metadata audit of playlist length, artist concentration, genres, eras, duplicates, and possible interludes. For BPM, key, energy, and transitions, use am_analyze_flow.",
     "am_analyze_flow": "Read-only diagnosis of BPM, key, loudness, energy, mood, adjacent transitions, and overall arc. It may fetch and cache remote feature data; use am_optimize_order only when a proposed replacement order is wanted.",
-    "am_optimize_order": "Compute a proposed order after the LLM has selected the songs and narrative blocks. It balances adjacent audio transitions with a chosen qualitative arc, returns an order without writing, and may fetch cached remote features; it must not choose songs or judge theme fit.",
+    "am_optimize_order": "Optionally refine local audio transitions after the LLM has selected the songs and narrative blocks. By default it does not impose a global narrative arc or tempo curve; pass a named arc only when the user explicitly requests that preset. It returns an order without writing and must not choose songs or judge theme fit.",
     "am_tag_directions": "Present and steer the playlist's direction tags: about five labels the host model authors, covering both musical character (sonic) and listening provenance (context, such as recent, high-rotation, or already in the library). It validates the set, applies user replies like 'more funk' or 'less disco' as explicit qualitative bookkeeping over three emphasis levels (soften/neutral/boost) with the user's own wording kept as a revision record, and returns a rendered line plus a direction note for the next curation round. There are no numeric weights, because decimals would read as precision the judgement does not have. Read-only and offline: it touches nothing in Apple Music, and the tags are a steering surface that never replaces the brief and never becomes a selection criterion.",
     "am_recently_played": "Read recent listening or recently added Apple Music content when recency matters. This API does not provide play counts; use am_top_played for Replay rankings.",
     "am_top_played": "Read Apple Music Replay play-count rankings by song, album, or artist when frequency matters. Use am_recently_played for latest listening; all-time data may be unavailable, so retry with a specific year.",
@@ -665,7 +666,7 @@ def t_optimize(args: dict) -> str:
     dev = am.get_developer_token(cfg)
     user = am.require_user(cfg)
     sf = am.resolve_storefront(None, cfg, dev, user)
-    arc = args.get("arc") or opt_mod.DEFAULT_SHAPE
+    arc = args.get("arc", opt_mod.DEFAULT_ARC)
     refresh = bool(args.get("refresh"))
     isrcs = bool(args.get("isrcs"))
 
@@ -845,15 +846,15 @@ Response language: {language}
 
 {_render_direction_tags(arguments.get("tags", "").strip(), language)}
 Use the Apple Music MCP tools to complete the task, not merely to suggest a list:
-1. Interpret the brief. Make reasonable assumptions instead of asking many questions; ask only if a missing choice would materially change the result.
-2. Call am_status before any write. If the user asks for personalization, use am_recently_played or am_top_played as supporting taste signals.
-3. Curate a candidate pool about 1.5–2 times the requested size. Use your direct understanding of the user's words, musical context, and relationships between songs. Do not turn theme fit into arbitrary 0–1 scores.
+1. Preserve the original brief, then write a compact curation contract in natural language: must-haves, avoidances, reference points, soft context or inferences, personalization scope, any narrative beats the user requested, and unresolved ambiguities. Do not invent a story, act structure, or emotional arc when the brief does not ask for one. A named song or artist used as "like X" is a reference, not an automatic request to include X; keep negation scoped to what the user rejected. Do not flatten the brief into mood/genre tags or numeric weights. Make reasonable assumptions instead of asking many questions; ask only if an ambiguity would materially change the result.
+2. Call am_status before any write. Decide from the user's words whether personalization is required, optional, or out of scope. Use am_recently_played or am_top_played only as supporting evidence when the request calls for personalization; do not silently bend a self-contained brief toward listening history.
+3. Curate a candidate pool about 1.5–2 times the requested size. Keep both the original brief and the curation contract visible. Use your direct understanding of the user's words, musical context, and relationships between songs. Do not turn theme fit into arbitrary 0–1 scores.
 4. Call am_resolve_candidates on that pool. Apple catalog data is the source of truth for availability and versions; do not invent catalog IDs. Treat has_lyrics=false as unknown, never as proof that a track is instrumental.
-5. Compare candidates directly within the role they could play: opening, development, peak, release, or landing. Prefer explicit natural-language reasons (essential / strong / bridge / optional / reject) over point scores. Unless the brief says otherwise, prefer original studio versions, avoid duplicates, and normally keep no more than two tracks per artist.
-6. Select the final set and arrange those narrative roles into ordered blocks. am_optimize_order is optional and may refine transitions inside blocks; it must not decide which songs fit the theme.
+5. Compare candidates directly against the user's brief and, only when requested or clearly implied, the narrative role they could play. For each retained track, connect the reason to the user's words or listening evidence and distinguish catalog facts from model inference. Prefer explicit natural-language reasons (essential / strong / bridge / optional / reject) over point scores. Unless the brief says otherwise, prefer original studio versions, avoid duplicates, and normally keep no more than two tracks per artist.
+6. Select the final set and choose an order that serves the brief. Use narrative sections only when requested or clearly implied; let the host LLM interpret free-form narrative intent rather than forcing it into a preset. am_optimize_order is optional and by default optimizes only local transitions; a named global arc is an opt-in for users who explicitly request that shape. It must not decide which songs fit the theme.
 7. Call am_create_playlist with dry_run=true using "Title - Artist" strings. Review misses and suspicious matches, revise candidates, and dry-run again when needed.
 8. Once the preview is sound, create the playlist with dry_run=false. If the user explicitly asked only for a plan or preview, stop before this write.
-9. Report the playlist name, ID, track count, unmatched tracks, and the most important curation choices briefly.
+9. Report the playlist name, ID, track count, unmatched tracks, the most important curation choices, and any must-have, avoidance, reference, or narrative requirement that remains uncertain. Do not collapse this coverage into one quality score.
 
 The language model in the MCP client performs the curation. This MCP server does not call or require a separate LLM provider.
 
@@ -881,6 +882,67 @@ def _validate_prompt_arguments(arguments) -> str | None:
     return None
 
 
+def _validate_schema_value(value, schema: dict, path: str) -> str | None:
+    """Validate the JSON Schema subset used by MCP tools, including nested unions."""
+    branches = schema.get("anyOf")
+    if branches is not None:
+        errors = [_validate_schema_value(value, branch, path) for branch in branches]
+        if any(error is None for error in errors):
+            return None
+        return f"{path} must match one of the allowed schema forms"
+
+    expected = schema.get("type")
+    type_checkers = {
+        "string": lambda item: isinstance(item, str),
+        "integer": lambda item: isinstance(item, int) and not isinstance(item, bool),
+        "number": lambda item: isinstance(item, (int, float)) and not isinstance(item, bool),
+        "boolean": lambda item: isinstance(item, bool),
+        "array": lambda item: isinstance(item, list),
+        "object": lambda item: isinstance(item, dict),
+        "null": lambda item: item is None,
+    }
+    checker = type_checkers.get(expected)
+    if checker and not checker(value):
+        return f"{path} must be {expected}"
+    if "enum" in schema and value not in schema["enum"]:
+        return f"{path} must be one of: {', '.join(map(str, schema['enum']))}"
+
+    if isinstance(value, str):
+        text = value.strip() if "[" in path else value
+        if len(text) < schema.get("minLength", 0):
+            return f"{path} must not be empty"
+    elif isinstance(value, (int, float)) and not isinstance(value, bool):
+        if "minimum" in schema and value < schema["minimum"]:
+            return f"{path} must be >= {schema['minimum']}"
+        if "maximum" in schema and value > schema["maximum"]:
+            return f"{path} must be <= {schema['maximum']}"
+    elif isinstance(value, list):
+        if len(value) < schema.get("minItems", 0):
+            return f"{path} must not be empty"
+        if "maxItems" in schema and len(value) > schema["maxItems"]:
+            return f"{path} must contain at most {schema['maxItems']} items"
+        item_schema = schema.get("items")
+        if item_schema:
+            for index, item in enumerate(value):
+                error = _validate_schema_value(item, item_schema, f"{path}[{index}]")
+                if error:
+                    return error
+    elif isinstance(value, dict):
+        properties = schema.get("properties", {})
+        missing = [key for key in schema.get("required", []) if key not in value]
+        if missing:
+            return f"{path} missing required field(s): {', '.join(missing)}"
+        unknown = sorted(set(value) - set(properties))
+        if unknown and schema.get("additionalProperties") is False:
+            return f"{path} has unknown field(s): {', '.join(unknown)}"
+        for key, item in value.items():
+            if key in properties:
+                error = _validate_schema_value(item, properties[key], f"{path}.{key}")
+                if error:
+                    return error
+    return None
+
+
 def _validate_tool_arguments(name: str, arguments) -> str | None:
     if not isinstance(arguments, dict):
         return "tool arguments must be a JSON object"
@@ -897,39 +959,11 @@ def _validate_tool_arguments(name: str, arguments) -> str | None:
     unknown = sorted(set(arguments) - set(properties))
     if unknown and tool["inputSchema"].get("additionalProperties") is False:
         return f"unknown argument(s): {', '.join(unknown)}"
-    expected_types = {
-        "string": lambda value: isinstance(value, str),
-        "integer": lambda value: isinstance(value, int) and not isinstance(value, bool),
-        "boolean": lambda value: isinstance(value, bool),
-        "array": lambda value: isinstance(value, list),
-    }
     for key, value in arguments.items():
         schema = properties.get(key, {})
-        expected = schema.get("type")
-        checker = expected_types.get(expected)
-        if checker and not checker(value):
-            return f"argument '{key}' must be {expected}"
-        if "enum" in schema and value not in schema["enum"]:
-            return f"argument '{key}' must be one of: {', '.join(map(str, schema['enum']))}"
-        if isinstance(value, str) and len(value) < schema.get("minLength", 0):
-            return f"argument '{key}' must not be empty"
-        if isinstance(value, int) and not isinstance(value, bool):
-            if "minimum" in schema and value < schema["minimum"]:
-                return f"argument '{key}' must be >= {schema['minimum']}"
-            if "maximum" in schema and value > schema["maximum"]:
-                return f"argument '{key}' must be <= {schema['maximum']}"
-        if isinstance(value, list):
-            if len(value) < schema.get("minItems", 0):
-                return f"argument '{key}' must not be empty"
-            if "maxItems" in schema and len(value) > schema["maxItems"]:
-                return f"argument '{key}' must contain at most {schema['maxItems']} items"
-            item_type = schema.get("items", {}).get("type")
-            item_checker = expected_types.get(item_type)
-            if item_checker and any(not item_checker(item) for item in value):
-                return f"every item in argument '{key}' must be {item_type}"
-            item_min_length = schema.get("items", {}).get("minLength", 0)
-            if item_type == "string" and any(len(item.strip()) < item_min_length for item in value):
-                return f"every item in argument '{key}' must not be empty"
+        error = _validate_schema_value(value, schema, f"argument '{key}'")
+        if error:
+            return error
     return None
 
 
