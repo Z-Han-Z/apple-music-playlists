@@ -102,7 +102,7 @@ annotation을 포함합니다. Codex, Claude, Cursor, VS Code/Copilot, Gemini CL
 Cordis/DSH 및 Harness 설정은 [docs/client-setup.md](docs/client-setup.md)를 참고하세요.
 
 ```bash
-docker build -t apple-music-playlists:1.4.0 .
+docker build -t apple-music-playlists:1.5.0 .
 ```
 
 stdio 컨테이너는 `-i`가 필요하며 `-d`를 사용하면 안 됩니다. 호스트에서 로그인한 뒤 전용 설정 디렉터리를

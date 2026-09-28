@@ -105,7 +105,7 @@ Gemini CLI, Windsurf, Docker, Cordis/DSH et Harness est détaillée dans
 [docs/client-setup.md](docs/client-setup.md).
 
 ```bash
-docker build -t apple-music-playlists:1.4.0 .
+docker build -t apple-music-playlists:1.5.0 .
 ```
 
 Le conteneur stdio exige `-i` et ne doit pas utiliser `-d`. Connectez-vous sur l'hôte, montez la

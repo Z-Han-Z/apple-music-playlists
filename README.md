@@ -192,7 +192,7 @@ linguistic; BPM, key, energy, and valence remained supporting evidence.
 </details>
 
 This is the normal MCP workflow: the host model interprets the brief and proposes more candidates
-than it needs; `am_resolve_candidates` grounds them; the model chooses and assigns narrative roles;
+than it needs; `am_resolve_candidates` grounds them; the model chooses tracks and interprets narrative roles only when the brief calls for them;
 `am_optimize_order` optionally checks local flow without crossing semantic boundaries; and
 `am_create_playlist(dry_run=true)` verifies the exact final recordings before the write.
 
@@ -265,7 +265,7 @@ Docker, Cordis/DSH, and Harness are in **[docs/client-setup.md](docs/client-setu
 Build the non-root local container with:
 
 ```bash
-docker build -t apple-music-playlists:1.4.0 .
+docker build -t apple-music-playlists:1.5.0 .
 ```
 
 The client must run it attached with `docker run --rm -i`; mount only the app config directory and

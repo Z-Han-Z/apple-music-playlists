@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-09-28
+
 ### Added
 
 - `am_resolve_candidates` now returns each grounded recording's Apple Music URL so users can
@@ -23,15 +25,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Package discovery metadata now describes the project as semantic curation and narrative
-  playlist sequencing instead of a generic playlist generator.
+- Package discovery metadata now describes language-led curation, catalog grounding, and
+  thoughtful listening flow rather than suggesting that every playlist needs a narrative arc.
 - All localized READMEs and both client guides now document the official MCP Registry's `uvx`
   launch path for running the PyPI package without a permanent install.
 - The description-to-playlist prompt now preserves the original brief beside a readable curation
   contract, distinguishes reference-only anchors from inclusion requests, scopes negation, and
   reports unresolved intent coverage without inventing a quality score. The contract also makes
   personalization scope explicit so listening history supports requests that need it without
-  silently bending self-contained briefs toward old taste.
+  silently bending self-contained briefs toward old taste. Narrative structure is conditional on
+  the user's brief; a named global arc is an explicit opt-in, not the default.
 
 ## [1.4.0] - 2026-09-23
 
@@ -313,7 +316,8 @@ First working toolkit.
 - `docs/` — the curation research the sequencing rules are derived from.
 - `skill/` and `preset/` — an agent skill, and a Cordis preset that mounts the MCP server.
 
-[Unreleased]: https://github.com/Z-Han-Z/apple-music-playlists/compare/v1.4.0...HEAD
+[Unreleased]: https://github.com/Z-Han-Z/apple-music-playlists/compare/v1.5.0...HEAD
+[1.5.0]: https://github.com/Z-Han-Z/apple-music-playlists/compare/v1.4.0...v1.5.0
 [1.4.0]: https://github.com/Z-Han-Z/apple-music-playlists/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/Z-Han-Z/apple-music-playlists/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/Z-Han-Z/apple-music-playlists/compare/v1.1.0...v1.2.0

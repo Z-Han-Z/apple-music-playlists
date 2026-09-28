@@ -99,7 +99,7 @@ Codex、Claude、Cursor、VS Code/Copilot、Gemini CLI、Windsurf、Docker、Cor
 的完整設定請見 [docs/client-setup.zh-CN.md](docs/client-setup.zh-CN.md)。
 
 ```bash
-docker build -t apple-music-playlists:1.4.0 .
+docker build -t apple-music-playlists:1.5.0 .
 ```
 
 stdio 容器必須保留 `-i`、不可使用 `-d`。將應用專用憑證目錄掛載到

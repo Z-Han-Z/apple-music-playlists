@@ -96,7 +96,7 @@ boundary from Deezer:
 original brief + readable curation contract
     → LLM proposes a deliberately oversized pool
     → am_resolve_candidates grounds exact Apple Music recordings
-    → LLM compares candidates inside narrative roles
+    → LLM compares candidates against the brief, using narrative roles only when relevant
     → LLM checks set-level coherence against the brief's promise
     → dry-run exposes catalog and version mistakes
     → optional local flow checks stay inside semantic boundaries

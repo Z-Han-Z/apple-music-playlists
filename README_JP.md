@@ -103,7 +103,7 @@ Windsurf、Docker、Cordis/DSH、Harness の設定は
 [docs/client-setup.md](docs/client-setup.md) を参照してください。
 
 ```bash
-docker build -t apple-music-playlists:1.4.0 .
+docker build -t apple-music-playlists:1.5.0 .
 ```
 
 stdio コンテナでは `-i` が必須で、`-d` は使用できません。ホストでログインした後、専用設定ディレクトリを

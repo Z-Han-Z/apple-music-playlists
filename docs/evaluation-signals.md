@@ -59,11 +59,11 @@ LLM 生成目标数量 1.5–2 倍的候选池
   ↓
 am_resolve_candidates 批量落到 Apple Music 真实元数据
   ↓
-LLM 按角色直接比较候选，保留自然语言理由
+LLM 按用户原意直接比较候选；只在 brief 需要时使用叙事角色
   ↓
-最终曲目 + opening / development / peak / release / landing 分段
+最终曲目 +（仅当用户要求或明确暗示时）叙事分段
   ↓
-可选 am_optimize_order（只做段内衔接）
+可选 am_optimize_order（默认只优化局部衔接；全局弧线须明确选择）
   ↓
 am_create_playlist dry-run → 修正 → 创建
 ```

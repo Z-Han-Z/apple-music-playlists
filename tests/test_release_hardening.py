@@ -165,6 +165,9 @@ class TestMcpCompatibility(unittest.TestCase):
         self.assertIn("Do not collapse this coverage into one quality score", text)
         self.assertIn("has_lyrics=false as unknown", text)
         self.assertIn("dry_run=true", text)
+        self.assertIn("Do not invent a story, act structure, or emotional arc", text)
+        self.assertIn("A named global arc is opt-in", text)
+        self.assertIn("narrative sections only when requested or clearly implied", text)
 
     def test_playlist_prompt_rejects_invalid_arguments(self):
         cases = [

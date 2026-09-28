@@ -106,7 +106,7 @@ VS Code/Copilot, Gemini CLI, Windsurf, Docker, Cordis/DSH und Harness stehen in
 [docs/client-setup.md](docs/client-setup.md).
 
 ```bash
-docker build -t apple-music-playlists:1.4.0 .
+docker build -t apple-music-playlists:1.5.0 .
 ```
 
 Der stdio-Container benötigt `-i` und darf nicht mit `-d` laufen. Nach der Anmeldung auf dem Host

@@ -13,7 +13,7 @@ winner forever. The cases intentionally contain no expected tracks.
    separates must-haves, avoidances, reference-only anchors, soft context, personalization scope,
    narrative beats, and unknowns. Then ask for 1.5–2× the target count, call
    `am_resolve_candidates`, compare the grounded
-   candidates in natural language, assign narrative roles, and dry-run the final list.
+   candidates in natural language, use narrative roles only when requested by the brief, and dry-run the final list.
 4. If useful, call `am_analyze_flow`. Use `am_optimize_order` only inside already chosen narrative
    blocks; keep semantic beat boundaries fixed.
 5. Listen blind. Hide the workflow label and curation notes, balance which playlist is heard first,

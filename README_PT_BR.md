@@ -103,7 +103,7 @@ operação destrutiva. A configuração para Codex, Claude, Cursor, VS Code/Copi
 Windsurf, Docker, Cordis/DSH e Harness está em [docs/client-setup.md](docs/client-setup.md).
 
 ```bash
-docker build -t apple-music-playlists:1.4.0 .
+docker build -t apple-music-playlists:1.5.0 .
 ```
 
 O contêiner stdio precisa de `-i` e não deve usar `-d`. Faça login no host, monte a configuração

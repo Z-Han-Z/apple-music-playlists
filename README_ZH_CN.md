@@ -125,7 +125,7 @@ Codex、Claude、Cursor、VS Code/Copilot、Gemini CLI、Windsurf、Docker、Cor
 ## Docker
 
 ```bash
-docker build -t apple-music-playlists:1.4.0 .
+docker build -t apple-music-playlists:1.5.0 .
 ```
 
 容器使用 stdio，必须保留 `-i`，不要加 `-d`。先在宿主机登录，再把应用专用配置目录挂载到
