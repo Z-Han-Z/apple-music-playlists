@@ -11,11 +11,12 @@ winner forever. The cases intentionally contain no expected tracks.
    list without a larger candidate pool.
 3. **Curation workflow:** keep the original brief visible and write a compact curation contract that
    separates must-haves, avoidances, reference-only anchors, soft context, personalization scope,
-   narrative beats, and unknowns. Then ask for 1.5–2× the target count, call
+   narrative beats only when requested (otherwise `none`), and unknowns. Then ask for 1.5–2× the target count, call
    `am_resolve_candidates`, compare the grounded
    candidates in natural language, use narrative roles only when requested by the brief, and dry-run the final list.
-4. If useful, call `am_analyze_flow`. Use `am_optimize_order` only inside already chosen narrative
-   blocks; keep semantic beat boundaries fixed.
+4. If useful, call `am_analyze_flow`. Use `am_optimize_order` for local transitions. Choose a
+   named global arc only when the user explicitly asks for one; keep requested semantic beat
+   boundaries fixed.
 5. Listen blind. Hide the workflow label and curation notes, balance which playlist is heard first,
    and record criterion-specific impressions before the listener states an overall preference. Do
    not reveal which workflow produced which sequence until the evaluator has answered the case's

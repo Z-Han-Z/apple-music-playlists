@@ -4,7 +4,7 @@
   "protocol": {
     "compare": [
       "baseline: ask the same model for exactly the target count and create immediately",
-      "curation workflow: expand the candidate pool, ground with am_resolve_candidates, compare candidates in language, assign narrative roles, dry-run, then optionally refine local flow",
+      "curation workflow: expand the candidate pool, ground with am_resolve_candidates, compare candidates in language, use narrative roles only when the brief calls for them, dry-run, then optionally refine local flow",
       "blind listening: hide workflow labels and curation notes, balance presentation order, and record criterion-specific impressions before overall preference",
       "optional LLM judge: report separately as a diagnostic, randomize and swap presentation order, and never merge its verdict into a human-preference score"
     ],
@@ -13,7 +13,7 @@
       "the personalization decision and which listening evidence, if any, influenced selection",
       "whole-playlist variety and local transition/flow observations as separate dimensions",
       "audio-feature coverage and adjacency warnings, reported separately from semantic quality",
-      "the natural-language role and reason for every retained track",
+      "the brief-fit reason for every retained track, and a narrative role only when the brief calls for one",
       "retained-track claims that still rely only on unverified model inference",
       "set-level coherence and any individually plausible track that weakens the brief's promise",
       "blind human preference and criterion-specific reasons",
@@ -32,6 +32,34 @@
     ]
   },
   "cases": [
+    {
+      "id": "sunday-morning-without-a-story",
+      "locale": "en",
+      "target_tracks": 10,
+      "data": "public_catalog",
+      "personalization_scope": "out_of_scope",
+      "brief": "Make a 10-track playlist for an unhurried Sunday breakfast: warm, lightly buoyant, and easy to talk over, with a mix of instrumental and vocal music from different eras. Avoid novelty songs, big dramatic crescendos, and anything that feels like background corporate music. Keep the sound varied but coherent. I do not want a story, acts, or a prescribed emotional journey—just a good, relaxed listening atmosphere.",
+      "hard_checks": [
+        "exactly 10 resolved recordings",
+        "includes both instrumental and vocal tracks",
+        "no novelty-song or corporate-background-music substitutions"
+      ],
+      "semantic_checks": [
+        "the relaxed breakfast atmosphere is clear without requiring a plot or emotional arc",
+        "the sequence remains easy to talk over without becoming uniformly sleepy",
+        "variety across eras and vocal presence still sounds like one considered playlist"
+      ],
+      "intent_risks": [
+        "warm and lightly buoyant do not require a rising energy curve",
+        "easy to talk over is not a request for bland instrumental background music",
+        "do not invent acts, characters, or a narrative journey"
+      ],
+      "blind_questions": [
+        "Does the playlist feel relaxed and present without sounding generic?",
+        "Can people comfortably talk over it while still noticing individual songs?",
+        "Does any imposed story or dramatic sequence distract from the simple use case?"
+      ]
+    },
     {
       "id": "machine-dreams-it-is-human",
       "locale": "en",

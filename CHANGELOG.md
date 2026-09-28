@@ -15,8 +15,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   audition and verify the exact catalog version before a playlist is written.
 - A root `llms.txt` gives agents and directory crawlers a concise, spec-shaped map of the project's
   curation boundary, setup, research, and implementation documentation.
-- A reusable multilingual curation evaluation set provides six difficult briefs with auditable
+- A reusable multilingual curation evaluation set provides seven difficult briefs with auditable
   constraints and blind-listening questions, without freezing any model's selections as truth.
+  It includes an explicit no-narrative brief to check that routine functional playlists are not
+  forced into invented stories or preset emotional arcs.
 - The evaluation guide now defines a reproducible one-shot baseline, result template, blind-listening
   protocol, interpretation boundaries, and privacy-safe sharing rules.
 - A primary-source research note connects broad music intent, preference-bearing references,

@@ -541,7 +541,14 @@ class TestStableReleaseAssets(unittest.TestCase):
         self.assertIn("unverified model inference", serialized)
         self.assertIn("resolved catalog record", serialized)
         self.assertIn("individually plausible track", serialized)
+        self.assertIn("use narrative roles only when the brief calls for them", serialized)
         self.assertIn("curation explanation", serialized)
+        no_story = next(case for case in payload["cases"]
+                        if case["id"] == "sunday-morning-without-a-story")
+        self.assertIn("I do not want a story, acts, or a prescribed emotional journey",
+                      no_story["brief"])
+        self.assertTrue(any("do not invent acts" in risk.lower()
+                            for risk in no_story["intent_risks"]))
         reference_case = next(case for case in payload["cases"]
                               if case["id"] == "reference-is-not-inclusion")
         self.assertIn("only as reference points", reference_case["brief"])
