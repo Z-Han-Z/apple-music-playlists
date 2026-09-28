@@ -12,8 +12,8 @@ playlist_optimize.py — 用模拟退火算出一个「好听」的曲序。
                 相邻不该在 tempo 和 key 上「同时」相似
                 不要 BPM 无理由地大跳（>40%）
                 能量骤变且调性不兼容 = 突兀
-  软性（整体）  valence/energy/loudness 朝**选定的叙事弧**（--arc，默认 man-in-a-hole）
-                tempo 走倒 U 型（快的放中段；排序惯例，不随形状变）
+  整体目标      默认不拟合叙事弧或全局 tempo 曲线；只有显式给出 --arc 才启用预设
+                valence/energy/loudness 目标与 tempo 倒 U（快的放中段）
   结构约束      分组顺序固定（"有意思"那一层不能为了顺耳牺牲掉）
 
 输入文件两种写法都支持：
@@ -52,7 +52,7 @@ ap.enable_utf8_stdout()
 # playlist_flow 会 import am_playlist（Apple 层），从它取会让这个纯算法模块
 # 间接依赖某个音乐平台——接第二个平台时算法层不该认识任何平台的代码。
 from playlist_core import (  # noqa: E402
-    DEFAULT_SHAPE,
+    DEFAULT_ARC,
     SHAPE_ALIASES,
     camelot,
     check_pair,
@@ -161,7 +161,7 @@ def load_tracks(spec_file, features_file=None):
     return spec, tracks
 
 
-def order_from_features(entries, features, *, arc=DEFAULT_SHAPE):
+def order_from_features(entries, features, *, arc=DEFAULT_ARC):
     """内存里排序：`entries` = [{cid, name, artist, isrc, block?}]，`features` = {isrc: 特征}。
 
     返回 `(ordered_tracks, report_text)`。
@@ -196,8 +196,9 @@ def order_from_features(entries, features, *, arc=DEFAULT_SHAPE):
     seq, cost = anneal(blocks, shape=arc)
 
     counts = Counter(t.get("stage", "ok") for t in seq)
+    target = resolve_shape(arc) if arc is not None else "无（仅局部衔接）"
     lines = [
-        f"目标形状：{resolve_shape(arc)}",
+        f"整体叙事弧：{target}",
         coverage_report(counts, len(seq)),
         f"原始顺序 cost = {total_cost(before, arc):.2f} "
         f"(相邻 {adjacency_cost(before):.2f} + 弧线 {arc_cost(before, arc):.2f})",
@@ -237,17 +238,17 @@ def adjacency_cost(seq):
                for r in check_pair(a, b))
 
 
-def arc_cost(seq, shape=DEFAULT_SHAPE):
-    """整体形状约束（§3.1 + §4）。
+def arc_cost(seq, shape=DEFAULT_ARC):
+    """可选的整体形状约束；`shape=None` 时不施加叙事弧或全局节奏目标。
 
-    目标曲线来自 `playlist_core.ARCHETYPES` —— 与体检器"认出你是什么形状"用的是
-    **同一份**曲线定义。这里以前硬编码 man-in-a-hole（valence 谷底在 60%），
-    而策划文档把"先选一个形状"列为第一步：那一步当时只有诊断价值，工具并没有
-    按你选的形状去排。
+    只有调用者显式提供 shape 时才使用 `playlist_core.ARCHETYPES` 中的目标；
+    体检器的形状诊断不会自动成为优化器的排序目标。
 
-      valence / energy / loudness → 选定的叙事弧（情绪走向）
-      tempo                       → 倒 U（快的放中段；排序惯例，不随形状变）
+      valence / energy / loudness → 显式选定的叙事弧（情绪走向）
+      tempo                       → 显式选弧时附带倒 U（快的放中段）
     """
+    if shape is None:
+        return 0.0
     known = [(i, t) for i, t in enumerate(seq) if t["f"]]
     if len(known) < 5:
         return 0.0
@@ -266,11 +267,11 @@ def arc_cost(seq, shape=DEFAULT_SHAPE):
     return W_ARC * total / (len(known) * len(specs))
 
 
-def total_cost(seq, shape=DEFAULT_SHAPE):
+def total_cost(seq, shape=DEFAULT_ARC):
     return adjacency_cost(seq) + arc_cost(seq, shape)
 
 
-def anneal(blocks, iters=60000, seed=7, shape=DEFAULT_SHAPE):
+def anneal(blocks, iters=60000, seed=7, shape=DEFAULT_ARC):
     rng = random.Random(seed)
     seq = [t for blk in blocks for t in blk]
     cur = total_cost(seq, shape)
@@ -318,11 +319,11 @@ def report(seq, blocks_spec):
     return ids
 
 
-def optimize(spec_file, features_file=None, out_file=None, shape=DEFAULT_SHAPE):
+def optimize(spec_file, features_file=None, out_file=None, shape=DEFAULT_ARC):
     """跑模拟退火，返回 (ids, 报告文本)。
 
     分组清单只做组内重排（保留分组顺序）；平铺清单整张自由重排。
-    shape 是目标叙事弧（见 playlist_core.SHAPE_ALIASES）。
+    shape 是可选的目标叙事弧（见 playlist_core.SHAPE_ALIASES）；默认只优化局部衔接。
     """
     import contextlib
     import io
@@ -339,7 +340,8 @@ def optimize(spec_file, features_file=None, out_file=None, shape=DEFAULT_SHAPE):
     # 覆盖率 60% 时"优化后 cost = 1.15"只说明四成位置没被评估过，
     # 而报告以前完全不提这件事。
     counts = Counter(t.get("stage", "ok") for t in tracks)
-    head = (f"目标形状：{resolve_shape(shape)}\n"
+    target = resolve_shape(shape) if shape is not None else "无（仅局部衔接）"
+    head = (f"整体叙事弧：{target}\n"
             f"载入 {len(tracks)} 首\n"
             f"{coverage_report(counts, len(tracks))}\n"
             f"原始顺序 cost = {total_cost(before, shape):.2f} "
@@ -369,15 +371,15 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     if "--list-shapes" in argv or "--shapes" in argv:
-        print("可选的目标形状（--arc <名字>）：")
+        print("可选的目标形状（仅在显式传入 --arc <名字> 时启用）：")
         for short, full in SHAPE_ALIASES.items():
             print(f"  {short:<16} {full}")
-        print(f"\n默认：{DEFAULT_SHAPE}")
+        print("\n不指定 --arc：不拟合全局叙事弧，只优化局部衔接。")
         return 0
 
     spec_file = argv[0]
     features_file = out_file = None
-    shape = DEFAULT_SHAPE
+    shape = DEFAULT_ARC
     i = 1
     while i < len(argv):
         if argv[i] in ("-o", "--out") and i + 1 < len(argv):

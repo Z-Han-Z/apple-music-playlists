@@ -90,7 +90,7 @@ python build_pool.py --tag old-and-new --years 2026 2023 2021
 python playlist_audit.py     "歌单名"              # 元数据层体检
 python playlist_flow.py      "歌单名" [--refresh]  # 听感层体检（联网抓特征）
 python playlist_optimize.py  清单.json [-o 输出.json] [--features 缓存.json] [--arc 形状]
-python playlist_optimize.py  --list-shapes   # 六个可选形状
+python playlist_optimize.py  --list-shapes   # 查看六个显式预设（默认不套用）
 python -m unittest discover -s tests         # 测试（全部离线）
 ```
 
@@ -111,37 +111,34 @@ python -m unittest discover -s tests         # 测试（全部离线）
 
 ## 三、排序：怎么排出一个「好听又有意思」的顺序
 
-**MCP 里有 `am_optimize_order`**（只读：返回建议曲序，不改动歌单）。它跑的就是下面这套规则与
-形状，参数 `arc` 选叙事弧、`blocks` 保留乐章顺序、`tracks` 自由重排。它是候选已由 LLM
-选定后的**可选衔接器**：适合在不改叙事分段的前提下减少明显的 BPM/能量突变，不能用它替代 LLM 判断主题、语义和文化语境。
+**MCP 里有 `am_optimize_order`**（只读：返回建议曲序，不改动歌单）。它是候选已由 LLM
+选定后的可选局部衔接器：省略 `arc` 时不拟合任何全局叙事弧或 tempo 曲线；`blocks` 保留
+LLM 排出的段落顺序，只在段内处理相邻衔接。只有用户明确要求某个固定形状时，才显式传入
+`arc` 预设。它不能替代 LLM 对主题、语义、文化语境或自然语言叙事的理解。
 `playlist_optimize.py` 是同一算法的离线/脚本化入口，两者共用 `playlist_core`，不会分叉。
 
 完整排序依据见仓库 `docs/how-to-build-a-good-playlist.md`（含 PLOS ONE 2025 的实证数据表）；
 自然语言意图、参照误读和验证边界见 `docs/natural-language-curation-evidence.md`。
 
-### 3.1 先选一个形状
+### 3.1 叙事弧是可选的
 
-六种叙事弧（Reagan et al. 2016 实证）：`rags to riches`（持续升）、`tragedy`（持续降）、
-**`man in a hole`（先落再起）**、`icarus`（先起再落）、`cinderella`（起落起）、`oedipus`（落起落）。
+歌单可以有清楚的故事，也可以只是围绕声音、场景或情绪形成连贯体验；不应默认替用户
+选一种固定曲线。由宿主 LLM 直接理解 brief、决定歌曲角色与顺序。若用户用自然语言描述
+了自定义叙事，把 LLM 排好的段落作为有序 `blocks` 传入；不要把叙事改写成数值轴或强行套用
+六种预设。
 
-**专业音乐人排专辑时偏向 `man in a hole`。** 30 首以上建议用"两个连续的 man-in-a-hole"——
-一个 40 分钟的大弧太难撑。**先选形状并写下来**，它是后面所有决定的裁判。
-
-**`--arc` 就是这一步的实现。** 六个形状：`rags-to-riches` / `tragedy` / `man-in-a-hole`（默认）/
-`icarus` / `cinderella` / `oedipus`。目标曲线和体检用来分类的曲线是
-`playlist_core.ARCHETYPES` 里的**同一张表**——所以"你是什么形状"和"你朝哪个形状排"不会跑偏。
+优化器省略 `--arc` 时只考虑局部相邻衔接。六种固定形状仍可作为兼容性选项，但必须由用户
+明确要求后显式传入：`rags-to-riches`、`tragedy`、`man-in-a-hole`、`icarus`、`cinderella`、
+`oedipus`。审计报告可以描述一张歌单像哪种形状；诊断不等于建议，更不代表所有歌单都应
+符合某条曲线。
 
 ```bash
 python playlist_optimize.py 清单.json --arc cinderella
 python playlist_optimize.py --list-shapes
 ```
 
-**valence / energy / loudness 跟选定的形状走，tempo 不跟。** 叙事弧描述的是情绪走向，
-而"快的放中段"是排序惯例——让 tempo 也跟着起落起，等于把两个独立的原则搅成一个。
-
-实测过为什么值得接上：那张 45 首歌单的前 30 首，在 `man-in-a-hole`（优化器原来**硬编码**的
-目标）下 arc cost 是 **2.95**，**六个形状里最差**；换成 `cinderella` 是 **1.19**。
-工具当时瞄的正是最不合身的那一个。
+显式选用预设形状时，优化器会对 `valence` / `energy` / `loudness` 拟合该曲线，并对 tempo
+使用倒 U。省略 `--arc` 则两类全局目标都关闭，避免把机械曲线误当成音乐理解。
 
 ### 3.2 四条硬性相邻规则
 
@@ -173,21 +170,18 @@ python playlist_optimize.py --list-shapes
 > 优化器只能组内重排，跨段的跳变是"六幕结构"这个决定本身的代价，不是排序没排好。
 > **结构从来不是免费的。**
 
-### 3.3 整体弧线
+### 3.3 全局曲线只在显式请求时启用
 
-```
-valence  → U 型（两端高）      ← man in a hole
-energy   → U 型
-loudness → U 型
-tempo    → 倒 U 型（两端慢、中段快）
-```
+默认没有统一的全局目标曲线。只有用户明确要求某条命名预设时，才为情绪特征增加该曲线
+偏差项，并同时启用独立的 tempo 倒 U 项；否则不把特征均值或某种情绪形状当成“好歌单”的
+定义。
 **第一首是专业人共识最高、最该单独打磨的位置。** 开场情绪按 ISO 原则：
 **先匹配听众当下状态，再引导**，而不是一上来就最炸。
 
 ### 3.4 用优化器算，而不是手排
 
-`playlist_optimize.py` 用模拟退火，在**保留分组顺序**的约束下只做组内重排，
-最小化「4 项相邻惩罚 + 4 项弧线形状偏差」。
+`playlist_optimize.py` 用模拟退火，在**保留分组顺序**的约束下只做组内重排。默认最小化
+局部相邻惩罚；只有显式指定 `--arc` 时才额外加入全局曲线偏差。
 
 输入清单两种格式：
 
@@ -202,7 +196,8 @@ tempo    → 倒 U 型（两端慢、中段快）
 
 特征数据来自 `playlist_flow.py` 生成的缓存（按 catalog id 索引，自动匹配）。
 
-**权重在文件顶部**（`W_TWO_SLOW` / `W_ARC` 等）。想让形状优先就调大 `W_ARC`；想更顺耳就调大相邻那几项。
+**权重在文件顶部**（`W_TWO_SLOW` / `W_ARC` 等）。`W_ARC` 只影响显式启用预设的调用；
+不要把调权重当作表达审美或修复主题理解的手段。
 **这两个目标会打架，得明确取舍**——实测同一份 39 首清单：保留分组时 cost 降到 19.41，
 完全自由重排能降到 1.28（相邻惩罚归零）。**分组本身是有代价的。**
 

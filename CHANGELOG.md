@@ -29,6 +29,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Package discovery metadata now describes language-led curation, catalog grounding, and
   thoughtful listening flow rather than suggesting that every playlist needs a narrative arc.
+- The ordering optimizer no longer applies a fixed narrative arc or global tempo curve when `arc`
+  is omitted. Named archetypes remain available as explicit opt-ins; free-form narrative and block
+  order belong to the host LLM.
 - All localized READMEs and both client guides now document the official MCP Registry's `uvx`
   launch path for running the PyPI package without a permanent install.
 - The description-to-playlist prompt now preserves the original brief beside a readable curation

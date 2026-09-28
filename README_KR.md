@@ -69,7 +69,7 @@ Windows Apple Music 앱, Playwright 브라우저 또는 `media-user-token` 수�
 - 플레이리스트 생성, 추가, 보기, 삭제와 대량 작업 전 `dry_run` 미리보기.
 - 메타데이터 진단: 곡 수, 아티스트 집중도, 장르, 시대, 길이, 중복, 짧은 인터루드.
 - 오디오 특성 진단: BPM, 키, 음량, energy, valence, 인접 곡 전환, 전체 서사 곡선.
-- 그룹을 유지할 수 있는 simulated annealing 순서 최적화와 여섯 가지 narrative arc.
+- 그룹 순서를 유지하는 트랙 순서 최적화. 여섯 가지 narrative arc는 선택 사항이며, `--arc`를 생략하면 로컬 전환만 최적화하고 자유로운 서사는 호스트 LLM이 해석합니다.
 - 최근 재생 내역과 Apple Music Replay 재생 횟수 순위.
 
 ```bash

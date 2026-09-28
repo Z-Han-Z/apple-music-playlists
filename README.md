@@ -35,7 +35,7 @@ API key, artist list, or fixed theme. The CLI remains available for login, diagn
 audits, and advanced sequencing.
 
 ```
-  understand  →  curate  →  ground  →  shape the arc  →  dry-run  →  create
+  understand  →  curate  →  ground  →  sequence with intent  →  dry-run  →  create
 ```
 
 ## Why this project
@@ -360,7 +360,10 @@ standard and repairing against another — so the count it reported could not be
 > that a uniformly slow playlist flags *every* adjacent pair — that is real, not a sequencing
 > failure, and the report says so.
 
-**Global arc** — you choose the target shape:
+**Global narrative arc is optional.** With no `--arc`, the optimizer only considers local
+adjacency and does not impose an emotional or tempo trajectory. The host LLM should interpret a
+free-form story from the brief and preserve its order through blocks; use a named preset only when
+the user explicitly asks for that kind of curve.
 
 ```bash
 python playlist_optimize.py stack.json --arc cinderella
@@ -369,22 +372,21 @@ python playlist_optimize.py --list-shapes
 
 | Axis | Target |
 |---|---|
-| `valence`, `energy`, `loudness` | the chosen narrative archetype |
-| `tempo` | inverted U — fast in the middle |
+| `valence`, `energy`, `loudness` | the chosen archetype, only when `--arc` is explicit |
+| `tempo` | inverted U — fast in the middle, only when `--arc` is explicit |
 
-Six shapes: `rags-to-riches`, `tragedy`, `man-in-a-hole` (default), `icarus`, `cinderella`,
+Six optional shapes: `rags-to-riches`, `tragedy`, `man-in-a-hole`, `icarus`, `cinderella`,
 `oedipus`. The target curve and the shape the audit *classifies* come from the same table in
-`playlist_core.ARCHETYPES`, so "what shape is this" and "what shape am I aiming for" cannot drift
-apart.
+`playlist_core.ARCHETYPES`. The audit may still report which preset a playlist resembles; that
+diagnosis does not make the preset a recommendation or an ordering target.
 
-Tempo deliberately does **not** follow the chosen shape. The archetypes describe an emotional
-trajectory (valence / arousal); "put the fast ones in the middle" is a sequencing convention.
-Making tempo follow Cinderella too would conflate two independent principles.
+When a preset is explicitly requested, `valence` / `energy` / `loudness` follow its emotional
+trajectory and tempo uses a separate inverted-U target. With no `--arc`, neither global target is
+applied.
 
-Measuring this on a real arc playlist is what justified wiring it up: under `man-in-a-hole` — the
-shape the optimizer used to hardcode — that playlist's opening 30 tracks score an arc cost of
-**2.95**, the *worst* of the six. The same tracks score **1.19** under `cinderella`. The tool had
-been aiming at the one shape that fit least.
+An arc cost is a distance from an explicitly requested feature curve, not a measure of whether a
+playlist is good. Coverage limits what it describes, and a lower cost cannot override the brief or
+prove that one sequence sounds better.
 
 The optimizer preserves your grouping (movements / eras / moods) and only reorders *within*
 groups, so thematic structure survives the loudness tuning. Drop the grouping and it reorders

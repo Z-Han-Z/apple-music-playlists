@@ -71,7 +71,7 @@ sécurité. Ne publiez jamais `config.json`, une clé `.p8`, l'historique d'éco
 - Création, ajout, affichage et suppression, avec `dry_run` avant les gros lots.
 - Audit des métadonnées : durée, artistes, genres, époques, doublons et interludes.
 - Audit audio : BPM, tonalité, volume, énergie, valence, transitions et arc global.
-- Optimisation de l'ordre conservant les groupes, avec six arcs narratifs.
+- Optimisation de l'ordre conservant les groupes, avec six arcs facultatifs ; sans `--arc`, seules les transitions locales sont optimisées et le LLM hôte interprète les récits libres.
 - Historique récent et classements de lectures Apple Music Replay.
 
 ```bash

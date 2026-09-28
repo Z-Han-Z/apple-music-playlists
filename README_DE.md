@@ -72,7 +72,7 @@ dürfen nicht in Git gelangen.
 - Playlists erstellen, erweitern, anzeigen und löschen; `dry_run` vor großen Änderungen.
 - Metadatenprüfung: Länge, Künstleranteile, Genres, Epochen, Duplikate und kurze Interludes.
 - Audioanalyse: BPM, Tonart, Lautheit, Energie, Valenz, Übergänge und Gesamtbogen.
-- Reihenfolgeoptimierung mit erhaltenen Gruppen und sechs narrativen Bögen.
+- Reihenfolgeoptimierung mit erhaltenen Gruppen und sechs optionalen Bögen; ohne `--arc` werden nur lokale Übergänge optimiert, freie Erzählungen interpretiert das Host-LLM.
 - Zuletzt gespielt und Wiedergabezahlen aus Apple Music Replay.
 
 ```bash
