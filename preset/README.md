@@ -1,7 +1,7 @@
 # 安装这个预设
 
 这个目录是一份 **Cordis agent preset 模板**，它把一个 MCP 服务挂到某个 Agent 上，
-让该会话直接获得 13 个 Apple Music 工具（`mcp__applemusic__am_*`）。
+让该会话直接获得 14 个 Apple Music 工具（`mcp__applemusic__am_*`）。
 
 模板里的两处占位符需要替换：
 

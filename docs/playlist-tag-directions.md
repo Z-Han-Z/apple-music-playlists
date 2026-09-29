@@ -1,0 +1,264 @@
+# 方向标签（direction tags）
+
+给用户一个**风格化的操纵面**：一次策展结束后，用大约 5 个标签说明这次「往哪个方向走」，
+让用户能说「多一点 funk / 少一点 disco」，而不必重写整段需求。
+
+对应的 MCP 工具是 `am_tag_directions`，实现是 `playlist_tags.py`。
+
+## 边界：brief 的定性补充，参与选曲但不越权
+
+先说边界，因为它决定了这个功能能做什么、不能做什么。边界是**三层**，缺一层就会自相矛盾。
+
+第一版写的是「给用户的操纵面，**永不**是选曲依据」。第二轮评审指出那是**过度矫正**：
+如果 `more funk` 永远不能参与候选取舍，用户的调整就改变不了任何东西，
+而工具与 prompt 却承诺这些标签会 steer 结果——**承诺与语义互相打架**。
+
+| 层 | 说的是 | 具体含义 |
+|---|---|---|
+| **参与** | 它**确实**进入选曲 | 方向在**下一轮候选比较**里生效，是 curation contract 的定性修订 |
+| **不是数值** | 它不是评分 | 没有权重、没有分数，不存在「1.5 比 1.0 多多少」这种假精度 |
+| **不越权** | 它不能推翻明确约束 | brief 里的**必须 / 排除 / 参照**优先；冲突时以 brief 为准 |
+
+`direction_note()` 的输出里**自带**这三层，宿主模型读到的就是带约束的指令，
+不依赖外部文档提醒：
+
+> 这些标签是原始 brief 的**定性补充**：它们**参与下一轮候选比较**，但**不是数值评分**，
+> 也不能推翻 brief 里的明确约束（必须 / 排除 / 参照）；冲突时以 brief 为准。
+
+`docs/evaluation-signals.md` 记录了为什么把需求压成标签或权重表是有害的：
+它会丢掉否定的作用范围、参照与必选的区分、以及叙事节点。**方向标签不推翻这个结论**——
+它是 brief 的**补充**，不是替代品；而「补充」意味着它确实要在写入之前参与一次比较。
+
+| | brief 与策展契约 | 方向标签 |
+|---|---|---|
+| 权威性 | **唯一权威** | 定性补充；冲突时以 brief 为准 |
+| 内容 | 必须、排除、参照、软语境、叙事节点、未决 | 约 5 个词，概括「这次往哪边挪」 |
+| 谁写的 | 用户 + 宿主模型 | 宿主模型 |
+| 用途 | 决定选哪些歌 | 在下一轮比较里**调整**候选与排序 |
+
+### 强制点在哪：`brief` 是必填
+
+「原始 brief 始终可见且优先」不能靠调用方自觉。第一版把 `brief` 做成**可选**参数，
+评审指出那等于没有保证——不传就回到「原始需求被挤出上下文」的老问题。
+现在：
+
+- `am_tag_directions` 的 schema 里 `brief` 是 **required**；
+- handler 再挡一次空值（防止绕过 schema 的调用路径）；
+- prompt 的工作流要求**始终**把用户的原始描述原样作为 `brief` 传入。
+
+## 为什么没有数值权重
+
+第一版给每个标签一个 `0.0–2.0` 的小数权重，`more` / `less` 各加减 `0.5`。
+评审否掉了它，理由成立：
+
+> 那会把自然语言中的审美判断**伪装成有精度的数值**，与项目已经确定的
+> 「由 LLM 直接理解 brief、不要把主题契合度压成参数化分数」的原则相冲突。
+
+所以现在侧重只有三档**定性**状态，**全程没有浮点数**：
+
+| 侧重 | 含义 | 由什么操作产生 |
+|---|---|---|
+| `soften` | 弱化 | 用户说 `less X` / `少一点 X` |
+| `neutral` | 中性（默认） | 标签的初始状态 |
+| `boost` | 强调 | 用户说 `more X` / `多一点 X` |
+
+`more` 在档位上走一格，到 `boost` 为止；`less` 走一格，低于 `soften` 就移除该标签。
+因此不存在「1.5 到底比 1.0 多多少」这种假精度——**这里没有可以读出精度的东西**。
+
+用户说的**原话会被完整保留**在修订记录里（`report[].input`）。所以整份结果是一份
+可读的、可回看的策展契约修订史，而不是一组参数：
+
+```text
+方向修订记录（保留原话）：
+  · 「多一点 funk」→ [applied]  「funk」neutral → boost
+  · 「less disco」→ [applied]  「disco」neutral → soften
+  · 「more techno」→ [unknown]  方向里没有「techno」…
+```
+
+## 两个轴
+
+标签分两个轴，因为它们的**可信度不同**：
+
+- **`sonic`** —— 音乐自身的属性：流派、年代、织体、氛围、编制、语言。
+- **`context`** —— 这些歌**为什么在这里**：最近在听、高播放、集中循环、本就在库里、
+  来自某个参照曲、新加入但还没听。
+
+轴必须**显式写**。本模块不猜轴——猜轴需要一份流派与行为词库，那等于把
+「这个模块不认识音乐」这句话作废。没写轴的标签会被接受但**报出来**，请补上。
+
+### `context` 必须带可核对的 `evidence`
+
+`context` 标签是「**用户在听什么**」的断言，所以它不能是印象。**光有非空字符串不算证据**——
+评审原话是 *A non-empty string is not evidence*：`in-library` 配 `evidence: "am_top_played"`
+照样能过，而那个调用根本证明不了歌单成员关系。
+
+来源要**结构化**，并且要记下**调用参数**（`ref`）：不记参数就无法复核。
+
+| `basis` | 允许的 `call` | `ref` 要记什么 |
+|---|---|---|
+| `recent-listening` | `am_recently_played` | `kind=tracks` / `played`——**不能是 `added`**（那是最近入库） |
+| `play-count` | `am_top_played` | 周期，如 `year-2026`（`all-time` 不一定存在） |
+| `playlist-membership` | **`am_show_playlist`** | 被查看的歌单名或 `p.xxxx` |
+| `derived` | `am_top_played` | 由哪些字段推导，如 `firstPlayed/lastPlayed × playCount` |
+
+**成员关系只认 `am_show_playlist`。** `am_list_playlists` 只列歌单名/ID，它自己的契约就写着
+要看曲目必须用 `am_show_playlist`——所以拿它当成员关系证据会被拒。
+
+```json
+{"label": "in-library", "axis": "context",
+ "evidence": {"basis": "playlist-membership", "call": "am_show_playlist", "ref": "歌单「通勤」"}}
+```
+
+### 结构化之后仍然叫「声明」，不叫「已核实」
+
+这一点是第二轮评审逼出来的：本模块校验的是 **`basis ↔ call ↔ ref` 这条链是否自洽**，
+而**标签是自由文本**——`in-library` 与 `basis: "play-count"` 是否矛盾，它**判断不了**。
+
+评审给的绕过例子正是：
+
+```json
+{"label": "in-library", "basis": "play-count", "call": "am_top_played", "ref": "year-2026"}
+```
+
+上一版这个输入**完全无问题**、还被渲染成「证据」。既然标签无法确定性分类，就不该声称已核实。
+所以四种状态在展示上分得开：
+
+| 状态 | 展示 |
+|---|---|
+| 结构化的链自洽 | `in-library（已声明的来源：playlist-membership via am_show_playlist ref=…（未与标签核对））` |
+| 链不自洽 / 缺 `ref` / 引用了 `added` | `⚠ …撑不住这条断言…` / `⚠ …没记 ref…` / `⚠ …是「最近入库」…` |
+| 自由文本 | `recent（来源自述（未校验）：trust me）` |
+| 空缺 | `in-library（证据缺失）` |
+
+同时每一条结构化来源都会附一句说明：**这是声明，不是已核实，转述时不要说成核对过。**
+
+**证据诊断在去重之后、对最终记录做。** 诊断若放在逐项循环里，「先出现无证据、后来的重复项
+补上了证据」会留下一条过期的「没写 evidence」，同一条标签同时显示有效来源和缺证据警告。
+
+`sonic` 标签带 `evidence` 会提示多余——音乐属性不需要收听证据。
+
+## 写法
+
+```text
+字符串：   night
+            sonic:night                              # 显式轴
+            context:recent-heavy-rotation
+对象：     {"label": "night", "axis": "sonic", "emphasis": "boost"}
+            {"label": "in-library", "axis": "context", "evidence": "am_list_playlists"}
+```
+
+约 5 个，上限 8 个——超过 8 个就不是操纵面，而是一份清单了。
+
+## 用户怎么调
+
+| 用户说 | 效果 |
+|---|---|
+| `more funk` / `多一点 funk` / `+funk` | 侧重上一档（boost 到顶就停） |
+| `less disco` / `少一点 disco` / `-disco` | 侧重下一档；低于 soften 就移除 |
+| `drop dark` / `去掉 dark` | 直接移除 |
+| `add ambient` / `加上 ambient` | 补一个（侧重 neutral） |
+
+调整有**两种写法，schema 都声明**（少了任一种，调用就会在到达 handler 之前被校验层拒掉）：
+
+```text
+字符串： more funk / less disco / drop dark / add ambient
+结构化： {"op": "add", "label": "recent", "axis": "context",
+          "evidence": {"basis": "recent-listening",
+                       "call": "am_recently_played", "ref": "kind=tracks"}}
+```
+
+结构化写法主要用于 `add` 时**一并带上 provenance**；`evidence` / `axis` 出现在非 `add` 操作上会被报成「已忽略」，而不是悄悄丢掉。
+
+三条性质是刻意保证的：
+
+1. **确定性**：同样的输入永远得到同样的输出。侧重是定性记账，不是模型即兴。
+2. **可解释**：每条调整都回一句 `before → after`，并保留用户原话。
+3. **不静默**：找不到的标签回 `unknown` 并**列出实际有哪些**；读不懂的调整回 `unparsed`；
+   去掉符号后没有可用字符的新增项回 `rejected`。用户说 `more techno` 而方向里没有 techno 时，
+   最坏的结果是「说了但没反应」——所以必须说出来。
+
+### 操作词必须有词边界
+
+拉丁操作词只在后面跟词边界时才算操作。这不是修饰，是修 bug：早期用 `startswith()`
+会把正常句子篡改掉——
+
+| 输入 | 曾经被解析成 | 现在 |
+|---|---|---|
+| `nothing but jazz` | `drop "thing but jazz"` | 解析不了 → `unparsed` |
+| `downbeat` | `less "beat"` | 解析不了 → `unparsed` |
+| `morello` | `more "llo"` | 解析不了 → `unparsed` |
+
+中文没有词边界，但操作词本身足够长且具体（`多一点` / `少一点` / `去掉`…），
+直接前缀匹配。
+
+## 交互流程：**写入之前**
+
+窗口的位置是这个功能的成败所在。第一版把方向放在写入**之后**（提示词里第 8 步
+`dry_run=false` 在前、steering 文本在后），评审复现后指出：用户第一次看到可调方向时
+歌单**已经写进去了**，`more funk` 无处生效。所以顺序必须是：
+
+```text
+1. 宿主模型读完 brief，做候选池与 grounded 预演（dry_run=true）。   ← 尚未写入
+2. 写约 5 个方向标签，混两个轴，调用 am_tag_directions(tags=[...], brief=<原始需求原文>)。
+3. 把返回的「展示」行给用户看：
+     音乐 — synthwave · night（强调）· cold（弱化）   ‖   行为 — in-library
+4. 用户回：more night / less dark。
+5. 同一工具带 adjustments 再调一次，得到新的展示行与 direction_note。
+6. **重做候选比较与分段排序**（在 brief 约束下、以方向为定性补充），再 dry-run 一次。
+7. 方向定下来之后，才 dry_run=false 写入，然后报告。               ← 写入
+```
+
+第 6 步是评审特别要求补上的：没有它，「调整」就只是一个字符串变化，
+不会改变任何候选或顺序，steering 就是空话。
+
+这个工具**只读且离线**：不碰 Apple Music，不需要登录，所以方向可以在一开始就谈清楚。
+
+当宿主通过 `create_playlist_from_description` 调用策展流程并带上 `tags` 参数时，
+这些标签会被**渲染进提示词**（含轴、侧重、证据、校验问题，以及三层边界），
+所以传入的方向不会石沉大海。
+
+## 一个完整的例子
+
+（用中立的描述，不指涉任何具体作品。）
+
+用户：「深夜开车听的那种，霓虹感，偏冷。」
+
+模型给出并展示：
+
+```text
+音乐 — synthwave · night · cold   ‖   行为 — in-library
+```
+
+用户回 `more cold` / `less driving`：
+
+```text
+[applied] 「cold」neutral → boost
+[applied] 「driving」neutral → soften
+
+展示：音乐 — synthwave · night · cold（强调）· driving（弱化）   ‖   行为 — in-library
+```
+
+若用户接着回 `more funk`，而方向里没有 funk：
+
+```text
+[unknown] 方向里没有「funk」，所以 more 没有作用；
+          现有标签：synthwave、night、cold、driving、in-library
+```
+
+—— 这是**期望行为**：宁可告诉用户「这个方向我这边没有」，也不要让它看起来生效了。
+
+## 与其他工具的分工
+
+| 关心的事 | 用哪个 |
+|---|---|
+| 选哪些歌、主题是否契合 | 宿主模型的判断（`am_resolve_candidates` 只提供 catalog 事实） |
+| 这次的**方向**是什么、用户想怎么调 | `am_tag_directions` |
+| 段内衔接是否顺 | `am_optimize_order`（可选，不负责选曲） |
+| 需求本身（必须/排除/参照/叙事） | brief 与策展契约，**始终优先** |
+
+## 边界（尚未证明的部分）
+
+- **5 个是不是正确的数量**，以及**这两个轴是不是正确的切分**——需要真实用户与盲听才能判断，
+  不是单元测试能定的。
+- 侧重档位**不参与任何打分或排序**。如果将来有人想把它喂给优化器，那正好是本文开头
+  警告过的那件事，应当先重新论证。
