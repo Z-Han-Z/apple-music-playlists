@@ -6,8 +6,8 @@
 [日本語](README_JP.md) | [한국어](README_KR.md) | [Español](README_ES.md) |
 [Português do Brasil](README_PT_BR.md) | [Deutsch](README_DE.md) | [Français](README_FR.md)
 
-**描述一種感覺、場景、年代、張力或敘事弧；MCP Agent 將它策劃成版本準確、起伏合理、
-銜接自然，能從頭聽到尾的 Apple Music 歌單。**
+**描述一種感覺、場景、年代、聆聽目的或想要的聲音；MCP Agent 會從 Apple Music 目錄挑選合適曲目、
+核對版本，並照顧整張歌單的聆聽連貫性。敘事節拍由你決定；沒有要求時，不會預設故事弧線。**
 
 主要入口是本機 `am-mcp` stdio 服務。MCP 客戶端既有的模型理解自然語言描述並挑選候選曲目；
 本服務負責目錄搜尋、精確配對和帳號操作，不內建模型，也不需要另一組 LLM API key。

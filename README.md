@@ -17,13 +17,13 @@ English | [简体中文](README_ZH_CN.md) | [繁體中文](README_ZH_TW.md) |
 [日本語](README_JP.md) | [한국어](README_KR.md) | [Español](README_ES.md) |
 [Português do Brasil](README_PT_BR.md) | [Deutsch](README_DE.md) | [Français](README_FR.md)
 
-**Deep playlist curation for Apple Music: describe a feeling, scene, era, tension, or narrative arc;
-your agent turns it into a catalog-grounded selection whose versions, pacing, and transitions hold
-together as a listening experience.**
+**Deep playlist curation for Apple Music: describe a feeling, scene, era, listening purpose, or sound;
+your agent grounds the selection and shapes its flow into a satisfying listening experience. You define
+any narrative beats; without that request, no story arc is imposed.**
 
-[See the 12-track curation demo](#a-real-curation-demo-a-machine-dreams-it-is-human): 22 grounded
-candidates become a three-act story, including a case where the numerically cheaper order damaged
-the narrative.
+[See a 12-track curation demo](#a-real-curation-demo-a-machine-dreams-it-is-human): 22 grounded
+candidates become a deliberately requested three-act story—and show why a lower optimizer cost can
+make a playlist worse. It is one possible shape, not a default template.
 
 Pure Python standard library — no `pip install` required to run, and **no Apple Developer Program
 membership needed**. Requires Python 3.10+ and works on Windows / macOS / Linux.
@@ -44,8 +44,8 @@ audits, and advanced sequencing.
   era, cultural context, contrast, and the role of each song. It is not reduced to a handful of
   user-supplied sliders or an opaque theme-fit number.
 - **Selection and sequencing stay separate.** The model decides what belongs; measured BPM, key,
-  energy, valence, and loudness can then diagnose transitions or refine order inside narrative
-  blocks without overriding the musical idea.
+  energy, valence, and loudness can diagnose transitions or refine flow within beats you specify—
+  otherwise, no global arc is imposed.
 - **Every candidate is grounded.** Catalog resolution catches missing tracks, duplicates, wrong
   artists, and suspicious live/remastered versions before the dry run and final create step.
 - **Listening evidence remains evidence.** Replay history, recent plays, dates, and play counts can

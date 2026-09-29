@@ -6,8 +6,9 @@
 [日本語](README_JP.md) | [한국어](README_KR.md) | [Español](README_ES.md) |
 [Português do Brasil](README_PT_BR.md) | Deutsch | [Français](README_FR.md)
 
-**Beschreibe ein Gefühl, eine Szene, Epoche, Spannung oder einen Erzählbogen; der MCP-Agent formt
-daraus eine Apple-Music-Playlist mit den richtigen Versionen, stimmiger Dramaturgie und fließenden Übergängen.**
+**Beschreibe ein Gefühl, eine Szene, Epoche, den Höranlass oder den gewünschten Klang; der MCP-Agent
+wählt passende Titel aus dem Apple-Music-Katalog, prüft die Versionen und gestaltet einen stimmigen
+Hörfluss. Einen Erzählbogen legst du selbst fest, wenn du einen möchtest; ungefragt wird keiner vorgegeben.**
 
 Die primäre Schnittstelle ist der lokale stdio-Dienst `am-mcp`. Das Modell im MCP-Client versteht
 die Beschreibung; dieser Dienst durchsucht den Katalog, löst Titel eindeutig auf und führt
