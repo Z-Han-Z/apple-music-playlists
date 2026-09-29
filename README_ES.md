@@ -95,7 +95,7 @@ python playlist_optimize.py list.json -o order.json --arc cinderella
 }
 ```
 
-El servidor ofrece 13 herramientas. `am_resolve_candidates` contrasta el grupo propuesto por el LLM
+El servidor ofrece 14 herramientas. `am_resolve_candidates` contrasta el grupo propuesto por el LLM
 con metadatos reales de Apple Music, pero no puntúa la afinidad temática: el modelo compara cada
 candidato directamente con las palabras del usuario. La optimización del orden es opcional y solo
 refina transiciones después de la selección. Las herramientas incluyen descripciones en inglés/chino y annotations de solo lectura,
