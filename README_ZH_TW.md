@@ -92,7 +92,7 @@ python playlist_optimize.py list.json -o order.json --arc cinderella
 }
 ```
 
-共 13 個 MCP 工具，包含 `am_resolve_candidates`：它將 LLM 提出的候選池批次對應到
+共 14 個 MCP 工具，包含 `am_resolve_candidates`：它將 LLM 提出的候選池批次對應到
 Apple Music 真實資料、重複與版本標記，但不代替 LLM 評分主題。LLM 直接根據使用者的文字比較候選；
 曲序優化只是可選的段內銜接工具。工具說明同時包含英文與中文，並標示只讀、寫入和破壞性操作。
 Codex、Claude、Cursor、VS Code/Copilot、Gemini CLI、Windsurf、Docker、Cordis/DSH 與 Harness

@@ -97,7 +97,7 @@ python playlist_optimize.py list.json -o order.json --arc cinderella
 }
 ```
 
-Der Server stellt 13 Werkzeuge bereit. `am_resolve_candidates` gleicht den vom LLM vorgeschlagenen
+Der Server stellt 14 Werkzeuge bereit. `am_resolve_candidates` gleicht den vom LLM vorgeschlagenen
 Kandidatenpool mit echten Apple-Music-Metadaten ab, bewertet aber nicht die thematische Passung:
 Das Modell vergleicht die Kandidaten direkt mit den Worten des Nutzers. Die Reihenfolgeoptimierung
 ist erst nach der Auswahl optional. Die Werkzeuge enthalten englisch/chinesische Beschreibungen sowie Annotationen für
