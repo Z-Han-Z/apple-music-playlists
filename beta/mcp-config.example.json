@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "netease-curator-beta": {
+      "command": "<ABSOLUTE_PYTHON_FROM_GENERATED_CONFIG>",
+      "args": ["-I", "-m", "netease_mcp_server"],
+      "env": {
+        "NETEASE_COOKIE": "",
+        "NETEASE_CSRF": "",
+        "NETEASE_API_URL": "",
+        "NETEASE_LOGIN_BUNDLE": "<ABSOLUTE_EXTRACTED_BUNDLE_DIRECTORY>",
+        "NETEASE_ENABLE_WRITES": "0"
+      }
+    }
+  }
+}

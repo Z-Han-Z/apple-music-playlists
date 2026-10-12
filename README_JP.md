@@ -1,5 +1,12 @@
 # Apple Music MCP プレイリスト・キュレーター
 
+**1.6.0 には NetEase の公開プレビュー**と独立した `nc-mcp` /
+`nc-login` が含まれます。[設定・Windows ダウンロード・検証範囲（中国語／英語）](docs/netease-port.md)を参照してください。
+既定の Apple サービスは変更されません。NetEase 対応は実験的な非公式機能です。
+
+プレビューもアプリではなく MCP です。`nc_setup` / `nc_status` による案内はホストとの会話で行います。
+同意後の `nc_login` はローカルでのみ QR 認証を開き、認証情報や QR をチャットに返しません。
+
 ![Apple Music MCP — Apple Music カタログで検証する自然言語プレイリスト](https://raw.githubusercontent.com/Z-Han-Z/apple-music-playlists/main/.github/assets/social-preview.jpg)
 
 [English](README.md) | [简体中文](README_ZH_CN.md) | [繁體中文](README_ZH_TW.md) |

@@ -1,5 +1,12 @@
 # Apple Music MCP 歌单策划器
 
+**1.6.0 正式版加入网易云公开预览**：独立 `nc-mcp` / `nc-login`
+入口、语言主导选曲、分页收藏读取和显式写入确认。参见[配置、Windows 下载与验证限制](docs/netease-port.md)。
+默认 Apple 服务及工具名保持不变；网易云适配仍为实验性功能，并非官方项目。
+
+公开预览仍是 MCP，不是应用：用 `nc_setup` / `nc_status` 在宿主对话中引导配置、登录和策划。
+经同意后的 `nc_login` 只在本机打开扫码授权；凭证和二维码不进入聊天，没有独立向导或问卷。
+
 ![Apple Music MCP——基于 Apple Music 曲库校验的自然语言歌单](https://raw.githubusercontent.com/Z-Han-Z/apple-music-playlists/main/.github/assets/social-preview.jpg)
 
 [English](README.md) | 简体中文 | [繁體中文](README_ZH_TW.md) |

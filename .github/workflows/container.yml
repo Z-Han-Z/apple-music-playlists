@@ -21,3 +21,8 @@ jobs:
           expected_version="$(python -c 'from am_paths import VERSION; print(VERSION)')"
           grep -q '"name": "apple-music-playlists"' <<<"$response"
           grep -q "\"version\": \"${expected_version}\"" <<<"$response"
+      - name: Verify NetEase preview entrypoint without account access
+        shell: bash
+        run: |
+          nc_response="$(printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}' '{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}' | docker run --rm -i --entrypoint python apple-music-playlists:test /app/netease_mcp_server.py)"
+          NC_RESPONSE="$nc_response" python -c 'import json, os; from am_paths import VERSION; from netease_mcp_server import TOOLS; rows=[json.loads(line) for line in os.environ["NC_RESPONSE"].splitlines()]; assert rows[0]["result"]["serverInfo"]["version"]==VERSION; assert {t["name"] for t in rows[1]["result"]["tools"]}=={t["name"] for t in TOOLS}'

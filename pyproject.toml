@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "apple-music-playlists"
 # 版本号只有一个来源：am_paths.VERSION。手写第二份必然对不上。
 dynamic = ["version"]
-description = "Deep Apple Music playlist curation via MCP: language-led selection, catalog grounding, and thoughtful listening flow"
+description = "Language-led Apple Music playlist curation via MCP, with catalog grounding and a NetEase public preview"
 readme = "README.md"
 requires-python = ">=3.10"
 license = "MIT"
@@ -16,7 +16,7 @@ dependencies = []
 keywords = [
     "apple-music", "apple-music-api", "playlist", "semantic-curation", "mcp", "mcp-server",
     "model-context-protocol", "llm", "curation", "music", "music-analysis", "cli",
-    "narrative-playlists", "sequencing", "playlist-curation", "playlist-sequencing",
+    "narrative-playlists", "sequencing", "playlist-curation", "playlist-sequencing", "netease",
 ]
 classifiers = [
     "Development Status :: 5 - Production/Stable",
@@ -45,6 +45,8 @@ PyPI = "https://pypi.org/project/apple-music-playlists/"
 # 不再需要两个绝对路径（<PYTHON> + <PROJECT_ROOT>）。
 am-playlist = "am_playlist:main"
 am-mcp = "am_mcp_server:main"
+nc-mcp = "netease_mcp_server:main"
+nc-login = "netease_login:main"
 
 [project.optional-dependencies]
 # 只有在用对应登录方式时才需要（见 SETUP.md）；核心功能零依赖。
@@ -59,6 +61,13 @@ py-modules = [
     "am_mcp_server",
     "am_meta",
     "am_paths",
+    "netease_api",
+    "netease_mcp_server",
+    "netease_login",
+    "netease_session",
+    "netease_onboarding",
+    "mcp_common",
+    "catalog_matching",
     "am_playlist",
     "build_pool",
     "listening_stats",
@@ -71,6 +80,9 @@ py-modules = [
 ]
 # 显式清空，避免 flat-layout 自动发现把 tests/ tools/ 之类扫进去
 packages = []
+
+[tool.setuptools.data-files]
+"share/apple-music-playlists" = ["README.md", "docs/netease-port.md", "beta/START_HERE_ZH_CN.txt", "beta/START_HERE_EN.md"]
 
 [tool.setuptools.dynamic]
 version = {attr = "am_paths.VERSION"}

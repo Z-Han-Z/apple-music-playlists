@@ -1,5 +1,11 @@
 # Apple Music MCP 歌單策劃器
 
+**1.6.0 正式版包含網易雲公開預覽**，提供獨立 `nc-mcp` / `nc-login`。
+參見[設定、Windows 下載與驗證限制（中文／英文）](docs/netease-port.md)。預設 Apple 服務不變；網易雲為實驗性、非官方功能。
+
+公開預覽仍是 MCP，不是應用程式：`nc_setup` / `nc_status` 在宿主對話中引導設定與策劃。
+經同意後 `nc_login` 僅在本機開啟掃碼授權，憑證和二維碼不進入聊天；沒有獨立精靈或問卷。
+
 ![Apple Music MCP——經 Apple Music 曲庫驗證的自然語言歌單](https://raw.githubusercontent.com/Z-Han-Z/apple-music-playlists/main/.github/assets/social-preview.jpg)
 
 [English](README.md) | [简体中文](README_ZH_CN.md) | 繁體中文 |

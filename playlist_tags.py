@@ -271,7 +271,7 @@ def _evidence_of(value):
     return {"kind": "claim", "raw": text}, []
 
 
-def _evidence_problem(tag: dict) -> list:
+def _evidence_problem(tag: dict, evidence_rules=None) -> list:
     """对**最终记录**做证据校验，返回要报告的说明（空列表=干净）。
 
     四种状态，刻意在展示上也分得开：
@@ -287,23 +287,25 @@ def _evidence_problem(tag: dict) -> list:
     还被渲染成「证据」。既然标签无法被确定性地分类，这里就不再声称「已核实」，
     只声明来源，并把「未与标签核对」写在展示与说明里。
     """
+    bases = BASES if evidence_rules is None else evidence_rules
+    hint = " / ".join(sorted({c for spec in bases.values() for c in spec["calls"]}))
     label = tag.get("label", "")
     evidence = tag.get("evidence")
     if not evidence:
         return [f"context 标签「{label}」没写 evidence：行为类方向要有可核对的来源"
-                f"（{EVIDENCE_HINT}），否则等于把模型推断当作用户事实呈现"]
+                f"（{hint}），否则等于把模型推断当作用户事实呈现"]
     if evidence.get("kind") == "claim":
         return [f"context 标签「{label}」的 evidence 是自由文本「{evidence.get('raw')}」，"
                 f"无法核对。它只会被当作**未经校验的来源自述**展示；"
                 f"要能被当作{ EVIDENCE_LABEL }，请写成 {EVIDENCE_SHAPE} 结构，"
-                f"其中 basis ∈ {sorted(BASES)}"]
+                f"其中 basis ∈ {sorted(bases)}"]
     basis = evidence.get("basis", "")
     call = evidence.get("call", "")
     ref = evidence.get("ref", "")
-    if basis not in BASES:
+    if basis not in bases:
         return [f"context 标签「{label}」的 evidence.basis「{basis}」不认识；"
-                f"只认 {sorted(BASES)}"]
-    spec = BASES[basis]
+                f"只认 {sorted(bases)}"]
+    spec = bases[basis]
     if call not in spec["calls"]:
         extra = ("注意 am_list_playlists 只列歌单名/ID，**证明不了某首歌在不在里面**，"
                  "要看曲目必须 am_show_playlist。"
@@ -312,9 +314,8 @@ def _evidence_problem(tag: dict) -> list:
                 f"它撑不住这条断言（{basis} 只认 {' / '.join(spec['calls'])}）。{extra}"]
     if not ref:
         return [f"context 标签「{label}」的 evidence 没记 ref：不记调用参数就无法复核，"
-                f"例如 am_recently_played(kind=added) 会被当成「最近在听」，"
-                f"而它是「最近入库」。这里要写：{spec['ref']}"]
-    if basis == "recent-listening" and "added" in ref.casefold():
+                f"这里要写：{spec['ref']}"]
+    if evidence_rules is None and basis == "recent-listening" and "added" in ref.casefold():
         return [f"context 标签「{label}」的 ref 写的是 added：am_recently_played(kind=added) "
                 f"是「最近**入库**」，不是「最近在听」，不能用来支撑这条断言"]
     # 说明清楚：这是**声明**，不是「已核实」。标签本身无法被确定性核对。
@@ -330,7 +331,7 @@ def _evidence_problem(tag: dict) -> list:
 
 # ---------------------------------------------------------------- 校验
 
-def normalize_tags(items) -> tuple:
+def normalize_tags(items, *, evidence_rules=None) -> tuple:
     """校验一组标签，返回 (tags, problems)。
 
     `items` 每项可以是 `"night"`、`"context:recent-heavy-rotation"`，或
@@ -393,7 +394,7 @@ def normalize_tags(items) -> tuple:
     # 于是同一条标签同时显示有效证据和缺证据警告。
     for t in tags:
         if t["axis"] == CONTEXT:
-            problems.extend(_evidence_problem(t))
+            problems.extend(_evidence_problem(t, evidence_rules))
         elif t["axis"] == SONIC and t.get("evidence"):
             problems.append(f"标签「{t['label']}」是 sonic（音乐自身属性），不需要收听证据；"
                             f"evidence 已保留，但它在这里不起支撑作用")
@@ -464,7 +465,7 @@ def _shift_level(emphasis: str, steps: int) -> int:
     return _LEVEL.get(emphasis, _LEVEL[NEUTRAL]) + steps
 
 
-def apply_adjustments(tags, adjustments) -> tuple:
+def apply_adjustments(tags, adjustments, *, evidence_rules=None) -> tuple:
     """按用户的方向调侧重档，返回 (tags, report)。
 
     语义（刻意做成简单可解释的记账，且全程没有算术）：
@@ -528,7 +529,7 @@ def apply_adjustments(tags, adjustments) -> tuple:
             by_key[key] = new
             notes = []
             if axis == CONTEXT:
-                notes = _evidence_problem(new)
+                notes = _evidence_problem(new, evidence_rules)
             elif evidence and axis == SONIC:
                 notes = [f"「{new_label}」标为 sonic（音乐属性），不需要收听证据——"
                          f"带 evidence 的通常是行为断言，应当标 context 轴"]

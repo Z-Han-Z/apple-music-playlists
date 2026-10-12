@@ -7,6 +7,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.6.0] - 2026-10-12
+
+### NetEase public preview
+
+The package release is stable; the new NetEase adapter is an experimental, unofficial public
+preview. Existing Apple entry points remain unchanged. Windows QR authorization was exercised
+during internal testing; other operating systems, accounts and container login are not certified.
+
+- Conversation-first Windows x64 preview ZIP: no standalone application, GUI wizard or fixed menu.
+  Offline private installation generates host config; `nc_setup`/`nc_status` facts and optional
+  `getting_started` Prompt support host-led dialogue. Explicit `nc_login` starts local QR only after
+  consent; progress/cancellation return no QR images/keys/URLs or credentials and avoid duplicate jobs.
+  Host disconnection signals helper shutdown. Playlist permissions remain readonly by default.
+  Python is not bundled. Private Node 24.19.0 and integrity-locked API Enhanced 4.41.1 dependencies
+  provide temporary login-only loopback QR, cancellation/cleanup and gateway-free verification;
+  end users need neither Node nor manual gateway setup. Licenses/provenance are included. The
+  standalone wheel/CLI still uses an external gateway; --light builds an advanced import-only ZIP.
+- Beta installs compare wheel SHA256, including same-version revisions. Failed updates preserve
+  the prior installation; successful updates retain old environments and require client reconnection.
+- Fresh Windows QR login via API Enhanced 4.41.1 has been smoke-tested through authorization,
+  current-user encrypted storage and subsequent gateway-free direct login. Fixed SDK concatenated
+  Set-Cookie import losing authentication when unknown attributes such as Partitioned occur;
+  conflicting authentication pairs remain rejected. Other environments are not certified.
+
+- Experimental NetEase stdio server (`nc-mcp`), separate from the existing Apple tool namespace.
+- Explicit local `nc-login` session import, current-user Windows DPAPI storage, automatic server-issued
+  CSRF, typed expiry/network failures, and optional QR via a user-managed loopback gateway.
+- Readonly liked-song, collected-album, followed-artist and batch song-detail tools. Account outputs
+  default to small pages; song/liked pages expose mutation-detecting snapshots and missing positions.
+- Recent-window and weekly/all-time evidence keep timestamps, play counts and ranking scores distinct;
+  qualitative tags validate provider-specific declared source chains, never numeric theme-fit scores.
+- Shared protocol validation and Unicode catalog identity matching no longer depend on the Apple
+  adapter. Existing Apple exports remain compatible.
+- Hardened partial-write reporting, owner/privacy/order readback, existing-track append safety and
+  non-finite JSON-RPC request IDs. Offline regressions cover these safety boundaries.
+- [Preview setup, downloads and validation limits](docs/netease-port.md). The PyPI wheel ships the
+  NetEase entry points and guides, but not the QR runtime; the complete Windows ZIP includes it.
+- Container CI validates NetEase tool names against the server definition instead of a stale
+  hardcoded tool count. Publishing CI checks the installed NetEase login entry point too.
+
+### Documentation
+
+- All nine localized READMEs explicitly make narrative arcs opt-in, not a default global shape.
+- All nine localized READMEs describe the NetEase public-preview boundary consistently.
+
 ### Added
 
 - **Direction tags**, so a user can steer a finished curation stylistically instead of restating

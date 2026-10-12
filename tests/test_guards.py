@@ -420,11 +420,11 @@ def _declared_modules() -> set[str]:
 
 
 def _tracked_modules() -> set[str]:
-    """仓库根的顶层模块（只算 git 跟踪的、且不在子目录里的）。"""
+    """顶层分发模块，包括未暂存且未被忽略的新增文件，避免提交前检查误报。"""
     try:
-        out = subprocess.run(["git", "ls-files", "*.py"], cwd=ROOT,
+        out = subprocess.run(["git", "ls-files", "--cached", "--others", "--exclude-standard", "*.py"], cwd=ROOT,
                              capture_output=True, text=True, check=True).stdout
-        return {Path(line).stem for line in out.split() if "/" not in line}
+        return {Path(line).stem for line in out.splitlines() if "/" not in line} - {"make_day_playlist"}
     except Exception:
         # 没有 git（例如从 sdist 里跑测试）时退回工作区，排除已知的本地私有脚本
         return {p.stem for p in ROOT.glob("*.py")} - {"make_day_playlist"}

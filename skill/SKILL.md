@@ -5,6 +5,16 @@ description: Use when creating, curating, auditing, or reordering Apple Music pl
 
 # Apple Music 歌单：创建、体检、排序
 
+## 网易云内测：同一对话原则，不是独立应用
+
+使用本地网易云内测服务时，首次调用 `nc_setup` / `nc_status`，由宿主 Agent 在用户语言的
+对话中说明配置、登录与只读权限。只在用户明确同意后调用 `nc_login(action=start, confirm=true)`，
+二维码仅在本机浏览器授权；轮询同一任务状态，再用 `nc_status` 验证。不要索取或返回 Cookie、
+密码、二维码图片/授权链接，也不要把网络失败判为会话过期。无独立向导、固定菜单或选曲问卷。
+不支持 MCP Prompts 菜单时普通聊天即可；接入前的安装/配置由宿主工具或用户完成，不能假称
+尚未连接的服务可以自行设置客户端。准备好后沿用下述语言主导策划与预览原则，工具名使用 `nc_*`。
+完整 ZIP 提供临时本地扫码组件；独立 wheel/CLI 的外部网关条件见 `docs/netease-port.md`。
+
 ## 首选路径：从自然语言描述直接创建
 
 用户描述场景、情绪、流派、年代、语言、偏好或排除项后，由当前 Agent 完成策划，MCP stdio

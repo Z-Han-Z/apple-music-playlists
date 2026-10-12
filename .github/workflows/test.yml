@@ -24,6 +24,7 @@ jobs:
         run: |
           python -m pip install .
           am-playlist --help
+          nc-login --help
           python -c "from importlib.metadata import version; from am_paths import VERSION; assert version('apple-music-playlists') == VERSION"
       - name: Run offline test suite
         run: python -m unittest discover -s tests -v

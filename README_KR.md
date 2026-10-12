@@ -1,5 +1,12 @@
 # Apple Music MCP 플레이리스트 큐레이터
 
+**1.6.0에는 NetEase 공개 프리뷰**와 별도 `nc-mcp` / `nc-login`이
+포함됩니다. [설정, Windows 다운로드 및 검증 범위(중국어/영어)](docs/netease-port.md)를 참고하세요.
+기본 Apple 서비스는 그대로이며 NetEase 지원은 실험적인 비공식 기능입니다.
+
+프리뷰도 앱이 아닌 MCP입니다. `nc_setup` / `nc_status` 안내는 호스트와의 대화에서 이루어집니다.
+동의 후 `nc_login`은 로컬 QR 인증만 열며, 인증 정보나 QR을 채팅으로 보내지 않습니다.
+
 ![Apple Music MCP — Apple Music 카탈로그로 검증하는 자연어 플레이리스트](https://raw.githubusercontent.com/Z-Han-Z/apple-music-playlists/main/.github/assets/social-preview.jpg)
 
 [English](README.md) | [简体中文](README_ZH_CN.md) | [繁體中文](README_ZH_TW.md) |

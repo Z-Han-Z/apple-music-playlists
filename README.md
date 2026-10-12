@@ -1,5 +1,13 @@
 # Apple Music MCP Curator
 
+Version **1.6.0 includes a NetEase public preview**: separate `nc-mcp`
+and `nc-login` entry points, language-led curation, bounded collection reads and explicit write
+confirmation. See [setup, Windows download and validation limits](docs/netease-port.md).
+The default Apple server and tool names stay unchanged; NetEase is experimental, not officially endorsed.
+
+The preview remains an MCP server, not an app: setup and curation guidance happen in the host conversation
+via `nc_setup` / `nc_status`. Approved `nc_login` opens QR only locally; no credentials or QR material enter chat.
+
 <!-- mcp-name: io.github.Z-Han-Z/apple-music-playlists -->
 
 ![Apple Music MCP — natural-language playlists grounded in Apple Music](https://raw.githubusercontent.com/Z-Han-Z/apple-music-playlists/main/.github/assets/social-preview.jpg)

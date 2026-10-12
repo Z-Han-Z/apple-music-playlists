@@ -1,6 +1,8 @@
 # 平台适配器：把核心和某个音乐平台隔开
 
 这份文档记录**边界在哪、为什么在那、以及接下一个平台时会撞上什么**。
+网易云已有独立的[1.6.0 MCP 公开预览](netease-port.md)：提供有界收藏/收听证据读取、本地会话
+交接与确认后的歌单写入；逐项区分实测、离线测试、未验证边界及缺特征降级，不改变 Apple 入口。
 它不是为了将来某天再读，而是为了让下一个平台的实现有唯一的接口可依。
 
 ## 现状：边界已经划出来了
@@ -11,6 +13,9 @@ playlist_core.py         ← 平台无关。导入本项目任何模块？没有
 playlist_optimize.py     ← 平台无关的算法层，只依赖 playlist_core
                             模拟退火、cost 函数、清单解析
 am_paths.py              ← 平台无关。目录、版本号
+mcp_common.py            ← 平台无关。协议版本、Unicode/Schema 校验
+catalog_matching.py      ← 平台无关。Unicode 曲目身份/版本匹配（不是主题评分）
+playlist_tags.py         ← 定性方向/证据链，可注入平台专属来源规则
 ─────────────────────────── 以上这一层，接新平台时**一行都不该改** ───────────
 playlist_flow.py         ← 混合：特征获取（reccobeats，平台无关） + Apple 取曲目
 am_playlist.py           ← Apple：令牌、搜索、歌单增删改查
@@ -20,6 +25,10 @@ playlist_audit.py        ← Apple：元数据体检
 listening_stats.py       ← Apple：播放历史
 profile_library.py       ← Apple：播放样本的描述性画像
 build_pool.py            ← Apple：跨时期收听证据归一化
+netease_api.py           ← 网易云：目录/账号读取与写入、内部枚举/MCP 有界分页
+netease_session.py       ← 网易云：显式本地会话保护，不抓取浏览器凭据
+netease_login.py         ← 网易云：隐藏导入，可选本地网关扫码交接
+netease_mcp_server.py    ← 网易云：独立 nc_* 契约、语言主导策划与安全门
 ```
 
 `tests/test_rules.py::TestSingleSourceOfTruth` 和
