@@ -6,8 +6,9 @@
 [日本語](README_JP.md) | [한국어](README_KR.md) | [Español](README_ES.md) |
 Português do Brasil | [Deutsch](README_DE.md) | [Français](README_FR.md)
 
-**Descreva uma sensação, cena, época, tensão ou arco narrativo; o agente MCP transforma isso em uma
-playlist do Apple Music com versões corretas, progressão coerente e transições que funcionam do início ao fim.**
+**Descreva uma sensação, cena, época, propósito de escuta ou som desejado; o agente MCP seleciona faixas
+no catálogo do Apple Music, confere as versões e cuida da continuidade da audição. O arco narrativo
+fica a seu critério; sem pedido, nenhum é imposto.**
 
 A interface principal é o serviço stdio local `am-mcp`. O modelo do cliente MCP interpreta a
 descrição; este serviço pesquisa o catálogo, resolve as faixas e opera a conta. Não há outro LLM

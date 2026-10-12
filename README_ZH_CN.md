@@ -6,8 +6,8 @@
 [日本語](README_JP.md) | [한국어](README_KR.md) | [Español](README_ES.md) |
 [Português do Brasil](README_PT_BR.md) | [Deutsch](README_DE.md) | [Français](README_FR.md)
 
-**描述一种感觉、场景、年代、张力或叙事弧；MCP Agent 把它策划成一张版本准确、起伏合理、
-衔接自然，真正能从头听到尾的 Apple Music 歌单。**
+**描述一种感觉、场景、年代、聆听目的或想要的声音；MCP Agent 会从 Apple Music 目录中挑选合适曲目、
+核对版本，并照顾整张歌单的听感连贯性。叙事节拍由你决定；没有要求时，不会预设故事弧线。**
 
 Python 3.10+，运行时只用标准库，支持 Windows / macOS / Linux。默认使用
 Apple 网页播放器的公开 developer token，不需要 Apple Developer Program。主入口是本地
