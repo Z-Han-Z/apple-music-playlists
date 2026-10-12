@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.6.1] - 2026-10-12
+
+### 网易云说明修订
+
+- 网易云用户说明只维护简体中文：安装、对话式引导、扫码授权、20 个工具、容器和验证边界。
+- Windows ZIP 与 wheel 移除网易云英文指南；其他语言 README 仅链接到中文说明。
+- Apple Music 的多语言文档和所有运行时接口保持不变，不重写已公开的 v1.6.0 标签。
+- 新增打包回归，确保中文入口可用且不再携带或引用被移除的英文指南。
+
 ## [1.6.0] - 2026-10-12
 
 ### NetEase public preview

@@ -82,7 +82,7 @@ py-modules = [
 packages = []
 
 [tool.setuptools.data-files]
-"share/apple-music-playlists" = ["README.md", "docs/netease-port.md", "beta/START_HERE_ZH_CN.txt", "beta/START_HERE_EN.md"]
+"share/apple-music-playlists" = ["README.md", "docs/netease-port.md", "beta/START_HERE_ZH_CN.txt"]
 
 [tool.setuptools.dynamic]
 version = {attr = "am_paths.VERSION"}

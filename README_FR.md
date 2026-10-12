@@ -1,11 +1,6 @@
 # Curateur MCP de playlists Apple Music
 
-**La version 1.6.0 inclut un aperçu public de NetEase** avec des commandes
-`nc-mcp` / `nc-login` distinctes. [Configuration, téléchargement Windows et limites (chinois/anglais)](docs/netease-port.md).
-Le service Apple par défaut reste inchangé ; NetEase est une fonctionnalité expérimentale et non officielle.
-
-L’aperçu reste un serveur MCP, pas une application : `nc_setup` / `nc_status` guident le dialogue dans l’hôte.
-Après accord, `nc_login` ouvre seulement l’authentification QR locale ; aucun secret ni QR n’est envoyé au chat.
+网易云（NCM）公开预览：[简体中文使用说明](docs/netease-port.md)。
 
 ![Apple Music MCP — playlists en langage naturel vérifiées dans le catalogue Apple Music](https://raw.githubusercontent.com/Z-Han-Z/apple-music-playlists/main/.github/assets/social-preview.jpg)
 

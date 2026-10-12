@@ -22,13 +22,13 @@ import netease_mcp_server
 
 
 BETA_FILES = {
-    "START_HERE_ZH_CN.txt": "README.txt", "START_HERE_EN.md": "README_EN.md",
+    "START_HERE_ZH_CN.txt": "README.txt",
     "bootstrap.py": "bootstrap.py", "qr_gateway.cjs": "qr_gateway.cjs",
     "mcp-config.example.json": "mcp-config.example.json",
     **{name: name for name in ("run.cmd", "install.cmd", "login-import.cmd", "login-qr.cmd",
                               "status.cmd", "configure.cmd", "forget-login.cmd", "uninstall.cmd")},
 }
-WHEEL_DOCS = ("README.md", "docs/netease-port.md", "beta/START_HERE_ZH_CN.txt", "beta/START_HERE_EN.md")
+WHEEL_DOCS = ("README.md", "docs/netease-port.md", "beta/START_HERE_ZH_CN.txt")
 NODE_VERSION = "24.19.0"
 NODE_ZIP_SHA256 = "57f71ab3652e797d84acddc79c81cc9ff1c6ddb2a1974cdb83f00fee9bff4c73"
 NODE_EXE_SHA256 = "3602f2bb1a10f2cbab4c36886218a33c1ab3db87290e73b033c46c77147d0237"

@@ -182,8 +182,9 @@ class BetaDistributionTests(unittest.TestCase):
             self.assertIsNone(archive.testzip())
             prefix = f"NetEase-Curator-{self.version}-Windows-Preview/"
             names = archive.namelist()
-            for name in ("README.txt", "README_EN.md", "qr_gateway.cjs", "install.cmd", "bootstrap.py", "login-import.cmd", "login-qr.cmd", "configure.cmd", "uninstall.cmd", "bundle.json", "docs/netease-port.md"):
+            for name in ("README.txt", "qr_gateway.cjs", "install.cmd", "bootstrap.py", "login-import.cmd", "login-qr.cmd", "configure.cmd", "uninstall.cmd", "bundle.json", "docs/netease-port.md"):
                 self.assertIn(prefix + name, names)
+            self.assertNotIn(prefix + "README_EN.md", names)
             self.assertNotIn(prefix + "START.cmd", names)
             self.assertNotIn(prefix + "onboarding.py", names)
             self.assertTrue(archive.read(prefix + "README.txt").startswith(b"\xef\xbb\xbf"))
@@ -210,6 +211,8 @@ class BetaDistributionTests(unittest.TestCase):
         data_files = text.split("[tool.setuptools.data-files]", 1)[1].split("\n[", 1)[0]
         for name in builder.WHEEL_DOCS:
             self.assertIn('"' + name + '"', data_files)
+        self.assertNotIn('START_HERE_EN.md', data_files)
+        self.assertNotIn('START_HERE_EN.md', builder.WHEEL_DOCS)
 
     def test_cli_opens_qr_only_if_explicitly_requested(self):
         with patch.object(netease_login, "qr_login", return_value={"logged_in": True}) as qr, contextlib.redirect_stdout(io.StringIO()):
